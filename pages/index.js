@@ -1,4 +1,3 @@
-// Trading funcional v2
 import { useEffect, useState } from 'react'
 import { getActiveMarkets, getOrCreateUser, createTrade } from '../lib/supabase'
 import { calculatePrices } from '../lib/amm'
@@ -16,7 +15,6 @@ export default function Home() {
   
   useEffect(() => {
     loadMarkets()
-    // Cargar usuario de localStorage si existe
     const savedUser = localStorage.getItem('predi_user')
     if (savedUser) {
       setUser(JSON.parse(savedUser))
@@ -78,7 +76,6 @@ export default function Home() {
     )
     
     if (result.success) {
-      // Actualizar balance del usuario
       setUser({ ...user, balance: result.newBalance })
       localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: result.newBalance }))
       
@@ -101,17 +98,12 @@ export default function Home() {
   
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
       <header className="border-b border-gray-800 bg-black/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-xl font-bold">
-                PM
-              </div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                PrediMarket
-              </h1>
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-xl font-bold">PM</div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">PrediMarket</h1>
             </div>
             
             {user ? (
@@ -120,142 +112,35 @@ export default function Home() {
                   <span className="text-gray-400 text-sm">Balance: </span>
                   <span className="text-green-400 font-bold font-mono">€{user.balance.toFixed(2)}</span>
                 </div>
-                <button 
-                  onClick={handleLogout}
-                  className="px-4 py-2 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors text-sm"
-                >
-                  Salir
-                </button>
+                <button onClick={handleLogout} className="px-4 py-2 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors text-sm">Salir</button>
               </div>
             ) : (
               <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowAuth(true)}
-                  className="px-4 py-2 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors text-sm font-medium"
-                >
-                  Conectar
-                </button>
-                <button 
-                  onClick={() => setShowAuth(true)}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm font-bold"
-                >
-                  Registrarse
-                </button>
+                <button onClick={() => setShowAuth(true)} className="px-4 py-2 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors text-sm font-medium">Conectar</button>
+                <button onClick={() => setShowAuth(true)} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm font-bold">Registrarse</button>
               </div>
             )}
           </div>
         </div>
       </header>
 
-      {/* Hero */}
       <div className="container mx-auto px-6 py-20 text-center">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-6xl font-bold mb-6 leading-tight">
-            Mercados de predicción
-            <br />
-            <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-              para España
-            </span>
+            Mercados de predicción<br />
+            <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">para España</span>
           </h2>
-          <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-            Tradea sobre índices económicos y eventos verificables. Datos reales, mercados transparentes.
-          </p>
+          <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">Tradea sobre índices económicos y eventos verificables. Datos reales, mercados transparentes.</p>
           {!user && (
-            <button 
-              onClick={() => setShowAuth(true)}
-              className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold text-lg transition-all hover:scale-105"
-            >
+            <button onClick={() => setShowAuth(true)} className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold text-lg transition-all hover:scale-105">
               Empezar con €1,000 gratis
             </button>
           )}
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="container mx-auto px-6 mb-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {[
-            { label: 'Volumen 24h', value: '€247,832', change: '+12%', positive: true },
-            { label: 'Traders activos', value: '1,284', change: '+8%', positive: true },
-            { label: 'Mercados activos', value: markets.length, change: '+5 hoy', positive: true },
-            { label: 'Precisión promedio', value: '89.2%', change: '+2%', positive: true }
-          ].map((stat, i) => (
-            <div 
-              key={i} 
-              className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-all"
-            >
-              <div className="text-gray-400 text-sm mb-2 font-medium">{stat.label}</div>
-              <div className="text-3xl font-bold mb-2">{stat.value}</div>
-              <div className={`text-sm font-semibold flex items-center gap-1 ${stat.positive ? 'text-green-400' : 'text-red-400'}`}>
-                <span>{stat.positive ? '↗' : '↘'}</span>
-                <span>{stat.change}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Trending */}
-      <div className="container mx-auto px-6 mb-16">
-        <div className="flex items-center gap-3 mb-8">
-          <span className="text-3xl">🔥</span>
-          <h3 className="text-3xl font-bold">Trending ahora</h3>
-        </div>
-        
-        <div className="grid md:grid-cols-3 gap-6">
-          {markets.slice(0, 3).map((m, i) => (
-            <div 
-              key={m.id}
-              className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-800 rounded-2xl p-6 hover:border-blue-500/50 transition-all cursor-pointer group"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className="text-xs px-3 py-1 bg-gray-800 text-gray-400 rounded-full font-medium">
-                  {m.category}
-                </div>
-                <div className="text-xs text-green-400 font-bold flex items-center gap-1">
-                  <span>↗</span>
-                  <span>+{15 + i * 5}%</span>
-                </div>
-              </div>
-              
-              <h4 className="font-bold text-lg mb-4 group-hover:text-blue-400 transition-colors">
-                {m.title}
-              </h4>
-              
-              <div className="text-sm text-gray-400 mb-6">
-                €{(m.total_volume / 1000).toFixed(1)}K volumen · {m.total_traders || 124} traders
-              </div>
-              
-              <div className="flex gap-4 mb-6">
-                <div className="flex-1 text-center">
-                  <div className="text-3xl font-bold text-blue-400 mb-1">
-                    {m.prices.yes}¢
-                  </div>
-                  <div className="text-xs text-gray-500 font-medium">SÍ</div>
-                </div>
-                <div className="w-px bg-gray-800"></div>
-                <div className="flex-1 text-center">
-                  <div className="text-3xl font-bold text-pink-400 mb-1">
-                    {m.prices.no}¢
-                  </div>
-                  <div className="text-xs text-gray-500 font-medium">NO</div>
-                </div>
-              </div>
-              
-              <button 
-                onClick={() => openTradeModal(m)}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold transition-all group-hover:scale-105"
-              >
-                {user ? 'Tradear ahora →' : 'Inicia sesión para tradear'}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* All Markets */}
       <div className="container mx-auto px-6 pb-20">
-        <h3 className="text-3xl font-bold mb-8">Todos los mercados</h3>
+        <h3 className="text-3xl font-bold mb-8">Mercados activos</h3>
         
         {loading ? (
           <div className="text-center py-20">
@@ -265,37 +150,22 @@ export default function Home() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {markets.map((m) => (
-              <div 
-                key={m.id}
-                className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-800 rounded-2xl p-6 hover:border-blue-500/50 transition-all cursor-pointer group"
-              >
-                <div className="text-xs px-3 py-1 bg-gray-800 text-gray-400 rounded-full font-medium mb-4 inline-block">
-                  {m.category}
-                </div>
-                
-                <h4 className="font-bold text-lg mb-6 group-hover:text-blue-400 transition-colors min-h-[56px]">
-                  {m.title}
-                </h4>
+              <div key={m.id} className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-800 rounded-2xl p-6 hover:border-blue-500/50 transition-all">
+                <div className="text-xs px-3 py-1 bg-gray-800 text-gray-400 rounded-full font-medium mb-4 inline-block">{m.category}</div>
+                <h4 className="font-bold text-lg mb-6">{m.title}</h4>
                 
                 <div className="flex gap-4 mb-6">
                   <div className="flex-1 text-center p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                    <div className="text-2xl font-bold text-blue-400 mb-1">
-                      {m.prices.yes}¢
-                    </div>
+                    <div className="text-2xl font-bold text-blue-400 mb-1">{m.prices.yes}¢</div>
                     <div className="text-xs text-gray-400 font-medium">SÍ</div>
                   </div>
                   <div className="flex-1 text-center p-4 bg-pink-500/10 border border-pink-500/20 rounded-xl">
-                    <div className="text-2xl font-bold text-pink-400 mb-1">
-                      {m.prices.no}¢
-                    </div>
+                    <div className="text-2xl font-bold text-pink-400 mb-1">{m.prices.no}¢</div>
                     <div className="text-xs text-gray-400 font-medium">NO</div>
                   </div>
                 </div>
                 
-                <button 
-                  onClick={() => openTradeModal(m)}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold transition-all group-hover:scale-105"
-                >
+                <button onClick={() => openTradeModal(m)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold transition-all">
                   Tradear
                 </button>
               </div>
@@ -304,18 +174,12 @@ export default function Home() {
         )}
       </div>
 
-      {/* Auth Modal */}
       {showAuth && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Empezar a tradear</h2>
-              <button 
-                onClick={() => setShowAuth(false)}
-                className="text-gray-400 hover:text-white text-2xl"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowAuth(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
             </div>
             
             <form onSubmit={handleLogin} className="space-y-4">
@@ -331,24 +195,18 @@ export default function Home() {
                 />
               </div>
               
-              <button 
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all"
-              >
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all">
                 Empezar con €1,000 gratis
               </button>
             </form>
             
             <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-              <p className="text-xs text-blue-400">
-                💡 <strong>Modo demo:</strong> Recibirás €1,000 virtuales para practicar sin riesgo.
-              </p>
+              <p className="text-xs text-blue-400">💡 <strong>Modo demo:</strong> Recibirás €1,000 virtuales para practicar sin riesgo.</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Trade Modal */}
       {showTradeModal && selectedMarket && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-lg w-full">
@@ -357,22 +215,14 @@ export default function Home() {
                 <h2 className="text-2xl font-bold mb-2">Tradear</h2>
                 <p className="text-sm text-gray-400">{selectedMarket.title}</p>
               </div>
-              <button 
-                onClick={() => setShowTradeModal(false)}
-                className="text-gray-400 hover:text-white text-2xl"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowTradeModal(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
             </div>
             
-            {/* YES/NO Toggle */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <button
                 onClick={() => setTradeSide('YES')}
                 className={`p-4 rounded-xl font-bold transition-all ${
-                  tradeSide === 'YES'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  tradeSide === 'YES' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                 }`}
               >
                 SÍ {selectedMarket.prices.yes}¢
@@ -380,16 +230,13 @@ export default function Home() {
               <button
                 onClick={() => setTradeSide('NO')}
                 className={`p-4 rounded-xl font-bold transition-all ${
-                  tradeSide === 'NO'
-                    ? 'bg-pink-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  tradeSide === 'NO' ? 'bg-pink-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                 }`}
               >
                 NO {selectedMarket.prices.no}¢
               </button>
             </div>
             
-            {/* Amount Input */}
             <div className="mb-6">
               <label className="block text-sm text-gray-400 mb-2">Cantidad a invertir</label>
               <div className="relative">
@@ -416,7 +263,6 @@ export default function Home() {
               </div>
             </div>
             
-            {/* Calculation */}
             <div className="bg-black border border-gray-800 rounded-xl p-4 mb-6 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Precio por acción</span>
@@ -436,9 +282,7 @@ export default function Home() {
                   <div className={`font-mono font-bold ${tradeProfit > 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {tradeProfit > 0 ? '+' : ''}{tradeProfit.toFixed(2)}€
                   </div>
-                  <div className="text-xs text-gray-400">
-                    ({tradeROI.toFixed(0)}% ROI)
-                  </div>
+                  <div className="text-xs text-gray-400">({tradeROI.toFixed(0)}% ROI)</div>
                 </div>
               </div>
             </div>
@@ -454,10 +298,7 @@ export default function Home() {
                   : 'bg-pink-600 hover:bg-pink-700'
               }`}
             >
-              {tradeAmount > (user?.balance || 0) 
-                ? 'Saldo insuficiente' 
-                : `Comprar ${tradeSide} — €${tradeAmount}`
-              }
+              {tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente' : `Comprar ${tradeSide} — €${tradeAmount}`}
             </button>
           </div>
         </div>
