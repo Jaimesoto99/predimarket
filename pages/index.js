@@ -1,6 +1,5 @@
 // Trading funcional v2
 import { useEffect, useState } from 'react'
-import { useEffect, useState } from 'react'
 import { getActiveMarkets, getOrCreateUser, createTrade } from '../lib/supabase'
 import { calculatePrices } from '../lib/amm'
 
