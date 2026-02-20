@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { getActiveMarkets, getOrCreateUser, createTrade, getPriceHistory } from '../lib/supabase'
-import { calculatePrices, calculateTradeImpact } from '../lib/amm'
-import { supabase } from '../lib/supabase'
+import { getActiveMarkets, getOrCreateUser, createTrade, getUserTrades, getPriceHistory, sellPosition } from '../lib/supabase'
+import { previewTrade, previewSellValue, calculatePrices } from '../lib/amm'
 
 export default function Home() {
   const [markets, setMarkets] = useState([])
@@ -11,12 +10,13 @@ export default function Home() {
   const [email, setEmail] = useState('')
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [tradeSide, setTradeSide] = useState('YES')
-  const [tradeAmount, setTradeAmount] = useState(100)
+  const [tradeAmount, setTradeAmount] = useState(10)
   const [showTradeModal, setShowTradeModal] = useState(false)
   const [showPortfolio, setShowPortfolio] = useState(false)
   const [userTrades, setUserTrades] = useState([])
   const [priceHistory, setPriceHistory] = useState([])
   const [tradeImpact, setTradeImpact] = useState(null)
+  const [processing, setProcessing] = useState(false)
   
   useEffect(() => {
     loadMarkets()
@@ -30,13 +30,13 @@ export default function Home() {
   
   useEffect(() => {
     if (selectedMarket && tradeAmount > 0) {
-      const impact = calculateTradeImpact(
+      const preview = previewTrade(
         tradeAmount,
         tradeSide,
         parseFloat(selectedMarket.yes_pool),
         parseFloat(selectedMarket.no_pool)
       )
-      setTradeImpact(impact)
+      setTradeImpact(preview)
     }
   }, [tradeAmount, tradeSide, selectedMarket])
   
@@ -51,43 +51,32 @@ export default function Home() {
     setLoading(false)
   }
   
-  async function loadUserTrades(email) {
-    const { data } = await supabase
-      .from('trades')
-      .select('*, markets(*)')
-      .eq('user_email', email)
-      .order('created_at', { ascending: false })
-    
-    if (data) {
-      const enriched = data.map(t => ({
+  async function loadUserTrades(userEmail) {
+    const data = await getUserTrades(userEmail)
+    const enriched = data.map(t => {
+      const currentPrice = calculatePrices(
+        parseFloat(t.markets.yes_pool),
+        parseFloat(t.markets.no_pool)
+      )
+      const currentValue = previewSellValue(
+        t.shares,
+        t.side,
+        parseFloat(t.markets.yes_pool),
+        parseFloat(t.markets.no_pool)
+      )
+      return {
         ...t,
-        currentPrice: calculatePrices(
-          parseFloat(t.markets.yes_pool),
-          parseFloat(t.markets.no_pool)
-        ),
+        currentPrice,
+        currentValue,
         potentialPayout: t.shares,
-        currentValue: t.shares * (t.side === 'YES' ? 
-          calculatePrices(parseFloat(t.markets.yes_pool), parseFloat(t.markets.no_pool)).yes : 
-          calculatePrices(parseFloat(t.markets.yes_pool), parseFloat(t.markets.no_pool)).no
-        ) / 100
-      }))
-      setUserTrades(enriched)
-    }
+        profit: currentValue - t.amount
+      }
+    })
+    setUserTrades(enriched)
   }
   
   async function loadPriceHistory(marketId) {
-    const history = await getPriceHistory(marketId, 24)
-    if (history.length === 0) {
-      // Si no hay historial, crear uno inicial
-      const market = markets.find(m => m.id === marketId)
-      if (market) {
-        history.push({
-          created_at: new Date().toISOString(),
-          yes_price: market.prices.yes,
-          no_price: market.prices.no
-        })
-      }
-    }
+    const history = await getPriceHistory(marketId, 168)
     setPriceHistory(history)
   }
   
@@ -95,7 +84,13 @@ export default function Home() {
     e.preventDefault()
     if (!email) return
     
-    const userData = await getOrCreateUser(email)
+    const result = await getOrCreateUser(email)
+    if (!result.success) {
+      alert('Error al crear usuario')
+      return
+    }
+    
+    const userData = result.user
     setUser(userData)
     localStorage.setItem('predi_user', JSON.stringify(userData))
     setShowAuth(false)
@@ -120,143 +115,204 @@ export default function Home() {
   }
   
   async function executeTrade() {
-    if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid) {
-      alert(`❌ ${tradeImpact?.error || 'Error desconocido'}`)
+    if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid || processing) {
       return
     }
     
-    const result = await createTrade(
-      user.email,
-      selectedMarket.id,
-      tradeSide,
-      tradeImpact.shares,
-      tradeImpact.avgPrice,
-      tradeAmount,
-      tradeImpact.newYesPool,
-      tradeImpact.newNoPool
-    )
+    setProcessing(true)
+    
+    const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount)
+    
+    setProcessing(false)
     
     if (result.success) {
-      setUser({ ...user, balance: result.newBalance })
-      localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: result.newBalance }))
-      
-      alert(`✅ Trade ejecutado!\n\nCompraste ${tradeImpact.shares.toFixed(2)} acciones ${tradeSide}\nCosto: €${tradeAmount}\nImpacto en precio: ${tradeImpact.priceImpactPercent}%\nNuevo balance: €${result.newBalance.toFixed(2)}`)
+      const newBalance = result.new_balance
+      setUser({ ...user, balance: newBalance })
+      localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: newBalance }))
       
       setShowTradeModal(false)
-      setTradeAmount(100)
+      setTradeAmount(10)
       loadUserTrades(user.email)
       loadMarkets()
+      
+      alert(`✅ Apuesta realizada!\n\n${result.shares} puntos ${tradeSide}\nCosto: €${tradeAmount}\nGanas si aciertas: €${result.shares}`)
     } else {
-      alert(`❌ Error: ${result.error}`)
+      alert(`❌ ${result.error}`)
     }
   }
   
-  async function sellPosition(trade) {
-    const currentPrice = trade.side === 'YES' 
-      ? trade.currentPrice.yes / 100
-      : trade.currentPrice.no / 100
+  async function handleSell(trade) {
+    const sellValue = previewSellValue(
+      trade.shares,
+      trade.side,
+      parseFloat(trade.markets.yes_pool),
+      parseFloat(trade.markets.no_pool)
+    )
     
-    const sellValue = trade.shares * currentPrice
+    if (!confirm(`¿Vender ${trade.shares.toFixed(1)} puntos ${trade.side} por ~€${sellValue.toFixed(2)}?`)) return
     
-    if (!confirm(`¿Vender ${trade.shares.toFixed(2)} acciones ${trade.side} por €${sellValue.toFixed(2)}?`)) return
+    const result = await sellPosition(trade.id, user.email)
     
-    await supabase
-      .from('users')
-      .update({ balance: user.balance + sellValue })
-      .eq('email', user.email)
+    if (result.success) {
+      const newBalance = result.new_balance
+      setUser({ ...user, balance: newBalance })
+      localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: newBalance }))
+      loadUserTrades(user.email)
+      loadMarkets()
+      alert(`✅ Vendido por €${result.sell_value}`)
+    } else {
+      alert(`❌ ${result.error}`)
+    }
+  }
+  
+  function getTimeLeft(closeDate) {
+    const now = new Date()
+    const close = new Date(closeDate)
+    const diff = close - now
     
-    await supabase
-      .from('trades')
-      .delete()
-      .eq('id', trade.id)
+    if (diff < 0) return 'Cerrado'
     
-    setUser({ ...user, balance: user.balance + sellValue })
-    localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: user.balance + sellValue }))
+    const hours = Math.floor(diff / 3600000)
+    const minutes = Math.floor((diff % 3600000) / 60000)
     
-    alert(`✅ Posición vendida!\n\nRecibiste: €${sellValue.toFixed(2)}\nNuevo balance: €${(user.balance + sellValue).toFixed(2)}`)
-    
-    loadUserTrades(user.email)
+    if (hours > 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
   }
   
   return (
-    <div className="min-h-screen bg-black text-white">
-      <header className="border-b border-gray-800 bg-black/50 backdrop-blur-xl sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-black text-white">
+      {/* Header */}
+      <header className="border-b border-green-900/30 bg-gradient-to-r from-[#0D5C2B] to-[#1A7A3E] sticky top-0 z-50 shadow-lg">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-cyan-600 rounded-xl flex items-center justify-center text-xl font-bold">PM</div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-cyan-500 bg-clip-text text-transparent">PrediMarket</h1>
+              <div className="w-10 h-10 bg-gradient-to-br from-[#1A7A3E] to-[#0D5C2B] rounded-xl flex items-center justify-center text-xl font-bold shadow-lg shadow-green-500/30 border border-green-400/20">
+                P
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">
+                  PrediMarket
+                </h1>
+                <div className="text-xs text-green-200">Beta</div>
+              </div>
             </div>
             
             {user ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <button 
                   onClick={() => setShowPortfolio(true)}
-                  className="px-4 py-2 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors text-sm font-medium"
+                  className="px-3 sm:px-4 py-2 border border-green-400/30 rounded-lg hover:bg-green-900/20 transition-colors text-xs sm:text-sm font-medium text-green-100"
                 >
-                  Portfolio ({userTrades.length})
+                  <span className="hidden sm:inline">Posiciones</span>
+                  <span className="sm:hidden">💼</span>
+                  {userTrades.length > 0 && (
+                    <span className="ml-2 bg-[#1A7A3E] text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                      {userTrades.length}
+                    </span>
+                  )}
                 </button>
-                <div className="px-4 py-2 bg-gray-900 border border-gray-800 rounded-lg">
-                  <span className="text-gray-400 text-sm">Balance: </span>
-                  <span className="text-green-400 font-bold font-mono">€{user.balance.toFixed(2)}</span>
+                <div className="px-3 sm:px-4 py-2 bg-[#1A7A3E] border border-green-400/20 rounded-lg">
+                  <span className="text-green-200 text-xs sm:text-sm">💰 </span>
+                  <span className="text-green-100 font-bold font-mono text-sm sm:text-base">€{parseFloat(user.balance).toFixed(2)}</span>
                 </div>
-                <button onClick={handleLogout} className="px-4 py-2 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors text-sm">Salir</button>
+                <button 
+                  onClick={handleLogout}
+                  className="text-green-300 hover:text-white text-sm"
+                >
+                  ✕
+                </button>
               </div>
             ) : (
-              <div className="flex gap-3">
-                <button onClick={() => setShowAuth(true)} className="px-4 py-2 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors text-sm font-medium">Conectar</button>
-                <button onClick={() => setShowAuth(true)} className="px-5 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors text-sm font-bold">Registrarse</button>
-              </div>
+              <button 
+                onClick={() => setShowAuth(true)}
+                className="px-4 sm:px-6 py-2 bg-[#1A7A3E] hover:bg-[#0D5C2B] rounded-lg font-bold text-sm sm:text-base shadow-lg shadow-green-500/20 border border-green-400/20"
+              >
+                Empezar
+              </button>
             )}
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-20 text-center">
+      {/* Hero */}
+      <div className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 text-center">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-6xl font-bold mb-6 leading-tight">
-            Mercados de predicción<br />
-            <span className="bg-gradient-to-r from-purple-400 via-cyan-500 to-purple-500 bg-clip-text text-transparent">
-              con precios reales
+          <h2 className="text-4xl sm:text-6xl font-bold mb-4 sm:mb-6 leading-tight text-white">
+            Apuesta en eventos
+            <br />
+            <span className="bg-gradient-to-r from-[#1A7A3E] to-[#22C55E] bg-clip-text text-transparent">
+              verificables
             </span>
           </h2>
-          <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">Mercados que cierran HOY. Precios dinámicos que cambian con cada trade.</p>
+          <p className="text-lg sm:text-xl text-gray-300 mb-6 sm:mb-8 max-w-2xl mx-auto">
+            Mercados políticos y de actualidad española. Precios en tiempo real.
+          </p>
           {!user && (
-            <button onClick={() => setShowAuth(true)} className="px-8 py-4 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-lg transition-all hover:scale-105">
-              Empezar con €1,000 gratis
+            <button 
+              onClick={() => setShowAuth(true)}
+              className="px-6 sm:px-8 py-3 sm:py-4 bg-[#1A7A3E] hover:bg-[#0D5C2B] rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105 shadow-xl shadow-green-500/20 border border-green-400/20"
+            >
+              Empieza con €1,000 gratis
             </button>
           )}
         </div>
       </div>
 
-      <div className="container mx-auto px-6 pb-20">
-        <h3 className="text-3xl font-bold mb-8">Mercados de hoy</h3>
+      {/* Markets Grid */}
+      <div className="container mx-auto px-4 sm:px-6 pb-20">
+        <div className="flex justify-between items-center mb-8">
+          <h3 className="text-2xl sm:text-3xl font-bold">Mercados activos</h3>
+          <div className="text-sm text-gray-400">{markets.length} mercados</div>
+        </div>
         
         {loading ? (
           <div className="text-center py-20">
-            <div className="inline-block w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <div className="text-gray-400">Cargando mercados...</div>
+            <div className="inline-block w-12 h-12 border-4 border-[#1A7A3E] border-t-transparent rounded-full animate-spin mb-4"></div>
+            <div className="text-gray-400">Cargando...</div>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {markets.map((m) => (
-              <div key={m.id} className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-800 rounded-2xl p-6 hover:border-purple-500/50 transition-all">
-                <div className="text-xs px-3 py-1 bg-gray-800 text-gray-400 rounded-full font-medium mb-4 inline-block">{m.category}</div>
-                <h4 className="font-bold text-lg mb-6">{m.title}</h4>
-                
-                <div className="flex gap-4 mb-6">
-                  <div className="flex-1 text-center p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-                    <div className="text-2xl font-bold text-purple-400 mb-1">{m.prices.yes}¢</div>
-                    <div className="text-xs text-gray-400 font-medium">SÍ</div>
+              <div 
+                key={m.id}
+                onClick={() => openTradeModal(m)}
+                className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 hover:border-[#1A7A3E] rounded-2xl p-4 sm:p-6 transition-all cursor-pointer group"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="text-xs px-3 py-1 bg-gray-800 text-gray-300 rounded-full font-medium">
+                    {m.category}
                   </div>
-                  <div className="flex-1 text-center p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
-                    <div className="text-2xl font-bold text-cyan-400 mb-1">{m.prices.no}¢</div>
-                    <div className="text-xs text-gray-400 font-medium">NO</div>
+                  <div className="text-xs text-yellow-400 font-bold">
+                    ⏱ {getTimeLeft(m.close_date)}
                   </div>
                 </div>
                 
-                <button onClick={() => openTradeModal(m)} className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold transition-all">
-                  Tradear
+                <h4 className="font-bold text-base sm:text-lg mb-4 sm:mb-6 group-hover:text-[#22C55E] transition-colors min-h-[48px]">
+                  {m.title}
+                </h4>
+                
+                <div className="flex gap-3 sm:gap-4 mb-4 sm:mb-6">
+                  <div className="flex-1 text-center p-3 sm:p-4 bg-[#1A7A3E]/20 border border-[#1A7A3E]/30 rounded-xl">
+                    <div className="text-xl sm:text-2xl font-bold text-[#22C55E] mb-1">
+                      {m.prices.yes}¢
+                    </div>
+                    <div className="text-xs text-green-200 font-medium">SÍ</div>
+                  </div>
+                  <div className="flex-1 text-center p-3 sm:p-4 bg-red-900/20 border border-red-700/30 rounded-xl">
+                    <div className="text-xl sm:text-2xl font-bold text-red-400 mb-1">
+                      {m.prices.no}¢
+                    </div>
+                    <div className="text-xs text-red-200 font-medium">NO</div>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-gray-500 text-center mb-3">
+                  Vol: €{(parseFloat(m.total_volume) / 1000).toFixed(1)}K
+                </div>
+                
+                <button className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-[#1A7A3E] to-[#0D5C2B] hover:from-[#22C55E] hover:to-[#1A7A3E] rounded-xl font-bold transition-all group-hover:scale-105 text-sm sm:text-base border border-green-400/20">
+                  Apostar
                 </button>
               </div>
             ))}
@@ -264,82 +320,12 @@ export default function Home() {
         )}
       </div>
 
-      {/* Portfolio Modal */}
-      {showPortfolio && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-4xl w-full my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Mi Portfolio</h2>
-              <button onClick={() => setShowPortfolio(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
-            </div>
-            
-            {userTrades.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                No tienes posiciones activas
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {userTrades.map((trade) => (
-                  <div key={trade.id} className="bg-black border border-gray-800 rounded-xl p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="font-bold mb-2">{trade.markets.title}</h3>
-                        <div className="flex gap-2">
-                          <span className={`text-xs px-3 py-1 rounded-full font-bold ${
-                            trade.side === 'YES' ? 'bg-purple-500/20 text-purple-400' : 'bg-cyan-500/20 text-cyan-400'
-                          }`}>
-                            {trade.side} {trade.side === 'YES' ? trade.currentPrice.yes : trade.currentPrice.no}¢
-                          </span>
-                          <span className="text-xs px-3 py-1 bg-gray-800 text-gray-400 rounded-full">
-                            {trade.shares.toFixed(2)} acciones
-                          </span>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => sellPosition(trade)}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-bold transition-colors"
-                      >
-                        Vender
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <div className="text-gray-500">Invertido</div>
-                        <div className="font-mono font-bold">€{trade.amount.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500">Valor actual</div>
-                        <div className="font-mono font-bold">€{trade.currentValue.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500">Si ganas</div>
-                        <div className="font-mono font-bold text-green-400">€{trade.potentialPayout.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500">P/L</div>
-                        <div className={`font-mono font-bold ${
-                          (trade.currentValue - trade.amount) > 0 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {(trade.currentValue - trade.amount) > 0 ? '+' : ''}
-                          €{(trade.currentValue - trade.amount).toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Auth Modal */}
       {showAuth && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-700 rounded-2xl p-6 sm:p-8 max-w-md w-full">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Empezar a tradear</h2>
+              <h2 className="text-xl sm:text-2xl font-bold">Empezar</h2>
               <button onClick={() => setShowAuth(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
             </div>
             
@@ -350,55 +336,59 @@ export default function Home() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 focus:border-purple-500 focus:outline-none"
+                  className="w-full bg-black border border-gray-700 rounded-xl px-4 py-3 focus:border-[#1A7A3E] focus:outline-none"
                   placeholder="tu@email.com"
                   required
                 />
               </div>
               
-              <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition-all">
+              <button 
+                type="submit"
+                className="w-full bg-[#1A7A3E] hover:bg-[#0D5C2B] text-white font-bold py-4 rounded-xl transition-all border border-green-400/20"
+              >
                 Empezar con €1,000 gratis
               </button>
             </form>
             
-            <div className="mt-6 p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-              <p className="text-xs text-purple-400">
-                💡 <strong>Modo demo:</strong> Mercados reales con dinero virtual.
+            <div className="mt-6 p-4 bg-[#1A7A3E]/20 border border-[#1A7A3E]/30 rounded-xl">
+              <p className="text-xs text-green-200">
+                💡 <strong>Dinero virtual.</strong> Practica sin riesgo.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Trade Modal con Gráfico */}
+      {/* Trade Modal */}
       {showTradeModal && selectedMarket && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-4xl w-full my-8">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-700 rounded-2xl p-6 sm:p-8 max-w-4xl w-full my-8">
             <div className="flex justify-between items-start mb-6">
               <div>
-                <h2 className="text-2xl font-bold mb-2">Tradear</h2>
-                <p className="text-sm text-gray-400">{selectedMarket.title}</p>
+                <h2 className="text-xl sm:text-2xl font-bold mb-2">{selectedMarket.title}</h2>
+                <div className="text-sm text-gray-400">Cierra en {getTimeLeft(selectedMarket.close_date)}</div>
               </div>
               <button onClick={() => setShowTradeModal(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
             </div>
             
             {/* Gráfico */}
-            {priceHistory.length > 0 && (
-              <div className="mb-6 bg-black border border-gray-800 rounded-xl p-6">
-                <div className="text-sm text-gray-400 mb-4">Evolución de precios</div>
-                <div className="h-48 relative">
+            {priceHistory.length > 1 && (
+              <div className="mb-6 bg-black/50 border border-gray-800 rounded-xl p-4 sm:p-6">
+                <div className="text-sm text-gray-400 mb-4">Evolución</div>
+                <div className="h-32 sm:h-48 relative">
                   <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                     <polyline
                       points={priceHistory.map((p, i) => 
                         `${(i / Math.max(priceHistory.length - 1, 1)) * 100},${100 - parseFloat(p.yes_price)}`
                       ).join(' ')}
                       fill="none"
-                      stroke="#a855f7"
-                      strokeWidth="0.5"
+                      stroke="#1A7A3E"
+                      strokeWidth="2"
+                      vectorEffect="non-scaling-stroke"
                     />
                   </svg>
-                  <div className="absolute top-0 right-0 text-sm">
-                    <span className="text-purple-400 font-bold">{selectedMarket.prices.yes}%</span>
+                  <div className="absolute top-2 right-2 text-sm">
+                    <span className="text-[#22C55E] font-bold">{selectedMarket.prices.yes}%</span>
                     <span className="text-gray-500"> SÍ</span>
                   </div>
                 </div>
@@ -411,40 +401,46 @@ export default function Home() {
                   <button
                     onClick={() => setTradeSide('YES')}
                     className={`p-4 rounded-xl font-bold transition-all ${
-                      tradeSide === 'YES' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      tradeSide === 'YES' 
+                        ? 'bg-gradient-to-r from-[#1A7A3E] to-[#0D5C2B] text-white shadow-lg shadow-green-500/50 border border-green-400/30' 
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                     }`}
                   >
-                    SÍ {selectedMarket.prices.yes}¢
+                    <div className="text-2xl mb-1">{selectedMarket.prices.yes}¢</div>
+                    <div className="text-xs">SÍ</div>
                   </button>
                   <button
                     onClick={() => setTradeSide('NO')}
                     className={`p-4 rounded-xl font-bold transition-all ${
-                      tradeSide === 'NO' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      tradeSide === 'NO' 
+                        ? 'bg-gradient-to-r from-red-700 to-red-900 text-white shadow-lg shadow-red-500/50' 
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                     }`}
                   >
-                    NO {selectedMarket.prices.no}¢
+                    <div className="text-2xl mb-1">{selectedMarket.prices.no}¢</div>
+                    <div className="text-xs">NO</div>
                   </button>
                 </div>
                 
-                <div className="mb-6">
-                  <label className="block text-sm text-gray-400 mb-2">Cantidad a invertir</label>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Cantidad</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">€</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">€</span>
                     <input
                       type="number"
                       value={tradeAmount}
                       onChange={(e) => setTradeAmount(Math.max(1, Number(e.target.value)))}
-                      className="w-full bg-black border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-xl font-mono font-bold focus:border-purple-500 focus:outline-none"
+                      className="w-full bg-black border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-xl font-mono font-bold focus:border-[#1A7A3E] focus:outline-none"
                       min="1"
-                      max={user?.balance || 1000}
+                      max={user ? parseFloat(user.balance) : 1000}
                     />
                   </div>
-                  <div className="flex gap-2 mt-3">
+                  <div className="grid grid-cols-4 gap-2 mt-3">
                     {[10, 25, 50, 100].map(v => (
                       <button
                         key={v}
                         onClick={() => setTradeAmount(v)}
-                        className="flex-1 py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                        className="py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors font-medium"
                       >
                         €{v}
                       </button>
@@ -453,62 +449,123 @@ export default function Home() {
                 </div>
               </div>
               
-              <div className="bg-black border border-gray-800 rounded-xl p-4 space-y-3 h-fit">
+              <div className="bg-black/50 border border-gray-800 rounded-xl p-6 h-fit">
                 <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-4">Resumen</div>
                 
                 {tradeImpact && tradeImpact.valid ? (
-                  <>
+                  <div className="space-y-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Recibes</span>
+                      <span className="font-mono font-bold text-lg">{tradeImpact.shares.toFixed(1)} puntos</span>
+                    </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Precio promedio</span>
                       <span className="font-mono font-bold">€{tradeImpact.avgPrice.toFixed(3)}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Acciones</span>
-                      <span className="font-mono font-bold">{tradeImpact.shares.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Impacto precio</span>
-                      <span className={`font-mono font-bold ${parseFloat(tradeImpact.priceImpactPercent) > 5 ? 'text-yellow-400' : 'text-green-400'}`}>
-                        {tradeImpact.priceImpactPercent}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm pt-3 border-t border-gray-800">
-                      <span className="text-gray-400">Si ganas</span>
-                      <span className="font-mono font-bold text-green-400">€{tradeImpact.shares.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between pt-3 border-t border-gray-800">
-                      <span className="font-semibold">Ganancia potencial</span>
-                      <div className="text-right">
-                        <div className="font-mono font-bold text-green-400">
-                          +{(tradeImpact.shares - tradeAmount).toFixed(2)}€
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          ({(((tradeImpact.shares - tradeAmount) / tradeAmount) * 100).toFixed(0)}% ROI)
+                    <div className="border-t border-gray-800 pt-4">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-gray-400">Si aciertas</span>
+                        <span className="font-mono font-bold text-[#22C55E] text-xl">€{tradeImpact.potentialWinnings.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-semibold">Ganancia</span>
+                        <div className="text-right">
+                          <div className={`font-mono font-bold text-lg ${tradeImpact.potentialProfit > 0 ? 'text-[#22C55E]' : 'text-red-400'}`}>
+                            {tradeImpact.potentialProfit > 0 ? '+' : ''}{tradeImpact.potentialProfit.toFixed(2)}€
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            ({tradeImpact.roi > 0 ? '+' : ''}{tradeImpact.roi.toFixed(0)}%)
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-red-400">
-                    {tradeImpact?.error || 'Calculando...'}
                   </div>
+                ) : (
+                  <div className="text-sm text-red-400">{tradeImpact?.error || 'Calculando...'}</div>
                 )}
               </div>
             </div>
             
             <button
               onClick={executeTrade}
-              disabled={!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0)}
+              disabled={!tradeImpact || !tradeImpact.valid || tradeAmount > parseFloat(user?.balance || 0) || processing}
               className={`w-full mt-6 py-4 rounded-xl font-bold text-lg transition-all ${
-                !tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0)
+                !tradeImpact || !tradeImpact.valid || tradeAmount > parseFloat(user?.balance || 0) || processing
                   ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
                   : tradeSide === 'YES'
-                  ? 'bg-purple-600 hover:bg-purple-700'
-                  : 'bg-cyan-600 hover:bg-cyan-700'
+                  ? 'bg-gradient-to-r from-[#1A7A3E] to-[#0D5C2B] hover:from-[#22C55E] hover:to-[#1A7A3E] shadow-lg shadow-green-500/30 border border-green-400/20'
+                  : 'bg-gradient-to-r from-red-700 to-red-900 hover:from-red-600 hover:to-red-800 shadow-lg shadow-red-500/30'
               }`}
             >
-              {!tradeImpact ? 'Calculando...' : !tradeImpact.valid ? tradeImpact.error : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente' : `Comprar ${tradeSide} — €${tradeAmount}`}
+              {processing ? 'Procesando...' : !tradeImpact ? 'Calculando...' : !tradeImpact.valid ? tradeImpact.error : tradeAmount > parseFloat(user?.balance || 0) ? 'Saldo insuficiente' : `Apostar ${tradeSide} — €${tradeAmount}`}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Portfolio Modal */}
+      {showPortfolio && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-700 rounded-2xl p-6 sm:p-8 max-w-4xl w-full my-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Mis posiciones</h2>
+              <button onClick={() => setShowPortfolio(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
+            </div>
+            
+            {userTrades.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                No tienes posiciones activas
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {userTrades.map((trade) => (
+                  <div key={trade.id} className="bg-black/50 border border-gray-800 rounded-xl p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
+                      <div className="flex-1">
+                        <h3 className="font-bold mb-2">{trade.markets.title}</h3>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`text-xs px-3 py-1 rounded-full font-bold ${
+                            trade.side === 'YES' ? 'bg-[#1A7A3E]/30 text-[#22C55E]' : 'bg-red-900/30 text-red-400'
+                          }`}>
+                            {trade.side} {trade.side === 'YES' ? trade.currentPrice.yes : trade.currentPrice.no}¢
+                          </span>
+                          <span className="text-xs px-3 py-1 bg-gray-800 text-gray-400 rounded-full">
+                            {parseFloat(trade.shares).toFixed(1)} puntos
+                          </span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleSell(trade)}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-bold transition-colors whitespace-nowrap"
+                      >
+                        Vender
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Invertido</div>
+                        <div className="font-mono font-bold">€{parseFloat(trade.amount).toFixed(2)}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Valor ahora</div>
+                        <div className="font-mono font-bold">€{trade.currentValue.toFixed(2)}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Si ganas</div>
+                        <div className="font-mono font-bold text-[#22C55E]">€{parseFloat(trade.potentialPayout).toFixed(2)}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">P/L</div>
+                        <div className={`font-mono font-bold ${trade.profit > 0 ? 'text-[#22C55E]' : 'text-red-400'}`}>
+                          {trade.profit > 0 ? '+' : ''}€{trade.profit.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
