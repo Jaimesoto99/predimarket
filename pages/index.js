@@ -1,22 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getActiveMarkets, getOrCreateUser, createTrade, getUserTrades, getPriceHistory, sellPosition } from '../lib/supabase'
-import { getLeaderboard, getUserRank, setDisplayName, getUserProfile, AVATAR_EMOJIS } from '../lib/leaderboard'
 import { previewTrade, previewSellValue, calculatePrices } from '../lib/amm'
-
-// Configuración de tipos de mercado
-const MARKET_TYPES = {
-  DIARIO:  { emoji: '⚡', label: '24h',   color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' },
-  SEMANAL: { emoji: '📊', label: '7 días', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
-  MENSUAL: { emoji: '🏠', label: 'Mes',    color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
-  STANDARD:{ emoji: '📈', label: '',        color: 'bg-gray-500/20 text-gray-300 border-gray-500/30' },
-}
-
-const URGENCY_STYLES = {
-  CLOSING_SOON: 'border-red-500 shadow-red-500/20 shadow-lg',
-  ACTIVE_HOT:   'border-orange-500/50',
-  ACTIVE:       'border-gray-700',
-  EXPIRED:      'border-gray-800 opacity-60',
-}
+import { supabase } from '../lib/supabase'
 
 export default function Home() {
   const [markets, setMarkets] = useState([])
@@ -29,20 +14,36 @@ export default function Home() {
   const [tradeAmount, setTradeAmount] = useState(10)
   const [showTradeModal, setShowTradeModal] = useState(false)
   const [showPortfolio, setShowPortfolio] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const [userTrades, setUserTrades] = useState([])
+  const [allTrades, setAllTrades] = useState([])
   const [priceHistory, setPriceHistory] = useState([])
   const [tradeImpact, setTradeImpact] = useState(null)
   const [processing, setProcessing] = useState(false)
-
-  // FASE 2: Filtros y leaderboard
-  const [filterType, setFilterType] = useState('ALL')
-  const [showLeaderboard, setShowLeaderboard] = useState(false)
-  const [leaderboard, setLeaderboard] = useState([])
-  const [myRank, setMyRank] = useState(null)
-  const [myProfile, setMyProfile] = useState(null)
-  const [editingName, setEditingName] = useState(false)
-  const [newDisplayName, setNewDisplayName] = useState('')
-  const [selectedEmoji, setSelectedEmoji] = useState('🎯')
+  const [recentActivity, setRecentActivity] = useState([])
+  const [filter, setFilter] = useState('ALL')
+  
+  // Colores - Paleta fintech dark + azul
+  const C = {
+    bg: '#0a0f1a',
+    card: '#111827',
+    cardBorder: '#1e293b',
+    cardHover: '#2563eb',
+    accent: '#3b82f6',
+    accentLight: '#60a5fa',
+    accentDark: '#1d4ed8',
+    yes: '#22c55e',
+    yesBg: 'rgba(34,197,94,0.12)',
+    yesBorder: 'rgba(34,197,94,0.25)',
+    no: '#ef4444',
+    noBg: 'rgba(239,68,68,0.12)',
+    noBorder: 'rgba(239,68,68,0.25)',
+    text: '#e2e8f0',
+    textMuted: '#94a3b8',
+    textDim: '#64748b',
+    surface: '#0f172a',
+    warning: '#f59e0b',
+  }
   
   useEffect(() => {
     loadMarkets()
@@ -69,83 +70,65 @@ export default function Home() {
   async function loadMarkets() {
     setLoading(true)
     const data = await getActiveMarkets()
-    // markets_live ya incluye live_yes_price y live_no_price, pero calculamos también con AMM local
     const withPrices = data.map(m => ({
       ...m,
-      prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool))
+      prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
+      isExpired: new Date(m.close_date) < new Date()
     }))
     setMarkets(withPrices)
     setLoading(false)
   }
   
   async function loadUserTrades(email) {
-    const data = await getUserTrades(email)
+    const data = await getUserTrades(email, true)
     const enriched = data.map(t => {
       const currentPrice = calculatePrices(
         parseFloat(t.markets.yes_pool),
         parseFloat(t.markets.no_pool)
       )
-      const currentValue = previewSellValue(
+      const currentValue = t.status === 'OPEN' ? previewSellValue(
         t.shares,
         t.side,
         parseFloat(t.markets.yes_pool),
         parseFloat(t.markets.no_pool)
-      )
+      ) : (t.sold_price || 0)
+      const isExpired = new Date(t.markets.close_date) < new Date()
       return {
         ...t,
         currentPrice,
         currentValue,
         potentialPayout: t.shares,
-        profit: currentValue - t.amount
+        profit: currentValue - t.amount,
+        isExpired
       }
     })
     setUserTrades(enriched)
+  }
+  
+  async function loadRecentActivity(marketId) {
+    const { data, error } = await supabase
+      .from('recent_trades')
+      .select('*')
+      .eq('market_id', marketId)
+      .limit(20)
+    if (!error && data) {
+      setRecentActivity(data)
+    }
   }
   
   async function loadPriceHistory(marketId) {
     const history = await getPriceHistory(marketId, 24)
     setPriceHistory(history)
   }
-
-  // FASE 2: Cargar leaderboard
-  async function loadLeaderboard() {
-    const lb = await getLeaderboard(20)
-    setLeaderboard(lb)
-    if (user) {
-      const rank = await getUserRank(user.email)
-      setMyRank(rank)
-      const profile = await getUserProfile(user.email)
-      setMyProfile(profile)
-    }
-  }
-
-  async function openLeaderboard() {
-    setShowLeaderboard(true)
-    await loadLeaderboard()
-  }
-
-  async function handleSetDisplayName() {
-    if (!newDisplayName.trim()) return
-    const result = await setDisplayName(user.email, newDisplayName.trim(), selectedEmoji)
-    if (result.success) {
-      setEditingName(false)
-      setNewDisplayName('')
-      await loadLeaderboard()
-    } else {
-      alert(`❌ ${result.error}`)
-    }
-  }
   
   async function handleLogin(e) {
     e.preventDefault()
     if (!email) return
-    
     const result = await getOrCreateUser(email)
     if (!result.success) {
       alert(result.error || 'Error al crear usuario')
       return
     }
-    
     setUser(result.user)
     localStorage.setItem('predi_user', JSON.stringify(result.user))
     setShowAuth(false)
@@ -157,62 +140,47 @@ export default function Home() {
     setUser(null)
     localStorage.removeItem('predi_user')
     setUserTrades([])
-    setMyRank(null)
-    setMyProfile(null)
   }
   
   function openTradeModal(market) {
-    if (!user) {
-      setShowAuth(true)
-      return
-    }
+    if (!user) { setShowAuth(true); return }
+    if (market.isExpired) { alert('Este mercado está cerrado — pendiente de resolución.'); return }
     setSelectedMarket(market)
     setShowTradeModal(true)
     loadPriceHistory(market.id)
+    loadRecentActivity(market.id)
   }
   
   async function executeTrade() {
-    if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid || processing) {
-      return
-    }
-    
+    if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid || processing) return
     setProcessing(true)
-    
-    const result = await createTrade(
-      user.email, 
-      selectedMarket.id, 
-      tradeSide, 
-      tradeAmount
-    )
-    
+    const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount)
     setProcessing(false)
-    
     if (result.success) {
       setUser({ ...user, balance: result.new_balance })
       localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: result.new_balance }))
-      
       setShowTradeModal(false)
       setTradeAmount(10)
       loadUserTrades(user.email)
       loadMarkets()
-      
-      alert(`✅ Apuesta realizada!\n\n${result.shares.toFixed(1)} puntos ${tradeSide}\nCosto: €${tradeAmount}\nGanas si aciertas: €${result.shares.toFixed(2)}`)
+      loadRecentActivity(selectedMarket.id)
+      alert(`✅ Posición abierta\n\n${result.shares.toFixed(1)} contratos ${tradeSide}\nCoste: €${tradeAmount}\nRetorno si aciertas: €${result.shares.toFixed(2)}`)
     } else {
       alert(`❌ ${result.error}`)
     }
   }
   
   async function handleSell(trade) {
-    if (!confirm(`¿Vender ${trade.shares.toFixed(1)} puntos ${trade.side} por €${trade.currentValue.toFixed(2)}?`)) return
-    
+    if (trade.isExpired) { alert('Mercado expirado — pendiente de resolución. No se puede vender.'); return }
+    if (!confirm(`¿Vender ${trade.shares.toFixed(1)} contratos ${trade.side} por ~€${trade.currentValue.toFixed(2)}?\n(Fee 2% incluido)`)) return
     const result = await sellPosition(trade.id, user.email)
-    
     if (result.success) {
-      setUser({ ...user, balance: result.new_balance })
-      localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: result.new_balance }))
+      const newBalance = result.new_balance
+      setUser({ ...user, balance: newBalance })
+      localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: newBalance }))
       loadUserTrades(user.email)
       loadMarkets()
-      alert(`✅ Vendido por €${result.sell_value.toFixed(2)}`)
+      alert(`✅ Vendido por €${(result.net_payout || result.sell_value || 0).toFixed(2)} (fee: €${(result.fee || 0).toFixed(2)})`)
     } else {
       alert(`❌ ${result.error}`)
     }
@@ -222,223 +190,221 @@ export default function Home() {
     const now = new Date()
     const close = new Date(closeDate)
     const diff = close - now
-    
-    if (diff < 0) return 'Cerrado'
-    
+    if (diff < 0) return 'Expirado'
     const hours = Math.floor(diff / 3600000)
     const minutes = Math.floor((diff % 3600000) / 60000)
-    
     if (hours > 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`
     if (hours > 0) return `${hours}h ${minutes}m`
     return `${minutes}m`
   }
 
-  // FASE 2: Filtrar mercados por tipo
-  const filteredMarkets = filterType === 'ALL'
-    ? markets
-    : markets.filter(m => m.market_type === filterType)
-
-  // Contadores para tabs
-  const typeCounts = {
-    ALL: markets.length,
-    DIARIO: markets.filter(m => m.market_type === 'DIARIO').length,
-    SEMANAL: markets.filter(m => m.market_type === 'SEMANAL').length,
-    MENSUAL: markets.filter(m => m.market_type === 'MENSUAL').length,
+  function isExpired(closeDate) {
+    return new Date(closeDate) < new Date()
   }
-  
+
+  function getMarketTypeLabel(market) {
+    const type = market.market_type
+    if (type === 'FLASH' || type === 'DIARIO') return { label: '24h', icon: '⚡', color: C.warning }
+    if (type === 'SHORT' || type === 'SEMANAL') return { label: '7d', icon: '📊', color: C.accentLight }
+    if (type === 'LONG' || type === 'MENSUAL') return { label: 'Mes', icon: '🏛', color: '#a78bfa' }
+    return { label: '', icon: '', color: C.textDim }
+  }
+
+  const filteredMarkets = markets.filter(m => {
+    if (filter === 'ALL') return true
+    const type = m.market_type
+    if (filter === 'DIARIO') return type === 'FLASH' || type === 'DIARIO'
+    if (filter === 'SEMANAL') return type === 'SHORT' || type === 'SEMANAL'
+    if (filter === 'MENSUAL') return type === 'LONG' || type === 'MENSUAL'
+    return true
+  })
+
+  // Stats para perfil
+  const totalInvested = userTrades.filter(t => t.status === 'OPEN').reduce((s, t) => s + t.amount, 0)
+  const totalPnL = userTrades.reduce((s, t) => s + (t.profit || 0), 0)
+  const winRate = userTrades.filter(t => t.status === 'SOLD').length > 0
+    ? (userTrades.filter(t => t.status === 'SOLD' && t.pnl > 0).length / userTrades.filter(t => t.status === 'SOLD').length * 100)
+    : 0
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-black text-white">
+    <div style={{ minHeight: '100vh', background: `linear-gradient(180deg, ${C.bg} 0%, #000 100%)`, color: C.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      
       {/* Header */}
-      <header className="border-b border-green-900/30 bg-gradient-to-r from-[#0D5C2B] to-[#1A7A3E] sticky top-0 z-50 shadow-lg">
-        <div className="container mx-auto px-4 sm:px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#1A7A3E] to-[#0D5C2B] rounded-xl flex items-center justify-center text-xl font-bold shadow-lg shadow-green-500/30 border border-green-400/20">
-                P
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-white">
-                  PrediMarket
-                </h1>
-                <div className="text-xs text-green-200">Beta · Créditos virtuales</div>
-              </div>
+      <header style={{ 
+        borderBottom: `1px solid ${C.cardBorder}`, 
+        background: `linear-gradient(135deg, ${C.surface} 0%, ${C.bg} 100%)`,
+        position: 'sticky', top: 0, zIndex: 50,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ 
+              width: 36, height: 36, 
+              background: `linear-gradient(135deg, ${C.accent}, ${C.accentDark})`,
+              borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, fontWeight: 800, color: '#fff',
+              boxShadow: `0 4px 12px ${C.accent}40`
+            }}>P</div>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>PrediMarket</div>
+              <div style={{ fontSize: 10, color: C.accentLight, fontWeight: 600, letterSpacing: '0.05em' }}>BETA</div>
             </div>
-            
-            {user ? (
-              <div className="flex items-center gap-2 sm:gap-4">
-                {/* Leaderboard button */}
-                <button 
-                  onClick={openLeaderboard}
-                  className="px-3 py-2 border border-green-400/30 rounded-lg hover:bg-green-900/20 transition-colors text-sm font-medium text-green-100"
-                  title="Leaderboard"
-                >
-                  🏆
-                </button>
-                <button 
-                  onClick={() => setShowPortfolio(true)}
-                  className="px-3 sm:px-4 py-2 border border-green-400/30 rounded-lg hover:bg-green-900/20 transition-colors text-xs sm:text-sm font-medium text-green-100"
-                >
-                  <span className="hidden sm:inline">Posiciones</span>
-                  <span className="sm:hidden">💼</span>
-                  {userTrades.length > 0 && (
-                    <span className="ml-2 bg-[#1A7A3E] text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                      {userTrades.length}
-                    </span>
-                  )}
-                </button>
-                <div className="px-3 sm:px-4 py-2 bg-[#1A7A3E] border border-green-400/20 rounded-lg">
-                  <span className="text-green-200 text-xs sm:text-sm">💰 </span>
-                  <span className="text-green-100 font-bold font-mono text-sm sm:text-base">€{user.balance.toFixed(2)}</span>
-                </div>
-                <button 
-                  onClick={handleLogout}
-                  className="text-green-300 hover:text-white text-sm"
-                >
-                  ✕
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => setShowAuth(true)}
-                className="px-4 sm:px-6 py-2 bg-[#1A7A3E] hover:bg-[#0D5C2B] rounded-lg font-bold text-sm sm:text-base shadow-lg shadow-green-500/20 border border-green-400/20"
-              >
-                Empezar
-              </button>
-            )}
           </div>
+          
+          {user ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button 
+                onClick={() => { setShowProfile(true); loadUserTrades(user.email) }}
+                style={{ padding: '6px 12px', border: `1px solid ${C.cardBorder}`, borderRadius: 8, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+              >
+                👤
+              </button>
+              <button 
+                onClick={() => { setShowPortfolio(true); loadUserTrades(user.email) }}
+                style={{ padding: '6px 12px', border: `1px solid ${C.cardBorder}`, borderRadius: 8, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+              >
+                📊 {userTrades.filter(t => t.status === 'OPEN').length > 0 && (
+                  <span style={{ marginLeft: 4, background: C.accent, color: '#fff', padding: '1px 6px', borderRadius: 10, fontSize: 11 }}>
+                    {userTrades.filter(t => t.status === 'OPEN').length}
+                  </span>
+                )}
+              </button>
+              <div style={{ padding: '6px 12px', background: `${C.accent}15`, border: `1px solid ${C.accent}30`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace', color: '#fff' }}>€{user.balance.toFixed(0)}</span>
+              </div>
+              <button onClick={handleLogout} style={{ color: C.textDim, cursor: 'pointer', background: 'none', border: 'none', fontSize: 16 }}>✕</button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setShowAuth(true)}
+              style={{ padding: '8px 20px', background: C.accent, borderRadius: 8, fontWeight: 700, fontSize: 14, color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              Empezar
+            </button>
+          )}
         </div>
       </header>
 
       {/* Hero */}
-      <div className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 text-center">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-4xl sm:text-6xl font-bold mb-4 sm:mb-6 leading-tight text-white">
-            Predice la actualidad
-            <br />
-            <span className="bg-gradient-to-r from-[#1A7A3E] to-[#22C55E] bg-clip-text text-transparent">
-              de España
-            </span>
-          </h2>
-          <p className="text-lg sm:text-xl text-gray-300 mb-6 sm:mb-8 max-w-2xl mx-auto">
-            Mercados diarios, semanales y mensuales. Política, economía, deportes y vivienda.
-          </p>
-          {!user && (
-            <button 
-              onClick={() => setShowAuth(true)}
-              className="px-6 sm:px-8 py-3 sm:py-4 bg-[#1A7A3E] hover:bg-[#0D5C2B] rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105 shadow-xl shadow-green-500/20 border border-green-400/20"
-            >
-              Empieza con 1.000 créditos gratis
-            </button>
-          )}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 16px 24px', textAlign: 'center' }}>
+        <h2 style={{ fontSize: 'clamp(28px, 5vw, 48px)', fontWeight: 800, marginBottom: 12, lineHeight: 1.1, letterSpacing: '-0.03em' }}>
+          Predice eventos
+          <br />
+          <span style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.accentLight})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            verificables
+          </span>
+        </h2>
+        <p style={{ fontSize: 16, color: C.textMuted, marginBottom: 20, maxWidth: 500, margin: '0 auto 20px' }}>
+          Mercados sobre indicadores económicos y actualidad española. Precios en tiempo real.
+        </p>
+        {!user && (
+          <button 
+            onClick={() => setShowAuth(true)}
+            style={{ padding: '12px 28px', background: C.accent, borderRadius: 10, fontWeight: 700, fontSize: 15, color: '#fff', border: 'none', cursor: 'pointer', boxShadow: `0 4px 20px ${C.accent}40` }}
+          >
+            Empieza con 1.000 créditos gratis
+          </button>
+        )}
+      </div>
+
+      {/* Filter Tabs */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 16px' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['ALL', 'DIARIO', 'SEMANAL', 'MENSUAL'].map(f => {
+            const count = f === 'ALL' ? markets.length : markets.filter(m => {
+              if (f === 'DIARIO') return m.market_type === 'FLASH' || m.market_type === 'DIARIO'
+              if (f === 'SEMANAL') return m.market_type === 'SHORT' || m.market_type === 'SEMANAL'
+              if (f === 'MENSUAL') return m.market_type === 'LONG' || m.market_type === 'MENSUAL'
+              return false
+            }).length
+            const labels = { ALL: 'Todos', DIARIO: '⚡ Diario', SEMANAL: '📊 Semanal', MENSUAL: '🏛 Mensual' }
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                style={{ 
+                  padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
+                  background: filter === f ? C.accent : `${C.card}`,
+                  color: filter === f ? '#fff' : C.textMuted,
+                  transition: 'all 0.2s'
+                }}
+              >
+                {labels[f]} <span style={{ opacity: 0.7, fontSize: 11 }}>{count}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* Markets Section */}
-      <div className="container mx-auto px-4 sm:px-6 pb-20">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h3 className="text-2xl sm:text-3xl font-bold">Mercados activos</h3>
-          
-          {/* FASE 2: Filter tabs */}
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { key: 'ALL', label: 'Todos' },
-              { key: 'DIARIO', label: '⚡ Diario' },
-              { key: 'SEMANAL', label: '📊 Semanal' },
-              { key: 'MENSUAL', label: '🏠 Mensual' },
-            ].map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setFilterType(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-                  filterType === tab.key
-                    ? 'bg-[#1A7A3E] text-white border border-green-400/30'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700'
-                }`}
-              >
-                {tab.label}
-                <span className="ml-1.5 text-xs opacity-70">{typeCounts[tab.key]}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        
+      {/* Markets Grid */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 80px' }}>
         {loading ? (
-          <div className="text-center py-20">
-            <div className="inline-block w-12 h-12 border-4 border-[#1A7A3E] border-t-transparent rounded-full animate-spin mb-4"></div>
-            <div className="text-gray-400">Cargando...</div>
-          </div>
-        ) : filteredMarkets.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
-            No hay mercados de este tipo ahora mismo
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <div style={{ color: C.textMuted }}>Cargando mercados...</div>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
             {filteredMarkets.map((m) => {
-              const typeConfig = MARKET_TYPES[m.market_type] || MARKET_TYPES.STANDARD
-              const urgencyClass = URGENCY_STYLES[m.urgency] || URGENCY_STYLES.ACTIVE
-
+              const expired = m.isExpired
+              const typeInfo = getMarketTypeLabel(m)
               return (
                 <div 
                   key={m.id}
                   onClick={() => openTradeModal(m)}
-                  className={`bg-gradient-to-br from-gray-900 to-gray-800 border rounded-2xl p-4 sm:p-6 transition-all cursor-pointer group hover:border-[#1A7A3E] ${urgencyClass}`}
+                  style={{ 
+                    background: C.card, 
+                    border: `1px solid ${expired ? '#374151' : C.cardBorder}`,
+                    borderRadius: 16, padding: 20, cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    opacity: expired ? 0.6 : 1,
+                  }}
+                  onMouseEnter={e => { if (!expired) e.currentTarget.style.borderColor = C.accent }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = expired ? '#374151' : C.cardBorder }}
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex gap-2 items-center flex-wrap">
-                      {/* Category badge */}
-                      <span className="text-xs px-3 py-1 bg-gray-800 text-gray-300 rounded-full font-medium">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', background: `${C.surface}`, color: C.textMuted, borderRadius: 6, fontWeight: 600 }}>
                         {m.category}
                       </span>
-                      {/* Market type badge */}
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-bold border ${typeConfig.color}`}>
-                        {typeConfig.emoji} {typeConfig.label}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {/* Urgency pulse */}
-                      {m.urgency === 'CLOSING_SOON' && (
-                        <span className="relative flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                      {typeInfo.label && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', background: `${typeInfo.color}15`, color: typeInfo.color, borderRadius: 6, fontWeight: 600 }}>
+                          {typeInfo.icon} {typeInfo.label}
                         </span>
                       )}
-                      {m.urgency === 'ACTIVE_HOT' && (
-                        <span className="h-2 w-2 rounded-full bg-orange-400"></span>
-                      )}
-                      <span className={`text-xs font-bold ${
-                        m.urgency === 'CLOSING_SOON' ? 'text-red-400' : 'text-yellow-400'
-                      }`}>
-                        ⏱ {getTimeLeft(m.close_date)}
-                      </span>
                     </div>
+                    <span style={{ fontSize: 12, color: expired ? C.no : C.warning, fontWeight: 700 }}>
+                      {expired ? '🔒 Expirado' : `⏱ ${getTimeLeft(m.close_date)}`}
+                    </span>
                   </div>
                   
-                  <h4 className="font-bold text-base sm:text-lg mb-4 sm:mb-6 group-hover:text-[#22C55E] transition-colors min-h-[48px]">
+                  <h4 style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, lineHeight: 1.4, minHeight: 42, color: '#fff' }}>
                     {m.title}
                   </h4>
                   
-                  <div className="flex gap-3 sm:gap-4 mb-4 sm:mb-6">
-                    <div className="flex-1 text-center p-3 sm:p-4 bg-[#1A7A3E]/20 border border-[#1A7A3E]/30 rounded-xl">
-                      <div className="text-xl sm:text-2xl font-bold text-[#22C55E] mb-1">
-                        {m.prices.yes}¢
-                      </div>
-                      <div className="text-xs text-green-200 font-medium">SÍ</div>
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                    <div style={{ flex: 1, textAlign: 'center', padding: '10px 8px', background: C.yesBg, border: `1px solid ${C.yesBorder}`, borderRadius: 10 }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: C.yes }}>{m.prices.yes}¢</div>
+                      <div style={{ fontSize: 11, color: C.yes, fontWeight: 600, opacity: 0.8 }}>SÍ</div>
                     </div>
-                    <div className="flex-1 text-center p-3 sm:p-4 bg-red-900/20 border border-red-700/30 rounded-xl">
-                      <div className="text-xl sm:text-2xl font-bold text-red-400 mb-1">
-                        {m.prices.no}¢
-                      </div>
-                      <div className="text-xs text-red-200 font-medium">NO</div>
+                    <div style={{ flex: 1, textAlign: 'center', padding: '10px 8px', background: C.noBg, border: `1px solid ${C.noBorder}`, borderRadius: 10 }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: C.no }}>{m.prices.no}¢</div>
+                      <div style={{ fontSize: 11, color: C.no, fontWeight: 600, opacity: 0.8 }}>NO</div>
                     </div>
                   </div>
                   
-                  <div className="flex justify-between text-xs text-gray-500 mb-3">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textDim, marginBottom: 12 }}>
                     <span>Vol: €{(m.total_volume / 1000).toFixed(1)}K</span>
-                    {m.active_traders > 0 && <span>{m.active_traders} traders</span>}
+                    <span>{m.active_traders || m.total_traders || 0} traders</span>
                   </div>
                   
-                  <button className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-[#1A7A3E] to-[#0D5C2B] hover:from-[#22C55E] hover:to-[#1A7A3E] rounded-xl font-bold transition-all group-hover:scale-105 text-sm sm:text-base border border-green-400/20">
-                    Apostar
+                  <button style={{ 
+                    width: '100%', padding: '10px 0', borderRadius: 10, fontWeight: 700, fontSize: 14, border: 'none', cursor: expired ? 'not-allowed' : 'pointer',
+                    background: expired ? '#374151' : C.accent,
+                    color: expired ? C.textDim : '#fff',
+                    transition: 'all 0.2s',
+                  }}>
+                    {expired ? '⏱ Pendiente resolución' : 'Predecir'}
                   </button>
                 </div>
               )
@@ -449,38 +415,27 @@ export default function Home() {
 
       {/* Auth Modal */}
       {showAuth && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-700 rounded-2xl p-6 sm:p-8 max-w-md w-full">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl sm:text-2xl font-bold">Empezar</h2>
-              <button onClick={() => setShowAuth(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 28, maxWidth: 400, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800 }}>Empezar</h2>
+              <button onClick={() => setShowAuth(false)} style={{ color: C.textDim, cursor: 'pointer', background: 'none', border: 'none', fontSize: 20 }}>✕</button>
             </div>
-            
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Email</label>
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: 13, color: C.textMuted, marginBottom: 6 }}>Email</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-black border border-gray-700 rounded-xl px-4 py-3 focus:border-[#1A7A3E] focus:outline-none"
-                  placeholder="tu@email.com"
-                  required
+                  type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  style={{ width: '100%', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 10, padding: '10px 14px', color: '#fff', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+                  placeholder="tu@email.com" required
                 />
               </div>
-              
-              <button 
-                type="submit"
-                className="w-full bg-[#1A7A3E] hover:bg-[#0D5C2B] text-white font-bold py-4 rounded-xl transition-all border border-green-400/20"
-              >
-                Empezar con 1.000 créditos gratis
+              <button type="submit" style={{ width: '100%', background: C.accent, color: '#fff', fontWeight: 700, padding: '12px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 15 }}>
+                Empezar con 1.000 créditos
               </button>
             </form>
-            
-            <div className="mt-6 p-4 bg-[#1A7A3E]/20 border border-[#1A7A3E]/30 rounded-xl">
-              <p className="text-xs text-green-200">
-                💡 <strong>Créditos virtuales.</strong> Practica sin riesgo real.
-              </p>
+            <div style={{ marginTop: 16, padding: 12, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: 10 }}>
+              <p style={{ fontSize: 12, color: C.accentLight }}>💡 <strong>Créditos virtuales.</strong> Practica sin riesgo.</p>
             </div>
           </div>
         </div>
@@ -488,351 +443,331 @@ export default function Home() {
 
       {/* Trade Modal */}
       {showTradeModal && selectedMarket && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-700 rounded-2xl p-6 sm:p-8 max-w-4xl w-full my-8">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <div className="flex gap-2 mb-2">
-                  {(() => {
-                    const tc = MARKET_TYPES[selectedMarket.market_type] || MARKET_TYPES.STANDARD
-                    return (
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-bold border ${tc.color}`}>
-                        {tc.emoji} {tc.label}
-                      </span>
-                    )
-                  })()}
-                  <span className="text-xs px-3 py-1 bg-gray-800 text-gray-300 rounded-full">{selectedMarket.category}</span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold mb-2">{selectedMarket.title}</h2>
-                <div className="text-sm text-gray-400">{selectedMarket.description}</div>
-                <div className="text-sm text-yellow-400 mt-2 font-bold">⏱ Cierra en {getTimeLeft(selectedMarket.close_date)}</div>
-              </div>
-              <button onClick={() => setShowTradeModal(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
-            </div>
-            
-            {/* Gráfico */}
-            {priceHistory.length > 1 && (
-              <div className="mb-6 bg-black/50 border border-gray-800 rounded-xl p-4 sm:p-6">
-                <div className="text-sm text-gray-400 mb-4">Evolución 24h</div>
-                <div className="h-32 sm:h-48 relative">
-                  <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <polyline
-                      points={priceHistory.map((p, i) => 
-                        `${(i / Math.max(priceHistory.length - 1, 1)) * 100},${100 - parseFloat(p.yes_price)}`
-                      ).join(' ')}
-                      fill="none"
-                      stroke="#1A7A3E"
-                      strokeWidth="2"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </svg>
-                  <div className="absolute top-2 right-2 text-sm">
-                    <span className="text-[#22C55E] font-bold">{selectedMarket.prices.yes}%</span>
-                    <span className="text-gray-500"> SÍ</span>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)', zIndex: 50, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ minHeight: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 24, maxWidth: 700, width: '100%', margin: '20px 0' }}>
+              
+              {/* Close button - fixed visible */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6, lineHeight: 1.3 }}>{selectedMarket.title}</h2>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: isExpired(selectedMarket.close_date) ? C.no : C.warning, fontWeight: 600 }}>
+                      {isExpired(selectedMarket.close_date) ? '🔒 Expirado' : `⏱ ${getTimeLeft(selectedMarket.close_date)}`}
+                    </span>
+                    <span style={{ fontSize: 12, color: C.textDim }}>{selectedMarket.category}</span>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <button
-                    onClick={() => setTradeSide('YES')}
-                    className={`p-4 rounded-xl font-bold transition-all ${
-                      tradeSide === 'YES' 
-                        ? 'bg-gradient-to-r from-[#1A7A3E] to-[#0D5C2B] text-white shadow-lg shadow-green-500/50 border border-green-400/30' 
-                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{selectedMarket.prices.yes}¢</div>
-                    <div className="text-xs">SÍ</div>
-                  </button>
-                  <button
-                    onClick={() => setTradeSide('NO')}
-                    className={`p-4 rounded-xl font-bold transition-all ${
-                      tradeSide === 'NO' 
-                        ? 'bg-gradient-to-r from-red-700 to-red-900 text-white shadow-lg shadow-red-500/50' 
-                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{selectedMarket.prices.no}¢</div>
-                    <div className="text-xs">NO</div>
-                  </button>
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Cantidad</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">€</span>
-                    <input
-                      type="number"
-                      value={tradeAmount}
-                      onChange={(e) => setTradeAmount(Math.max(1, Number(e.target.value)))}
-                      className="w-full bg-black border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-xl font-mono font-bold focus:border-[#1A7A3E] focus:outline-none"
-                      min="1"
-                      max={user?.balance || 1000}
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 gap-2 mt-3">
-                    {[10, 25, 50, 100].map(v => (
-                      <button
-                        key={v}
-                        onClick={() => setTradeAmount(v)}
-                        className="py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors font-medium"
-                      >
-                        €{v}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <button 
+                  onClick={() => setShowTradeModal(false)} 
+                  style={{ 
+                    width: 36, height: 36, borderRadius: 10, background: C.surface, border: `1px solid ${C.cardBorder}`,
+                    color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 700, flexShrink: 0, marginLeft: 12,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}
+                >✕</button>
               </div>
               
-              <div className="bg-black/50 border border-gray-800 rounded-xl p-6 h-fit">
-                <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-4">Resumen</div>
-                
-                {tradeImpact && tradeImpact.valid ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Recibes</span>
-                      <span className="font-mono font-bold text-lg">{tradeImpact.shares.toFixed(1)} puntos</span>
+              {/* Chart */}
+              {priceHistory.length > 1 && (
+                <div style={{ marginBottom: 16, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: 12, color: C.textDim, marginBottom: 8 }}>Evolución 24h</div>
+                  <div style={{ height: 100, position: 'relative' }}>
+                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                      <polyline
+                        points={priceHistory.map((p, i) => 
+                          `${(i / Math.max(priceHistory.length - 1, 1)) * 100},${100 - parseFloat(p.yes_price)}`
+                        ).join(' ')}
+                        fill="none" stroke={C.accent} strokeWidth="2" vectorEffect="non-scaling-stroke"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              )}
+              
+              {!isExpired(selectedMarket.close_date) && (
+                <>
+                  {/* YES / NO buttons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+                    <button
+                      onClick={() => setTradeSide('YES')}
+                      style={{ 
+                        padding: '14px 8px', borderRadius: 12, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.2s',
+                        background: tradeSide === 'YES' ? C.yes : C.surface,
+                        color: tradeSide === 'YES' ? '#fff' : C.textMuted,
+                        boxShadow: tradeSide === 'YES' ? `0 4px 16px ${C.yes}40` : 'none'
+                      }}
+                    >
+                      <div style={{ fontSize: 24, marginBottom: 2 }}>{selectedMarket.prices.yes}¢</div>
+                      <div style={{ fontSize: 11 }}>SÍ</div>
+                    </button>
+                    <button
+                      onClick={() => setTradeSide('NO')}
+                      style={{ 
+                        padding: '14px 8px', borderRadius: 12, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.2s',
+                        background: tradeSide === 'NO' ? C.no : C.surface,
+                        color: tradeSide === 'NO' ? '#fff' : C.textMuted,
+                        boxShadow: tradeSide === 'NO' ? `0 4px 16px ${C.no}40` : 'none'
+                      }}
+                    >
+                      <div style={{ fontSize: 24, marginBottom: 2 }}>{selectedMarket.prices.no}¢</div>
+                      <div style={{ fontSize: 11 }}>NO</div>
+                    </button>
+                  </div>
+                  
+                  {/* Amount */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>Cantidad (créditos)</label>
+                    <input
+                      type="number" value={tradeAmount}
+                      onChange={(e) => setTradeAmount(Math.max(1, Number(e.target.value)))}
+                      style={{ width: '100%', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 10, padding: '10px 14px', color: '#fff', fontSize: 18, fontWeight: 700, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
+                      min="1" max={user?.balance || 1000}
+                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 8 }}>
+                      {[10, 25, 50, 100].map(v => (
+                        <button key={v} onClick={() => setTradeAmount(v)}
+                          style={{ padding: '6px 0', fontSize: 13, background: C.surface, color: C.textMuted, borderRadius: 8, border: `1px solid ${C.cardBorder}`, cursor: 'pointer', fontWeight: 600 }}>
+                          {v}
+                        </button>
+                      ))}
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Precio promedio</span>
-                      <span className="font-mono font-bold">€{tradeImpact.avgPrice.toFixed(3)}</span>
-                    </div>
-                    <div className="border-t border-gray-800 pt-4">
-                      <div className="flex justify-between mb-2">
-                        <span className="text-gray-400">Si aciertas</span>
-                        <span className="font-mono font-bold text-[#22C55E] text-xl">€{tradeImpact.potentialWinnings.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-semibold">Ganancia</span>
-                        <div className="text-right">
-                          <div className={`font-mono font-bold text-lg ${tradeImpact.potentialProfit > 0 ? 'text-[#22C55E]' : 'text-red-400'}`}>
-                            {tradeImpact.potentialProfit > 0 ? '+' : ''}{tradeImpact.potentialProfit.toFixed(2)}€
+                  </div>
+                  
+                  {/* Summary */}
+                  <div style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Resumen</div>
+                    {tradeImpact && tradeImpact.valid ? (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <span style={{ fontSize: 13, color: C.textMuted }}>Contratos</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{tradeImpact.shares.toFixed(1)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <span style={{ fontSize: 13, color: C.textMuted }}>Precio medio</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>€{tradeImpact.avgPrice.toFixed(3)}</span>
+                        </div>
+                        <div style={{ borderTop: `1px solid ${C.cardBorder}`, paddingTop: 10, marginTop: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, color: C.textMuted }}>Si aciertas</span>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 800, color: C.yes, fontSize: 18 }}>€{tradeImpact.potentialWinnings.toFixed(2)}</span>
                           </div>
-                          <div className="text-xs text-gray-400">
-                            ({tradeImpact.roi > 0 ? '+' : ''}{tradeImpact.roi.toFixed(0)}%)
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>Retorno</span>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 800, color: tradeImpact.potentialProfit > 0 ? C.yes : C.no }}>
+                              {tradeImpact.potentialProfit > 0 ? '+' : ''}{tradeImpact.potentialProfit.toFixed(2)}€ ({tradeImpact.roi > 0 ? '+' : ''}{tradeImpact.roi.toFixed(0)}%)
+                            </span>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div style={{ fontSize: 13, color: C.no }}>{tradeImpact?.error || 'Calculando...'}</div>
+                    )}
                   </div>
-                ) : (
-                  <div className="text-sm text-red-400">{tradeImpact?.error || 'Calculando...'}</div>
-                )}
-              </div>
+                  
+                  {/* Execute button */}
+                  <button
+                    onClick={executeTrade}
+                    disabled={!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing}
+                    style={{ 
+                      width: '100%', padding: '14px 0', borderRadius: 12, fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer',
+                      background: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? '#374151' : (tradeSide === 'YES' ? C.yes : C.no),
+                      color: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? C.textDim : '#fff',
+                      boxShadow: (!tradeImpact || !tradeImpact.valid) ? 'none' : `0 4px 16px ${tradeSide === 'YES' ? C.yes : C.no}40`
+                    }}
+                  >
+                    {processing ? 'Procesando...' : !tradeImpact ? 'Calculando...' : !tradeImpact.valid ? tradeImpact.error : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente' : `Predecir ${tradeSide === 'YES' ? 'SÍ' : 'NO'} — ${tradeAmount} créditos`}
+                  </button>
+                </>
+              )}
+              
+              {isExpired(selectedMarket.close_date) && (
+                <div style={{ padding: 20, background: `${C.no}10`, border: `1px solid ${C.no}25`, borderRadius: 12, textAlign: 'center' }}>
+                  <div style={{ fontSize: 24, marginBottom: 8 }}>🔒</div>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Mercado cerrado</div>
+                  <div style={{ fontSize: 13, color: C.textMuted }}>Pendiente de resolución automática por el oráculo.</div>
+                </div>
+              )}
+              
+              {/* Order Book */}
+              {recentActivity.length > 0 && (
+                <div style={{ marginTop: 20, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Actividad reciente</div>
+                  <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                    {recentActivity.slice(0, 15).map((a, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < recentActivity.length - 1 ? `1px solid ${C.cardBorder}` : 'none', fontSize: 12 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ 
+                            padding: '1px 6px', borderRadius: 4, fontWeight: 700, fontSize: 10,
+                            background: a.side === 'YES' ? C.yesBg : C.noBg,
+                            color: a.side === 'YES' ? C.yes : C.no
+                          }}>{a.side}</span>
+                          <span style={{ color: C.textMuted }}>{a.status === 'SOLD' ? 'Vendió' : 'Compró'}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{parseFloat(a.amount).toFixed(0)}€</span>
+                          <span style={{ color: C.textDim, fontSize: 10 }}>
+                            {new Date(a.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            
-            <button
-              onClick={executeTrade}
-              disabled={!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing}
-              className={`w-full mt-6 py-4 rounded-xl font-bold text-lg transition-all ${
-                !tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing
-                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                  : tradeSide === 'YES'
-                  ? 'bg-gradient-to-r from-[#1A7A3E] to-[#0D5C2B] hover:from-[#22C55E] hover:to-[#1A7A3E] shadow-lg shadow-green-500/30 border border-green-400/20'
-                  : 'bg-gradient-to-r from-red-700 to-red-900 hover:from-red-600 hover:to-red-800 shadow-lg shadow-red-500/30'
-              }`}
-            >
-              {processing ? 'Procesando...' : !tradeImpact ? 'Calculando...' : !tradeImpact.valid ? tradeImpact.error : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente' : `Apostar ${tradeSide} — €${tradeAmount}`}
-            </button>
           </div>
         </div>
       )}
 
       {/* Portfolio Modal */}
       {showPortfolio && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-700 rounded-2xl p-6 sm:p-8 max-w-4xl w-full my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Mis posiciones</h2>
-              <button onClick={() => setShowPortfolio(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
-            </div>
-            
-            {userTrades.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                No tienes posiciones activas
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)', zIndex: 50, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ minHeight: '100%', padding: 16 }}>
+            <div style={{ maxWidth: 700, margin: '20px auto', background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 24 }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, position: 'sticky', top: 0, background: C.card, paddingBottom: 12, zIndex: 1 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 800 }}>Mis posiciones</h2>
+                <button 
+                  onClick={() => setShowPortfolio(false)} 
+                  style={{ width: 36, height: 36, borderRadius: 10, background: C.surface, border: `1px solid ${C.cardBorder}`, color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >✕</button>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {userTrades.map((trade) => (
-                  <div key={trade.id} className="bg-black/50 border border-gray-800 rounded-xl p-4 sm:p-6">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-                      <div className="flex-1">
-                        <h3 className="font-bold mb-2">{trade.markets.title}</h3>
-                        <div className="flex flex-wrap gap-2">
-                          <span className={`text-xs px-3 py-1 rounded-full font-bold ${
-                            trade.side === 'YES' ? 'bg-[#1A7A3E]/30 text-[#22C55E]' : 'bg-red-900/30 text-red-400'
-                          }`}>
+              
+              {userTrades.filter(t => t.status === 'OPEN').length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: C.textDim }}>
+                  No tienes posiciones abiertas
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {userTrades.filter(t => t.status === 'OPEN').map((trade) => (
+                    <div key={trade.id} style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <h3 style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, lineHeight: 1.4 }}>{trade.markets.title}</h3>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ 
+                            fontSize: 11, padding: '2px 8px', borderRadius: 6, fontWeight: 700,
+                            background: trade.side === 'YES' ? C.yesBg : C.noBg,
+                            color: trade.side === 'YES' ? C.yes : C.no
+                          }}>
                             {trade.side} {trade.side === 'YES' ? trade.currentPrice.yes : trade.currentPrice.no}¢
                           </span>
-                          <span className="text-xs px-3 py-1 bg-gray-800 text-gray-400 rounded-full">
-                            {trade.shares.toFixed(1)} puntos
+                          <span style={{ fontSize: 11, padding: '2px 8px', background: C.card, color: C.textDim, borderRadius: 6 }}>
+                            {trade.shares.toFixed(1)} contratos
                           </span>
+                          {trade.isExpired && (
+                            <span style={{ fontSize: 11, padding: '2px 8px', background: `${C.no}15`, color: C.no, borderRadius: 6, fontWeight: 600 }}>
+                              🔒 Expirado
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <button 
-                        onClick={() => handleSell(trade)}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-bold transition-colors whitespace-nowrap"
-                      >
-                        Vender
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <div className="text-gray-500 text-xs mb-1">Invertido</div>
-                        <div className="font-mono font-bold">€{trade.amount.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500 text-xs mb-1">Valor ahora</div>
-                        <div className="font-mono font-bold">€{trade.currentValue.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500 text-xs mb-1">Si ganas</div>
-                        <div className="font-mono font-bold text-[#22C55E]">€{trade.potentialPayout.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500 text-xs mb-1">P/L</div>
-                        <div className={`font-mono font-bold ${trade.profit > 0 ? 'text-[#22C55E]' : 'text-red-400'}`}>
-                          {trade.profit > 0 ? '+' : ''}€{trade.profit.toFixed(2)}
+                      
+                      {!trade.isExpired && (
+                        <button 
+                          onClick={() => handleSell(trade)}
+                          style={{ width: '100%', padding: '8px 0', background: C.no, color: '#fff', borderRadius: 8, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', marginBottom: 12 }}
+                        >
+                          Vender
+                        </button>
+                      )}
+                      
+                      {trade.isExpired && (
+                        <div style={{ width: '100%', padding: '8px 0', background: '#374151', color: C.textDim, borderRadius: 8, fontWeight: 600, fontSize: 13, textAlign: 'center', marginBottom: 12 }}>
+                          ⏱ Pendiente resolución
+                        </div>
+                      )}
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>Invertido</div>
+                          <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14 }}>€{trade.amount.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>Valor venta</div>
+                          <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14 }}>€{trade.currentValue.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>Si aciertas</div>
+                          <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: C.yes }}>€{trade.potentialPayout.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>P/L</div>
+                          <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: trade.profit > 0 ? C.yes : C.no }}>
+                            {trade.profit > 0 ? '+' : ''}€{trade.profit.toFixed(2)}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* FASE 2: Leaderboard Modal */}
-      {showLeaderboard && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-700 rounded-2xl p-6 sm:p-8 max-w-2xl w-full my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">🏆 Ranking</h2>
-              <button onClick={() => setShowLeaderboard(false)} className="text-gray-400 hover:text-white text-2xl">✕</button>
-            </div>
-
-            {/* Tu perfil / Editar nombre */}
-            {user && (
-              <div className="mb-6 p-4 bg-black/50 border border-gray-800 rounded-xl">
-                {editingName ? (
-                  <div className="space-y-3">
-                    <div className="text-sm text-gray-400 mb-2">Elige tu nombre y avatar</div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newDisplayName}
-                        onChange={(e) => setNewDisplayName(e.target.value)}
-                        className="flex-1 bg-black border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-[#1A7A3E] focus:outline-none"
-                        placeholder="Tu nombre (2-20 chars)"
-                        maxLength={20}
-                      />
-                      <button
-                        onClick={handleSetDisplayName}
-                        className="px-4 py-2 bg-[#1A7A3E] rounded-lg text-sm font-bold hover:bg-[#0D5C2B]"
-                      >
-                        Guardar
-                      </button>
-                      <button
-                        onClick={() => setEditingName(false)}
-                        className="px-3 py-2 bg-gray-800 rounded-lg text-sm hover:bg-gray-700"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {AVATAR_EMOJIS.map(e => (
-                        <button
-                          key={e}
-                          onClick={() => setSelectedEmoji(e)}
-                          className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all ${
-                            selectedEmoji === e 
-                              ? 'bg-[#1A7A3E] border border-green-400/50 scale-110' 
-                              : 'bg-gray-800 hover:bg-gray-700'
-                          }`}
-                        >
-                          {e}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{myProfile?.avatar_emoji || '🎯'}</span>
-                      <div>
-                        <div className="font-bold">{myProfile?.display_name || user.email.split('@')[0]}</div>
-                        {myRank ? (
-                          <div className="text-xs text-gray-400">
-                            #{myRank.rank} · Profit: <span className={myRank.net_profit >= 0 ? 'text-[#22C55E]' : 'text-red-400'}>
-                              {myRank.net_profit >= 0 ? '+' : ''}€{parseFloat(myRank.net_profit).toFixed(0)}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-gray-500">Haz tu primer trade para aparecer</div>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setEditingName(true)
-                        setNewDisplayName(myProfile?.display_name || '')
-                        setSelectedEmoji(myProfile?.avatar_emoji || '🎯')
-                      }}
-                      className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg"
-                    >
-                      Editar
-                    </button>
-                  </div>
-                )}
+      {/* Profile Modal */}
+      {showProfile && user && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)', zIndex: 50, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ minHeight: '100%', padding: 16 }}>
+            <div style={{ maxWidth: 500, margin: '20px auto', background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 24 }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 800 }}>Mi perfil</h2>
+                <button 
+                  onClick={() => setShowProfile(false)} 
+                  style={{ width: 36, height: 36, borderRadius: 10, background: C.surface, border: `1px solid ${C.cardBorder}`, color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >✕</button>
               </div>
-            )}
-
-            {/* Tabla del ranking */}
-            {leaderboard.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                No hay traders con actividad esta semana
+              
+              {/* User info */}
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{ width: 60, height: 60, borderRadius: 30, background: `linear-gradient(135deg, ${C.accent}, ${C.accentDark})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, margin: '0 auto 12px' }}>
+                  👤
+                </div>
+                <div style={{ fontSize: 14, color: C.textMuted }}>{user.email}</div>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {leaderboard.map((entry, i) => (
-                  <div
-                    key={entry.user_email}
-                    className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-                      i === 0 ? 'bg-yellow-500/10 border border-yellow-500/20' :
-                      i === 1 ? 'bg-gray-400/10 border border-gray-400/20' :
-                      i === 2 ? 'bg-orange-500/10 border border-orange-500/20' :
-                      'bg-black/30 border border-gray-800'
-                    } ${user && entry.user_email === user.email ? 'ring-1 ring-[#1A7A3E]' : ''}`}
-                  >
-                    <div className="w-8 text-center font-bold text-lg">
-                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${entry.rank}`}
-                    </div>
-                    <span className="text-xl">{entry.avatar_emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-sm truncate">{entry.display_name}</div>
-                      <div className="text-xs text-gray-500">
-                        {entry.trades_this_week} trades · {parseFloat(entry.win_rate).toFixed(0)}% win
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`font-mono font-bold ${parseFloat(entry.net_profit) >= 0 ? 'text-[#22C55E]' : 'text-red-400'}`}>
-                        {parseFloat(entry.net_profit) >= 0 ? '+' : ''}€{parseFloat(entry.net_profit).toFixed(0)}
-                      </div>
-                      <div className="text-xs text-gray-500 font-mono">
-                        €{parseFloat(entry.current_balance).toFixed(0)}
-                      </div>
-                    </div>
+              
+              {/* Stats grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+                <div style={{ background: C.surface, borderRadius: 12, padding: 16, textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', marginBottom: 6 }}>Saldo</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'monospace', color: '#fff' }}>€{user.balance.toFixed(0)}</div>
+                </div>
+                <div style={{ background: C.surface, borderRadius: 12, padding: 16, textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', marginBottom: 6 }}>P/L Total</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'monospace', color: totalPnL >= 0 ? C.yes : C.no }}>
+                    {totalPnL >= 0 ? '+' : ''}€{totalPnL.toFixed(0)}
+                  </div>
+                </div>
+                <div style={{ background: C.surface, borderRadius: 12, padding: 16, textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', marginBottom: 6 }}>Invertido</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'monospace' }}>€{totalInvested.toFixed(0)}</div>
+                </div>
+                <div style={{ background: C.surface, borderRadius: 12, padding: 16, textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', marginBottom: 6 }}>Win Rate</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'monospace', color: C.accentLight }}>{winRate.toFixed(0)}%</div>
+                </div>
+              </div>
+              
+              {/* Stats detail */}
+              <div style={{ background: C.surface, borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Estadísticas</div>
+                {[
+                  { label: 'Posiciones abiertas', value: userTrades.filter(t => t.status === 'OPEN').length },
+                  { label: 'Posiciones cerradas', value: userTrades.filter(t => t.status !== 'OPEN').length },
+                  { label: 'Total operaciones', value: userTrades.length },
+                  { label: 'Saldo inicial', value: '€1.000' },
+                  { label: 'Retorno total', value: `${((user.balance - 1000) / 1000 * 100).toFixed(1)}%` },
+                ].map((stat, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < 4 ? `1px solid ${C.cardBorder}` : 'none' }}>
+                    <span style={{ fontSize: 13, color: C.textMuted }}>{stat.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>{stat.value}</span>
                   </div>
                 ))}
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}
