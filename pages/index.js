@@ -33,14 +33,14 @@ export default function Home() {
 
   function getOracleDescription(market) {
     const t = (market.title || '').toLowerCase()
-    if (t.includes('ibex')) return { source: 'Yahoo Finance — IBEX 35 (BME)', url: 'https://finance.yahoo.com/quote/%5EIBEX/', method: 'Comparación precio apertura vs cierre. Resolución automática tras cierre BME 17:35.' }
-    if (t.includes('luz') || t.includes('mwh')) return { source: 'OMIE / preciodelaluz.org', url: 'https://www.preciodelaluz.org', method: 'Precio medio pool eléctrico diario.' }
-    if (t.includes('temperatura') || t.includes('°c')) return { source: 'Open-Meteo (AEMET)', url: 'https://open-meteo.com', method: 'Temperatura máxima capitales de provincia.' }
-    if (t.includes('trending') || t.includes('sánchez') || t.includes('sanchez')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Frecuencia en noticias españolas como proxy de trending.' }
-    if (t.includes('real madrid') || t.includes('barça') || t.includes('barcelona')) return { source: 'football-data.org', url: 'https://www.football-data.org', method: 'Resultado oficial La Liga.' }
-    if (t.includes('ministro')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Monitoreo noticias polémicas ministeriales.' }
-    if (t.includes('vivienda') || t.includes('idealista')) return { source: 'INE / Idealista', url: 'https://www.idealista.com/informes/', method: 'Índice precios vivienda mensual.' }
-    return { source: 'Fuente verificable', url: '', method: 'Datos oficiales públicos.' }
+    if (t.includes('ibex')) return { source: 'Yahoo Finance — IBEX 35', url: 'https://finance.yahoo.com/quote/%5EIBEX/', method: 'Se resuelve SÍ si el IBEX 35 cierra con variación positiva respecto a la apertura en BME. Dato verificable tras las 17:35h.' }
+    if (t.includes('luz') || t.includes('mwh')) return { source: 'OMIE / preciodelaluz.org', url: 'https://www.preciodelaluz.org', method: 'Se resuelve SÍ si el precio medio del pool eléctrico diario supera el umbral indicado (€/MWh). Dato publicado por OMIE.' }
+    if (t.includes('grados') || t.includes('temperatura') || t.includes('°c')) return { source: 'Open-Meteo (AEMET)', url: 'https://open-meteo.com', method: 'Se resuelve SÍ si la temperatura máxima en alguna capital de provincia española supera el umbral. Fuente: estaciones AEMET vía Open-Meteo.' }
+    if (t.includes('trending') || t.includes('sánchez') || t.includes('sanchez') || t.includes('topic')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Se resuelve SÍ si el término aparece en 5+ noticias españolas del día. Proxy de tendencias basado en cobertura mediática.' }
+    if (t.includes('real madrid') || t.includes('barça') || t.includes('barcelona')) return { source: 'football-data.org', url: 'https://www.football-data.org', method: 'Se resuelve SÍ si el equipo gana su próximo partido oficial. Resultado final tras los 90 minutos (empate = NO).' }
+    if (t.includes('ministro')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Se resuelve SÍ si se detectan 3+ noticias sobre polémicas ministeriales en medios españoles durante el periodo.' }
+    if (t.includes('vivienda') || t.includes('idealista')) return { source: 'INE / Idealista', url: 'https://www.idealista.com/informes/', method: 'Se resuelve al publicarse el dato mensual de Idealista o el trimestral del INE. Compara precio m² mes actual vs anterior.' }
+    return { source: 'Fuente verificable', url: '', method: 'Resolución basada en datos oficiales públicos y verificables.' }
   }
   
   useEffect(() => {
@@ -326,13 +326,19 @@ export default function Home() {
               })()}
               
               {/* Chart */}
-              {priceHistory.length > 1 && (() => {
-                const prices = priceHistory.map(p => parseFloat(p.yes_price))
+              {(() => {
+                const rawPrices = priceHistory.map(p => parseFloat(p.yes_price))
+                const currentPrice = parseFloat(selectedMarket.prices.yes)
+                // Always start from 50% baseline + add current price
+                const prices = rawPrices.length > 0 ? [50, ...rawPrices, currentPrice] : [50, currentPrice]
+                if (prices.length < 2) return null
                 const minP = Math.max(0, Math.min(...prices) - 3)
                 const maxP = Math.min(100, Math.max(...prices) + 3)
                 const range = maxP - minP || 1
                 const first = prices[0], last = prices[prices.length - 1]
                 const trend = last > first ? C.yes : last < first ? C.no : C.accent
+                const firstTime = priceHistory.length > 0 ? priceHistory[0].created_at : selectedMarket.open_date
+                const lastTime = priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].created_at : new Date().toISOString()
                 return (
                   <div style={{ marginBottom: 16, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -344,22 +350,18 @@ export default function Home() {
                       </div>
                     </div>
                     <div style={{ height: 140, position: 'relative' }}>
-                      {/* Y axis labels */}
                       <div style={{ position: 'absolute', left: 0, top: 0, fontSize: 9, color: C.textDim }}>{maxP.toFixed(0)}%</div>
                       <div style={{ position: 'absolute', left: 0, bottom: 0, fontSize: 9, color: C.textDim }}>{minP.toFixed(0)}%</div>
-                      {/* 50% line */}
                       {minP < 50 && maxP > 50 && (
                         <div style={{ position: 'absolute', left: 20, right: 0, top: `${((maxP - 50) / range) * 100}%`, borderTop: `1px dashed ${C.cardBorder}`, zIndex: 0 }}>
                           <span style={{ position: 'absolute', left: -18, top: -7, fontSize: 9, color: C.textDim }}>50</span>
                         </div>
                       )}
                       <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ paddingLeft: 20 }}>
-                        {/* Fill area */}
                         <polygon
                           points={`${0},100 ${prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')} ${100},100`}
                           fill={`${trend}15`} stroke="none"
                         />
-                        {/* Line */}
                         <polyline
                           points={prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')}
                           fill="none" stroke={trend} strokeWidth="2.5" vectorEffect="non-scaling-stroke"
@@ -367,8 +369,8 @@ export default function Home() {
                       </svg>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: C.textDim, marginTop: 4, paddingLeft: 20 }}>
-                      <span>{new Date(priceHistory[0].created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                      <span>{new Date(priceHistory[priceHistory.length - 1].created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>Inicio (50%)</span>
+                      <span>Ahora ({currentPrice.toFixed(1)}%)</span>
                     </div>
                   </div>
                 )
