@@ -326,20 +326,53 @@ export default function Home() {
               })()}
               
               {/* Chart */}
-              {priceHistory.length > 1 && (
-                <div style={{ marginBottom: 16, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontSize: 12, color: C.textDim, marginBottom: 8 }}>Evolución del precio</div>
-                  <div style={{ height: 120, position: 'relative' }}>
-                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-                      <polyline points={priceHistory.map((p, i) => `${(i / Math.max(priceHistory.length - 1, 1)) * 100},${100 - parseFloat(p.yes_price)}`).join(' ')} fill="none" stroke={C.accent} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                    </svg>
-                    <div style={{ position: 'absolute', top: 4, right: 4, fontSize: 12, background: `${C.surface}dd`, padding: '2px 6px', borderRadius: 4 }}>
-                      <span style={{ color: C.yes, fontWeight: 700 }}>{selectedMarket.prices.yes}%</span>
-                      <span style={{ color: C.textDim }}> SÍ</span>
+              {priceHistory.length > 1 && (() => {
+                const prices = priceHistory.map(p => parseFloat(p.yes_price))
+                const minP = Math.max(0, Math.min(...prices) - 3)
+                const maxP = Math.min(100, Math.max(...prices) + 3)
+                const range = maxP - minP || 1
+                const first = prices[0], last = prices[prices.length - 1]
+                const trend = last > first ? C.yes : last < first ? C.no : C.accent
+                return (
+                  <div style={{ marginBottom: 16, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, color: C.textDim }}>Evolución del precio</div>
+                      <div style={{ fontSize: 12 }}>
+                        <span style={{ color: trend, fontWeight: 700 }}>{last.toFixed(1)}%</span>
+                        <span style={{ color: C.textDim }}> SÍ</span>
+                        <span style={{ color: C.textDim, marginLeft: 8, fontSize: 11 }}>({last > first ? '+' : ''}{(last - first).toFixed(1)})</span>
+                      </div>
+                    </div>
+                    <div style={{ height: 140, position: 'relative' }}>
+                      {/* Y axis labels */}
+                      <div style={{ position: 'absolute', left: 0, top: 0, fontSize: 9, color: C.textDim }}>{maxP.toFixed(0)}%</div>
+                      <div style={{ position: 'absolute', left: 0, bottom: 0, fontSize: 9, color: C.textDim }}>{minP.toFixed(0)}%</div>
+                      {/* 50% line */}
+                      {minP < 50 && maxP > 50 && (
+                        <div style={{ position: 'absolute', left: 20, right: 0, top: `${((maxP - 50) / range) * 100}%`, borderTop: `1px dashed ${C.cardBorder}`, zIndex: 0 }}>
+                          <span style={{ position: 'absolute', left: -18, top: -7, fontSize: 9, color: C.textDim }}>50</span>
+                        </div>
+                      )}
+                      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ paddingLeft: 20 }}>
+                        {/* Fill area */}
+                        <polygon
+                          points={`${0},100 ${prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')} ${100},100`}
+                          fill={`${trend}15`} stroke="none"
+                        />
+                        {/* Line */}
+                        <polyline
+                          points={prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')}
+                          fill="none" stroke={trend} strokeWidth="2.5" vectorEffect="non-scaling-stroke"
+                        />
+                      </svg>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: C.textDim, marginTop: 4, paddingLeft: 20 }}>
+                      <span>{new Date(priceHistory[0].created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>{new Date(priceHistory[priceHistory.length - 1].created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
               
               {!isExpired(selectedMarket.close_date) ? (
                 <>
