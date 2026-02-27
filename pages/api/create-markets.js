@@ -14,21 +14,45 @@ const supabase = createClient(
 async function fetchSpanishTrending() {
   const topics = []
 
-  // 1. Google News España — principales titulares
+  // 1. Google Trends RSS (funciona desde servidores)
   try {
-    const res = await fetch('https://news.google.com/rss?hl=es&gl=ES&ceid=ES:es', { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    const res = await fetch('https://trends.google.es/trends/trendingsearches/daily/rss?geo=ES', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'application/rss+xml, application/xml, text/xml' }
+    })
     const text = await res.text()
-    const titles = [...text.matchAll(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g)].map(m => m[1]).slice(1, 20)
-    titles.forEach(t => topics.push({ title: t, source: 'Google News ES' }))
-  } catch (e) { console.error('Google News error:', e) }
-
-  // 2. Google Trends España (RSS)
-  try {
-    const res = await fetch('https://trends.google.com/trending/rss?geo=ES', { headers: { 'User-Agent': 'Mozilla/5.0' } })
-    const text = await res.text()
-    const titles = [...text.matchAll(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g)].map(m => m[1]).slice(1, 10)
+    const titles = [...text.matchAll(/<title>([^<]+)<\/title>/g)].map(m => m[1]).filter(t => t !== 'Daily Search Trends' && t.length > 3).slice(0, 10)
     titles.forEach(t => topics.push({ title: t, source: 'Google Trends ES' }))
-  } catch (e) { console.error('Google Trends error:', e) }
+  } catch (e) { console.error('Trends error:', e.message) }
+
+  // 2. El País RSS
+  try {
+    const res = await fetch('https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada', {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    })
+    const text = await res.text()
+    const titles = [...text.matchAll(/<title>([^<]+)<\/title>/g)].map(m => m[1]).filter(t => t.length > 15 && !t.includes('EL PAÍS')).slice(0, 8)
+    titles.forEach(t => topics.push({ title: t, source: 'El País' }))
+  } catch (e) { console.error('El País error:', e.message) }
+
+  // 3. El Mundo RSS
+  try {
+    const res = await fetch('https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml', {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    })
+    const text = await res.text()
+    const titles = [...text.matchAll(/<title>([^<]+)<\/title>/g)].map(m => m[1]).filter(t => t.length > 15 && !t.includes('elmundo')).slice(0, 8)
+    titles.forEach(t => topics.push({ title: t, source: 'El Mundo' }))
+  } catch (e) { console.error('El Mundo error:', e.message) }
+
+  // 4. 20 Minutos RSS
+  try {
+    const res = await fetch('https://www.20minutos.es/rss/', {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    })
+    const text = await res.text()
+    const titles = [...text.matchAll(/<title>([^<]+)<\/title>/g)].map(m => m[1]).filter(t => t.length > 15 && !t.includes('20minutos')).slice(0, 5)
+    titles.forEach(t => topics.push({ title: t, source: '20 Minutos' }))
+  } catch (e) { console.error('20min error:', e.message) }
 
   return topics
 }
