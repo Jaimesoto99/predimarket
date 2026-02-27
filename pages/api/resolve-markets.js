@@ -167,7 +167,7 @@ function getOracleForMarket(market) {
   const t = market.title.toLowerCase()
   if (t.includes('ibex') && (t.includes('verde') || t.includes('cierra'))) return { fn: checkIBEXVerde, type: 'IBEX' }
   if (t.includes('luz') || t.includes('mwh')) { const m = t.match(/>(\d+)/); return { fn: () => checkPrecioLuz(m ? parseInt(m[1]) : 100), type: 'LUZ' } }
-  if (t.includes('c ') || t.includes('grados') || t.includes('temperatura')) { const m = t.match(/>?(\d+)/); return { fn: () => checkTemperatura(m ? parseInt(m[1]) : 30), type: 'TEMP' } }
+  if (t.includes('grados') || t.includes('temperatura') || t.includes('30°') || t.includes('30 c')) { const m = t.match(/>?(\d+)/); return { fn: () => checkTemperatura(m ? parseInt(m[1]) : 30), type: 'TEMP' } }
   if (t.includes('trending') || t.includes('topic')) { const kw = t.includes('nchez') ? 'Sánchez' : 'España'; return { fn: () => checkTrendingSpain(kw), type: 'TRENDING' } }
   if (t.includes('real madrid') && t.includes('gana')) return { fn: () => checkFootballResult('Real Madrid'), type: 'FUTBOL' }
   if ((t.includes('barça') || t.includes('barcelona')) && t.includes('gana')) return { fn: () => checkFootballResult('Barcelona'), type: 'FUTBOL' }
