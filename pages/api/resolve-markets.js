@@ -163,6 +163,39 @@ async function checkMinistroControversia() {
   } catch (err) { return null }
 }
 
+async function checkIdealista() {
+  try {
+    const res = await fetch('https://www.idealista.com/sala-de-prensa/informes-precio-vivienda/', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+    })
+    const html = await res.text()
+    // Look for price per m2 pattern: "X.XXX €/m2" or "X.XXX €/m²"
+    const priceMatch = html.match(/([\d.]+)\s*€\/m[2²]/i)
+    // Look for monthly variation: "+ X,X %" or "- X,X %"
+    const varMatch = html.match(/([+-])\s*([\d,]+)\s*%\s*(?:Evolución frente|frente a)/i)
+    
+    if (priceMatch) {
+      const price = parseFloat(priceMatch[1].replace('.', ''))
+      const isUp = varMatch ? varMatch[1] === '+' : null
+      const variation = varMatch ? parseFloat(varMatch[2].replace(',', '.')) : null
+      
+      if (isUp !== null) {
+        return {
+          outcome: isUp,
+          source: `Idealista Sala de Prensa — Precio m2 España: ${priceMatch[1]} €/m2. Variación mensual: ${varMatch[1]}${variation}%.`,
+          value: price,
+          oracleUrl: 'https://www.idealista.com/sala-de-prensa/informes-precio-vivienda/'
+        }
+      }
+    }
+    console.log('Idealista: no se encontró dato de precio')
+    return null
+  } catch (err) {
+    console.error('Error Idealista:', err)
+    return null
+  }
+}
+
 function getOracleForMarket(market) {
   const t = market.title.toLowerCase()
   if (t.includes('ibex') && (t.includes('verde') || t.includes('cierra'))) return { fn: checkIBEXVerde, type: 'IBEX' }
@@ -172,7 +205,7 @@ function getOracleForMarket(market) {
   if (t.includes('real madrid') && t.includes('gana')) return { fn: () => checkFootballResult('Real Madrid'), type: 'FUTBOL' }
   if ((t.includes('barça') || t.includes('barcelona')) && t.includes('gana')) return { fn: () => checkFootballResult('Barcelona'), type: 'FUTBOL' }
   if (t.includes('ministro') && (t.includes('polémica') || t.includes('polemica'))) return { fn: checkMinistroControversia, type: 'NOTICIAS' }
-  if (t.includes('vivienda') || t.includes('idealista')) return { fn: async () => null, type: 'VIVIENDA_PENDIENTE' }
+  if (t.includes('vivienda') || t.includes('idealista')) return { fn: checkIdealista, type: 'VIVIENDA' }
   return null
 }
 

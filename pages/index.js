@@ -170,10 +170,28 @@ export default function Home() {
     return true
   })
 
-  const totalInvested = userTrades.filter(t => t.status === 'OPEN').reduce((s, t) => s + t.amount, 0)
-  const totalPnL = userTrades.reduce((s, t) => s + (t.profit || 0), 0)
-  const winRate = userTrades.filter(t => t.status === 'SOLD').length > 0
-    ? (userTrades.filter(t => t.status === 'SOLD' && t.pnl > 0).length / userTrades.filter(t => t.status === 'SOLD').length * 100) : 0
+  const realizedTrades = userTrades.filter(t => t.status === 'WON' || t.status === 'LOST' || t.status === 'SOLD')
+  const openTrades = userTrades.filter(t => t.status === 'OPEN')
+  const realizedPnL = realizedTrades.reduce((s, t) => s + (t.pnl || 0), 0)
+  const totalInvested = openTrades.reduce((s, t) => s + t.amount, 0)
+  const wonTrades = userTrades.filter(t => t.status === 'WON')
+  const lostTrades = userTrades.filter(t => t.status === 'LOST')
+  const soldTrades = userTrades.filter(t => t.status === 'SOLD')
+  const winRate = (wonTrades.length + lostTrades.length) > 0
+    ? (wonTrades.length / (wonTrades.length + lostTrades.length) * 100) : 0
+  
+  // Category breakdown
+  const catBreakdown = {}
+  userTrades.forEach(t => {
+    const cat = t.markets?.category || 'OTRO'
+    if (!catBreakdown[cat]) catBreakdown[cat] = { count: 0, pnl: 0, won: 0, lost: 0 }
+    catBreakdown[cat].count++
+    catBreakdown[cat].pnl += (t.pnl || 0)
+    if (t.status === 'WON') catBreakdown[cat].won++
+    if (t.status === 'LOST') catBreakdown[cat].lost++
+  })
+  const catColors = { ECONOMIA: '#8b5cf6', POLITICA: '#f59e0b', DEPORTES: '#34d399', ENERGIA: '#f87171', CLIMA: '#60a5fa', ACTUALIDAD: '#a78bfa', OTRO: '#71717a' }
+  const catEmojis = { ECONOMIA: '📈', POLITICA: '🏛', DEPORTES: '⚽', ENERGIA: '⚡', CLIMA: '🌡', ACTUALIDAD: '📰', OTRO: '📋' }
 
   const S = {
     modal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)', zIndex: 50, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
@@ -547,40 +565,116 @@ export default function Home() {
       {showProfile && user && (
         <div style={S.modal}>
           <div style={{ minHeight: '100%', padding: 16 }}>
-            <div style={{ ...S.panel, maxWidth: 500, margin: '20px auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <h2 style={{ fontSize: 20, fontWeight: 800 }}>Mi perfil</h2>
+            <div style={{ ...S.panel, maxWidth: 560, margin: '20px auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 700 }}>Mi perfil</h2>
                 <button onClick={() => setShowProfile(false)} style={S.closeBtn}>✕</button>
               </div>
-              <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                <div style={{ width: 60, height: 60, borderRadius: 30, background: `linear-gradient(135deg, ${C.accent}, ${C.accentDark})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, margin: '0 auto 12px' }}>👤</div>
-                <div style={{ fontSize: 14, color: C.textMuted }}>{user.email}</div>
+              
+              {/* User header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24, padding: 16, background: C.surface, borderRadius: 10 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 24, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>{user.display_name || user.email.split('@')[0]}</div>
+                  <div style={{ fontSize: 12, color: C.textDim }}>{user.email}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace' }}>€{user.balance.toFixed(0)}</div>
+                  <div style={{ fontSize: 10, color: C.textDim }}>Saldo actual</div>
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-                {[
-                  ['Saldo', `€${user.balance.toFixed(0)}`, null],
-                  ['P/L Total', `${totalPnL >= 0 ? '+' : ''}€${totalPnL.toFixed(0)}`, totalPnL >= 0 ? C.yes : C.no],
-                  ['Invertido', `€${totalInvested.toFixed(0)}`, null],
-                  ['Win Rate', `${winRate.toFixed(0)}%`, C.accentLight],
-                ].map(([label, val, col], i) => (
-                  <div key={i} style={{ background: C.surface, borderRadius: 12, padding: 16, textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
-                    <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'monospace', color: col || '#fff' }}>{val}</div>
+
+              {/* KPIs row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
+                <div style={{ background: C.surface, borderRadius: 10, padding: 14, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>P/L Realizado</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: realizedPnL >= 0 ? C.yes : C.no }}>
+                    {realizedPnL >= 0 ? '+' : ''}€{realizedPnL.toFixed(0)}
                   </div>
-                ))}
+                  <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>Solo trades cerrados</div>
+                </div>
+                <div style={{ background: C.surface, borderRadius: 10, padding: 14, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>Win Rate</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: winRate >= 50 ? C.yes : C.no }}>
+                    {winRate.toFixed(0)}%
+                  </div>
+                  <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>{wonTrades.length}W / {lostTrades.length}L</div>
+                </div>
+                <div style={{ background: C.surface, borderRadius: 10, padding: 14, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>YTD Return</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: (user.balance - 1000) >= 0 ? C.yes : C.no }}>
+                    {((user.balance - 1000) / 10).toFixed(1)}%
+                  </div>
+                  <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>vs 1.000 inicial</div>
+                </div>
               </div>
-              <div style={{ background: C.surface, borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Estadísticas</div>
+
+              {/* Open exposure */}
+              {openTrades.length > 0 && (
+                <div style={{ background: `${C.warning}08`, border: `1px solid ${C.warning}20`, borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.warning }}>Posiciones abiertas</div>
+                      <div style={{ fontSize: 11, color: C.textDim }}>{openTrades.length} trades · €{totalInvested.toFixed(0)} expuesto</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textMuted }}>Pendiente resolución</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Category breakdown */}
+              {Object.keys(catBreakdown).length > 0 && (
+                <div style={{ background: C.surface, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Desglose por categoría</div>
+                  {/* Bar chart */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', gap: 1 }}>
+                      {Object.entries(catBreakdown).map(([cat, data]) => (
+                        <div key={cat} style={{ flex: data.count, background: catColors[cat] || C.textDim, minWidth: 4, transition: 'flex 0.3s' }} title={`${cat}: ${data.count} trades`} />
+                      ))}
+                    </div>
+                  </div>
+                  {/* Category list */}
+                  {Object.entries(catBreakdown).sort((a, b) => b[1].count - a[1].count).map(([cat, data]) => {
+                    const catWr = (data.won + data.lost) > 0 ? (data.won / (data.won + data.lost) * 100) : 0
+                    return (
+                      <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.cardBorder}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 14 }}>{catEmojis[cat] || '📋'}</span>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 600 }}>{cat}</div>
+                            <div style={{ fontSize: 10, color: C.textDim }}>{data.count} trades · WR {catWr.toFixed(0)}%</div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace', color: data.pnl >= 0 ? C.yes : C.no }}>
+                            {data.pnl >= 0 ? '+' : ''}€{data.pnl.toFixed(0)}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Detailed stats */}
+              <div style={{ background: C.surface, borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Estadísticas detalladas</div>
                 {[
-                  ['Posiciones abiertas', userTrades.filter(t => t.status === 'OPEN').length],
-                  ['Posiciones cerradas', userTrades.filter(t => t.status !== 'OPEN').length],
                   ['Total operaciones', userTrades.length],
-                  ['Saldo inicial', '€1.000'],
-                  ['Retorno total', `${((user.balance - 1000) / 1000 * 100).toFixed(1)}%`],
-                ].map(([label, val], i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < 4 ? `1px solid ${C.cardBorder}` : 'none' }}>
-                    <span style={{ fontSize: 13, color: C.textMuted }}>{label}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>{val}</span>
+                  ['Ganadas', wonTrades.length, C.yes],
+                  ['Perdidas', lostTrades.length, C.no],
+                  ['Vendidas antes', soldTrades.length, C.accentLight],
+                  ['Abiertas', openTrades.length, C.warning],
+                  ['Mayor ganancia', realizedTrades.length > 0 ? '€' + Math.max(0, ...realizedTrades.map(t => t.pnl || 0)).toFixed(0) : '—', C.yes],
+                  ['Mayor pérdida', realizedTrades.length > 0 ? '€' + Math.min(0, ...realizedTrades.map(t => t.pnl || 0)).toFixed(0) : '—', C.no],
+                  ['Avg por trade', realizedTrades.length > 0 ? '€' + (realizedPnL / realizedTrades.length).toFixed(1) : '—'],
+                  ['Capital inicial', '€1.000'],
+                  ['Saldo actual', '€' + user.balance.toFixed(0), user.balance >= 1000 ? C.yes : C.no],
+                ].map(([label, val, col], i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 9 ? `1px solid ${C.cardBorder}` : 'none' }}>
+                    <span style={{ fontSize: 12, color: C.textMuted }}>{label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'monospace', color: col || C.text }}>{val}</span>
                   </div>
                 ))}
               </div>
