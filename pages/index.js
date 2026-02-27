@@ -23,12 +23,12 @@ export default function Home() {
   const [filter, setFilter] = useState('ALL')
   
   const C = {
-    bg: '#0a0f1a', card: '#111827', cardBorder: '#1e293b', cardHover: '#2563eb',
-    accent: '#3b82f6', accentLight: '#60a5fa', accentDark: '#1d4ed8',
-    yes: '#22c55e', yesBg: 'rgba(34,197,94,0.12)', yesBorder: 'rgba(34,197,94,0.25)',
-    no: '#ef4444', noBg: 'rgba(239,68,68,0.12)', noBorder: 'rgba(239,68,68,0.25)',
-    text: '#e2e8f0', textMuted: '#94a3b8', textDim: '#64748b',
-    surface: '#0f172a', warning: '#f59e0b',
+    bg: '#09090b', card: '#18181b', cardBorder: '#27272a', cardHover: '#7c3aed',
+    accent: '#8b5cf6', accentLight: '#a78bfa', accentDark: '#6d28d9',
+    yes: '#34d399', yesBg: 'rgba(52,211,153,0.08)', yesBorder: 'rgba(52,211,153,0.18)',
+    no: '#f87171', noBg: 'rgba(248,113,113,0.08)', noBorder: 'rgba(248,113,113,0.18)',
+    text: '#fafafa', textMuted: '#a1a1aa', textDim: '#71717a',
+    surface: '#0f0f12', warning: '#fbbf24',
   }
 
   function getOracleDescription(market) {
@@ -182,16 +182,16 @@ export default function Home() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: `linear-gradient(180deg, ${C.bg} 0%, #000 100%)`, color: C.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', fontSize: 14 }}>
       
       {/* ===== HEADER ===== */}
-      <header style={{ borderBottom: `1px solid ${C.cardBorder}`, background: C.surface, position: 'sticky', top: 0, zIndex: 50, backdropFilter: 'blur(20px)' }}>
+      <header style={{ borderBottom: `1px solid ${C.cardBorder}`, background: `${C.bg}ee`, position: 'sticky', top: 0, zIndex: 50, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, background: `linear-gradient(135deg, ${C.accent}, ${C.accentDark})`, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, color: '#fff', boxShadow: `0 4px 12px ${C.accent}40` }}>P</div>
+            <div style={{ width: 32, height: 32, background: C.accent, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff' }}>P</div>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>PrediMarket</div>
-              <div style={{ fontSize: 10, color: C.accentLight, fontWeight: 600, letterSpacing: '0.05em' }}>BETA</div>
+              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em' }}>PrediMarket</div>
+              <div style={{ fontSize: 9, color: C.textDim, fontWeight: 500, letterSpacing: '0.08em' }}>BETA</div>
             </div>
           </div>
           {user ? (
@@ -213,12 +213,12 @@ export default function Home() {
 
       {/* ===== HERO ===== */}
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 16px 24px', textAlign: 'center' }}>
-        <h2 style={{ fontSize: 'clamp(28px, 5vw, 48px)', fontWeight: 800, marginBottom: 12, lineHeight: 1.1, letterSpacing: '-0.03em' }}>
+        <h2 style={{ fontSize: 'clamp(28px, 5vw, 44px)', fontWeight: 700, marginBottom: 12, lineHeight: 1.15, letterSpacing: '-0.03em', color: '#fafafa' }}>
           Predice eventos <br />
-          <span style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.accentLight})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>verificables</span>
+          <span style={{ color: C.accentLight }}>verificables</span>
         </h2>
-        <p style={{ fontSize: 16, color: C.textMuted, marginBottom: 20, maxWidth: 500, margin: '0 auto 20px' }}>Mercados sobre indicadores económicos y actualidad española. Precios en tiempo real.</p>
-        {!user && <button onClick={() => setShowAuth(true)} style={{ padding: '12px 28px', background: C.accent, borderRadius: 10, fontWeight: 700, fontSize: 15, color: '#fff', border: 'none', cursor: 'pointer', boxShadow: `0 4px 20px ${C.accent}40` }}>Empieza con 1.000 créditos gratis</button>}
+        <p style={{ fontSize: 15, color: C.textMuted, marginBottom: 20, maxWidth: 460, margin: '0 auto 20px', lineHeight: 1.5 }}>Mercados sobre indicadores económicos y actualidad española.</p>
+        {!user && <button onClick={() => setShowAuth(true)} style={{ padding: '10px 24px', background: C.accent, borderRadius: 8, fontWeight: 600, fontSize: 14, color: '#fff', border: 'none', cursor: 'pointer' }}>Empieza con 1.000 créditos gratis</button>}
       </div>
 
       {/* ===== FILTERS ===== */}
@@ -240,9 +240,9 @@ export default function Home() {
               const ti = getTypeInfo(m)
               const oracle = getOracleDescription(m)
               return (
-                <div key={m.id} onClick={() => openTradeModal(m)} style={{ background: C.card, border: `1px solid ${exp ? '#374151' : C.cardBorder}`, borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'all 0.2s', opacity: exp ? 0.6 : 1 }}
-                  onMouseEnter={e => { if (!exp) e.currentTarget.style.borderColor = C.accent }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = exp ? '#374151' : C.cardBorder }}>
+                <div key={m.id} onClick={() => openTradeModal(m)} style={{ background: C.card, border: `1px solid ${exp ? '#27272a' : C.cardBorder}`, borderRadius: 12, padding: 20, cursor: 'pointer', transition: 'all 0.15s', opacity: exp ? 0.5 : 1 }}
+                  onMouseEnter={e => { if (!exp) { e.currentTarget.style.borderColor = C.accent + '60'; e.currentTarget.style.background = '#1f1f23' } }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = exp ? '#27272a' : C.cardBorder; e.currentTarget.style.background = C.card }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <span style={{ fontSize: 11, padding: '2px 8px', background: C.surface, color: C.textMuted, borderRadius: 6, fontWeight: 600 }}>{m.category}</span>
@@ -266,7 +266,7 @@ export default function Home() {
                     <span>{m.active_traders || m.total_traders || 0} traders</span>
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim, textAlign: 'center', marginBottom: 10 }}>📡 {oracle.source}</div>
-                  <button style={{ width: '100%', padding: '10px 0', borderRadius: 10, fontWeight: 700, fontSize: 14, border: 'none', cursor: exp ? 'not-allowed' : 'pointer', background: exp ? '#374151' : C.accent, color: exp ? C.textDim : '#fff' }}>
+                  <button style={{ width: '100%', padding: '9px 0', borderRadius: 8, fontWeight: 600, fontSize: 13, border: 'none', cursor: exp ? 'not-allowed' : 'pointer', background: exp ? '#27272a' : C.accent, color: exp ? C.textDim : '#fff', transition: 'all 0.15s' }}>
                     {exp ? '⏱ Pendiente resolución' : 'Predecir'}
                   </button>
                 </div>
@@ -435,24 +435,59 @@ export default function Home() {
                 </div>
               )}
               
-              {/* Order Book */}
-              {recentActivity.length > 0 && (
+              {/* Liquidity / Order Book */}
+              {selectedMarket && (
                 <div style={{ marginTop: 20, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Actividad reciente</div>
-                  <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                    {recentActivity.slice(0, 15).map((a, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < 14 ? `1px solid ${C.cardBorder}` : 'none', fontSize: 12 }}>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <span style={{ padding: '1px 6px', borderRadius: 4, fontWeight: 700, fontSize: 10, background: a.side === 'YES' ? C.yesBg : C.noBg, color: a.side === 'YES' ? C.yes : C.no }}>{a.side}</span>
-                          <span style={{ color: C.textMuted }}>{a.status === 'SOLD' ? 'Vendió' : 'Compró'}</span>
+                  <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Liquidez del mercado</div>
+                  {/* Pool visualization */}
+                  {(() => {
+                    const yesPool = parseFloat(selectedMarket.yes_pool)
+                    const noPool = parseFloat(selectedMarket.no_pool)
+                    const total = yesPool + noPool
+                    const yesPct = (yesPool / total * 100).toFixed(1)
+                    const noPct = (noPool / total * 100).toFixed(1)
+                    return (
+                      <div>
+                        <div style={{ display: 'flex', gap: 2, marginBottom: 12, height: 8, borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ width: `${yesPct}%`, background: C.yes, borderRadius: '4px 0 0 4px', transition: 'width 0.3s' }} />
+                          <div style={{ width: `${noPct}%`, background: C.no, borderRadius: '0 4px 4px 0', transition: 'width 0.3s' }} />
                         </div>
-                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{parseFloat(a.amount).toFixed(0)}€</span>
-                          <span style={{ color: C.textDim, fontSize: 10 }}>{new Date(a.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <div style={{ background: C.yesBg, border: `1px solid ${C.yesBorder}`, borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 10, color: C.yes, marginBottom: 4, fontWeight: 600 }}>POOL SÍ</div>
+                            <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'monospace', color: C.yes }}>€{yesPool.toFixed(0)}</div>
+                            <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{yesPct}% del total</div>
+                          </div>
+                          <div style={{ background: C.noBg, border: `1px solid ${C.noBorder}`, borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                            <div style={{ fontSize: 10, color: C.no, marginBottom: 4, fontWeight: 600 }}>POOL NO</div>
+                            <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'monospace', color: C.no }}>€{noPool.toFixed(0)}</div>
+                            <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{noPct}% del total</div>
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textDim }}>
+                          <span>Pool total: €{total.toFixed(0)}</span>
+                          <span>Vol: €{parseFloat(selectedMarket.total_volume).toFixed(0)}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )
+                  })()}
+                  {/* Recent trades below */}
+                  {recentActivity.length > 0 && (
+                    <div style={{ marginTop: 14, borderTop: `1px solid ${C.cardBorder}`, paddingTop: 12 }}>
+                      <div style={{ fontSize: 10, color: C.textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Últimas operaciones</div>
+                      <div style={{ maxHeight: 140, overflowY: 'auto' }}>
+                        {recentActivity.slice(0, 10).map((a, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 11 }}>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <span style={{ padding: '1px 5px', borderRadius: 3, fontWeight: 700, fontSize: 9, background: a.side === 'YES' ? C.yesBg : C.noBg, color: a.side === 'YES' ? C.yes : C.no }}>{a.side}</span>
+                              <span style={{ color: C.textDim }}>{parseFloat(a.amount).toFixed(0)}€</span>
+                            </div>
+                            <span style={{ color: C.textDim, fontSize: 10 }}>{new Date(a.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
