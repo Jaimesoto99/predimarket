@@ -23,6 +23,18 @@ export default function Home() {
   const [recentActivity, setRecentActivity] = useState([])
   const [filter, setFilter] = useState('ALL')
   
+  function getOracleDescription(market) {
+    const t = (market.title || '').toLowerCase()
+    if (t.includes('ibex')) return { source: 'Yahoo Finance — IBEX 35 (BME)', url: 'https://finance.yahoo.com/quote/%5EIBEX/', method: 'Comparación precio apertura vs cierre. Resolución automática tras cierre BME 17:35.' }
+    if (t.includes('luz') || t.includes('mwh')) return { source: 'OMIE / preciodelaluz.org', url: 'https://www.preciodelaluz.org', method: 'Precio medio pool eléctrico diario.' }
+    if (t.includes('temperatura') || t.includes('°c')) return { source: 'Open-Meteo (AEMET)', url: 'https://open-meteo.com', method: 'Temperatura máxima capitales de provincia.' }
+    if (t.includes('trending') || t.includes('sánchez')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Frecuencia en noticias españolas.' }
+    if (t.includes('real madrid') || t.includes('barça')) return { source: 'football-data.org', url: 'https://www.football-data.org', method: 'Resultado oficial La Liga.' }
+    if (t.includes('ministro')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Monitoreo noticias polémicas ministeriales.' }
+    if (t.includes('vivienda') || t.includes('idealista')) return { source: 'INE / Idealista', url: 'https://www.idealista.com/informes/', method: 'Índice precios vivienda mensual.' }
+    return { source: 'Fuente verificable', url: '', method: 'Datos oficiales públicos.' }
+  }
+  
   // Colores - Paleta fintech dark + azul
   const C = {
     bg: '#0a0f1a',
@@ -395,6 +407,9 @@ export default function Home() {
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textDim, marginBottom: 12 }}>
                     <span>Vol: €{(m.total_volume / 1000).toFixed(1)}K</span>
+                    <div style={{ fontSize: 10, color: C.textDim, textAlign: 'center', marginBottom: 8 }}>
+                    📡 {getOracleDescription(m).source}
+                  </div>
                     <span>{m.active_traders || m.total_traders || 0} traders</span>
                   </div>
                   
@@ -485,6 +500,18 @@ export default function Home() {
                 </div>
               )}
               
+              {(() => {
+                const oracle = getOracleDescription(selectedMarket)
+                return (
+                  <div style={{ marginBottom: 16, background: C.surface, border: '1px solid ' + C.cardBorder, borderRadius: 12, padding: 14 }}>
+                    <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Oráculo de resolución</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.accentLight, marginBottom: 4 }}>{oracle.source}</div>
+                    <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.4 }}>{oracle.method}</div>
+                    {oracle.url && <a href={oracle.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.accent, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Ver fuente ↗</a>}
+                  </div>
+                )
+              })()}
+
               {!isExpired(selectedMarket.close_date) && (
                 <>
                   {/* YES / NO buttons */}
