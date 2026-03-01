@@ -343,11 +343,6 @@ export default function Home() {
 
           {/* Nav right */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              onClick={() => { setShowLeaderboard(true); loadLeaderboard() }}
-              style={{ padding: '6px 13px', borderRadius: 6, background: 'transparent', border: `1px solid ${C.cardBorder}`, color: C.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
-              Ranking
-            </button>
 
             {user ? (
               <>

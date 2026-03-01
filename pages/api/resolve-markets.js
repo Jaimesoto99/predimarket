@@ -255,19 +255,45 @@ export default async function handler(req, res) {
         : { id: market.id, title: market.title, status: 'RESOLVED', outcome: oracleResult.outcome, source: oracleResult.source })
     }
 
-    const recurring = await createRecurringMarkets()
-    // Expirar órdenes límite de mercados cerrados
-  let expiredOrders = 0
-  try {
-    const { data: expData } = await supabase.rpc('expire_limit_orders')
-    expiredOrders = expData || 0
-  } catch (e) { console.error('Error expiring limit orders:', e) }
+    // Redistribuir ganancias en mercados ya RESOLVED pero con trades aún OPEN
+    // (mercados resueltos antes de que existiera la llamada a distribute_winnings)
+    const redistributed = []
+    try {
+      const { data: resolvedWithOpenTrades } = await supabase
+        .from('markets')
+        .select('id, title')
+        .eq('status', 'RESOLVED')
+        .not('resolved_outcome', 'is', null)
+      for (const m of (resolvedWithOpenTrades || [])) {
+        const { data: openTrades } = await supabase
+          .from('trades')
+          .select('id')
+          .eq('market_id', m.id)
+          .eq('status', 'OPEN')
+          .limit(1)
+        if (openTrades && openTrades.length > 0) {
+          try {
+            await supabase.rpc('distribute_winnings', { p_market_id: m.id })
+            redistributed.push({ id: m.id, title: m.title, status: 'REDISTRIBUTED' })
+          } catch (e) { console.error('Error redistributing:', m.id, e) }
+        }
+      }
+    } catch (e) { console.error('Error en redistribución:', e) }
 
-  return res.status(200).json({
+    const recurring = await createRecurringMarkets()
+    let expiredOrders = 0
+    try {
+      const { data: expData } = await supabase.rpc('expire_limit_orders')
+      expiredOrders = expData || 0
+    } catch (e) { console.error('Error expiring limit orders:', e) }
+
+    return res.status(200).json({
       timestamp: new Date().toISOString(),
       resolved: results.filter(r => r.status === 'RESOLVED').length,
       pending: results.filter(r => r.status !== 'RESOLVED').length,
+      redistributed: redistributed.length,
       details: results,
+      redistributed_details: redistributed,
       recurring,
       expired_orders: expiredOrders
     })
