@@ -247,18 +247,29 @@ export default async function handler(req, res) {
       const oracleResult = await oracle.fn()
       if (!oracleResult) { results.push({ id: market.id, title: market.title, status: 'ORACLE_UNAVAILABLE', type: oracle.type }); continue }
       const { error: rErr } = await supabase.rpc('resolve_market_manual', { p_market_id: market.id, p_outcome: oracleResult.outcome, p_source: oracleResult.source })
+      if (!rErr) {
+        try { await supabase.rpc('distribute_winnings', { p_market_id: market.id }) } catch (e) { console.error('Error distributing winnings:', market.id, e) }
+      }
       results.push(rErr
         ? { id: market.id, title: market.title, status: 'ERROR', error: rErr.message }
         : { id: market.id, title: market.title, status: 'RESOLVED', outcome: oracleResult.outcome, source: oracleResult.source })
     }
 
     const recurring = await createRecurringMarkets()
-    return res.status(200).json({
+    // Expirar órdenes límite de mercados cerrados
+  let expiredOrders = 0
+  try {
+    const { data: expData } = await supabase.rpc('expire_limit_orders')
+    expiredOrders = expData || 0
+  } catch (e) { console.error('Error expiring limit orders:', e) }
+
+  return res.status(200).json({
       timestamp: new Date().toISOString(),
       resolved: results.filter(r => r.status === 'RESOLVED').length,
       pending: results.filter(r => r.status !== 'RESOLVED').length,
       details: results,
-      recurring
+      recurring,
+      expired_orders: expiredOrders
     })
   } catch (err) {
     return res.status(500).json({ error: err.message })

@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
-import { getActiveMarkets, getOrCreateUser, createTrade, getUserTrades, getPriceHistory, sellPosition } from '../lib/supabase'
+import { getActiveMarkets, getResolvedMarkets, getOrCreateUser, createTrade, getUserTrades, getPriceHistory, sellPosition } from '../lib/supabase'
 import { previewTrade, previewSellValue, calculatePrices } from '../lib/amm'
 import { supabase } from '../lib/supabase'
+import { getLeaderboard } from '../lib/leaderboard'
 
 export default function Home() {
+  // ─── State ───────────────────────────────────────────────────────────────
   const [markets, setMarkets] = useState([])
+  const [resolvedMarkets, setResolvedMarkets] = useState([])
+  const [showResolved, setShowResolved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
@@ -15,84 +19,166 @@ export default function Home() {
   const [showTradeModal, setShowTradeModal] = useState(false)
   const [showPortfolio, setShowPortfolio] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [userTrades, setUserTrades] = useState([])
+  const [leaderboard, setLeaderboard] = useState([])
   const [priceHistory, setPriceHistory] = useState([])
   const [tradeImpact, setTradeImpact] = useState(null)
   const [processing, setProcessing] = useState(false)
   const [recentActivity, setRecentActivity] = useState([])
   const [filter, setFilter] = useState('ALL')
-  
+  const [orderBook, setOrderBook] = useState([])
+  const [userOrders, setUserOrders] = useState([])
+  const [orderMode, setOrderMode] = useState('MARKET')
+  const [limitPrice, setLimitPrice] = useState(0.40)
+
+  // ─── Colors ──────────────────────────────────────────────────────────────
   const C = {
-    bg: '#09090b', card: '#18181b', cardBorder: '#27272a', cardHover: '#7c3aed',
-    accent: '#8b5cf6', accentLight: '#a78bfa', accentDark: '#6d28d9',
-    yes: '#34d399', yesBg: 'rgba(52,211,153,0.08)', yesBorder: 'rgba(52,211,153,0.18)',
-    no: '#f87171', noBg: 'rgba(248,113,113,0.08)', noBorder: 'rgba(248,113,113,0.18)',
-    text: '#fafafa', textMuted: '#a1a1aa', textDim: '#71717a',
-    surface: '#0f0f12', warning: '#fbbf24',
+    bg: '#09090b',
+    card: '#18181b',
+    cardBorder: '#27272a',
+    cardBorderHover: '#3f3f46',
+    accent: '#8b5cf6',
+    accentLight: '#a78bfa',
+    yes: '#34d399',
+    yesBg: 'rgba(52,211,153,0.06)',
+    yesBorder: 'rgba(52,211,153,0.14)',
+    no: '#f87171',
+    noBg: 'rgba(248,113,113,0.06)',
+    noBorder: 'rgba(248,113,113,0.14)',
+    text: '#fafafa',
+    textMuted: '#a1a1aa',
+    textDim: '#71717a',
+    surface: '#0f0f12',
+    warning: '#f59e0b',
+    divider: '#1f1f23',
   }
 
+  // ─── Style helpers ───────────────────────────────────────────────────────
+  const modal = {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
+    backdropFilter: 'blur(12px)', zIndex: 50, overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+  }
+  const panel = {
+    background: C.card, border: `1px solid ${C.cardBorder}`,
+    borderRadius: 12, padding: 24,
+  }
+  const closeBtn = {
+    width: 32, height: 32, borderRadius: 6, background: 'transparent',
+    border: `1px solid ${C.cardBorder}`, color: C.textMuted, cursor: 'pointer',
+    fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  }
+  const inputStyle = {
+    width: '100%', background: C.surface, border: `1px solid ${C.cardBorder}`,
+    borderRadius: 7, padding: '10px 14px', color: C.text, fontSize: 14,
+    outline: 'none', boxSizing: 'border-box',
+  }
+  function badge(color) {
+    return {
+      fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 600,
+      letterSpacing: '0.06em', textTransform: 'uppercase',
+      border: `1px solid ${color}35`, color: color, background: `${color}0c`,
+      display: 'inline-block',
+    }
+  }
+  function sectionLabel(text) {
+    return (
+      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10 }}>
+        {text}
+      </div>
+    )
+  }
+
+  // ─── Oracle descriptions ─────────────────────────────────────────────────
   function getOracleDescription(market) {
     const t = (market.title || '').toLowerCase()
     if (t.includes('ibex')) return { source: 'Yahoo Finance — IBEX 35', url: 'https://finance.yahoo.com/quote/%5EIBEX/', method: 'Se resuelve SÍ si el IBEX 35 cierra con variación positiva respecto a la apertura en BME. Dato verificable tras las 17:35h.' }
-    if (t.includes('luz') || t.includes('mwh')) return { source: 'OMIE / preciodelaluz.org', url: 'https://www.preciodelaluz.org', method: 'Se resuelve SÍ si el precio medio del pool eléctrico diario supera el umbral indicado (€/MWh). Dato publicado por OMIE.' }
-    if (t.includes('grados') || t.includes('temperatura') || t.includes('°c')) return { source: 'Open-Meteo (AEMET)', url: 'https://open-meteo.com', method: 'Se resuelve SÍ si la temperatura máxima en alguna capital de provincia española supera el umbral. Fuente: estaciones AEMET vía Open-Meteo.' }
-    if (t.includes('trending') || t.includes('sánchez') || t.includes('sanchez') || t.includes('topic')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Se resuelve SÍ si el término aparece en 5+ noticias españolas del día. Proxy de tendencias basado en cobertura mediática.' }
-    if (t.includes('real madrid') || t.includes('barça') || t.includes('barcelona')) return { source: 'football-data.org', url: 'https://www.football-data.org', method: 'Se resuelve SÍ si el equipo gana su próximo partido oficial. Resultado final tras los 90 minutos (empate = NO).' }
-    if (t.includes('ministro')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Se resuelve SÍ si se detectan 3+ noticias sobre polémicas ministeriales en medios españoles durante el periodo.' }
-    if (t.includes('vivienda') || t.includes('idealista')) return { source: 'INE / Idealista', url: 'https://www.idealista.com/informes/', method: 'Se resuelve al publicarse el dato mensual de Idealista o el trimestral del INE. Compara precio m² mes actual vs anterior.' }
+    if (t.includes('luz') || t.includes('mwh')) return { source: 'OMIE / preciodelaluz.org', url: 'https://www.preciodelaluz.org', method: 'Se resuelve SÍ si el precio medio del pool eléctrico diario supera el umbral indicado (€/MWh).' }
+    if (t.includes('grados') || t.includes('temperatura') || t.includes('°c')) return { source: 'Open-Meteo (AEMET)', url: 'https://open-meteo.com', method: 'Se resuelve SÍ si la temperatura máxima en alguna capital de provincia española supera el umbral.' }
+    if (t.includes('trending') || t.includes('sánchez') || t.includes('sanchez') || t.includes('topic')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Se resuelve SÍ si el término aparece en 5+ noticias españolas del día.' }
+    if (t.includes('real madrid') || t.includes('barça') || t.includes('barcelona')) return { source: 'football-data.org', url: 'https://www.football-data.org', method: 'Se resuelve SÍ si el equipo gana su próximo partido oficial. Empate = NO.' }
+    if (t.includes('ministro')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Se resuelve SÍ si se detectan 3+ noticias sobre polémicas ministeriales en el periodo.' }
+    if (t.includes('vivienda') || t.includes('idealista')) return { source: 'Idealista / INE', url: 'https://www.idealista.com/informes/', method: 'Se resuelve al publicarse el dato mensual de Idealista o el trimestral del INE.' }
     return { source: 'Fuente verificable', url: '', method: 'Resolución basada en datos oficiales públicos y verificables.' }
   }
-  
+
+  // ─── Lifecycle ───────────────────────────────────────────────────────────
   useEffect(() => {
     loadMarkets()
+    loadResolvedMarkets()
     const savedUser = localStorage.getItem('predi_user')
     if (savedUser) {
-      const u = JSON.parse(savedUser)
-      setUser(u)
-      loadUserTrades(u.email)
+      try {
+        const u = JSON.parse(savedUser)
+        setUser(u)
+        loadUserTrades(u.email)
+      } catch (e) { localStorage.removeItem('predi_user') }
     }
   }, [])
-  
+
   useEffect(() => {
     if (selectedMarket && tradeAmount > 0) {
       const preview = previewTrade(tradeAmount, tradeSide, selectedMarket.yes_pool, selectedMarket.no_pool)
       setTradeImpact(preview)
     }
   }, [tradeAmount, tradeSide, selectedMarket])
-  
+
+  // ─── Data loaders ────────────────────────────────────────────────────────
   async function loadMarkets() {
     setLoading(true)
     const data = await getActiveMarkets()
-    const withPrices = data.map(m => ({
+    setMarkets(data.map(m => ({
       ...m,
       prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
-      isExpired: new Date(m.close_date) < new Date()
-    }))
-    setMarkets(withPrices)
+      isExpired: new Date(m.close_date) < new Date(),
+    })))
     setLoading(false)
   }
-  
+
+  async function loadResolvedMarkets() {
+    const data = await getResolvedMarkets(10)
+    setResolvedMarkets(data)
+  }
+
+  async function loadLeaderboard() {
+    const data = await getLeaderboard(50)
+    setLeaderboard(data)
+  }
+
   async function loadUserTrades(email) {
     const data = await getUserTrades(email, true)
-    const enriched = data.map(t => {
+    setUserTrades(data.map(t => {
       const currentPrice = calculatePrices(parseFloat(t.markets.yes_pool), parseFloat(t.markets.no_pool))
-      const currentValue = t.status === 'OPEN' ? previewSellValue(t.shares, t.side, parseFloat(t.markets.yes_pool), parseFloat(t.markets.no_pool)) : (t.sold_price || 0)
+      const currentValue = t.status === 'OPEN'
+        ? previewSellValue(t.shares, t.side, parseFloat(t.markets.yes_pool), parseFloat(t.markets.no_pool))
+        : (t.sold_price || 0)
       const isExpired = new Date(t.markets.close_date) < new Date()
       return { ...t, currentPrice, currentValue, potentialPayout: t.shares, profit: currentValue - t.amount, isExpired }
-    })
-    setUserTrades(enriched)
+    }))
   }
-  
+
   async function loadRecentActivity(marketId) {
     const { data, error } = await supabase.from('recent_trades').select('*').eq('market_id', marketId).limit(20)
     if (!error && data) setRecentActivity(data)
   }
-  
+
+  async function loadOrderBook(marketId) {
+    const { data } = await supabase.from('order_book').select('*').eq('market_id', marketId)
+    if (data) setOrderBook(data)
+    if (user) {
+      const { data: orders } = await supabase.from('limit_orders').select('*').eq('market_id', marketId).eq('user_email', user.email).eq('status', 'PENDING')
+      if (orders) setUserOrders(orders)
+    }
+  }
+
   async function loadPriceHistory(marketId) {
     const history = await getPriceHistory(marketId, 168)
     setPriceHistory(history)
   }
-  
+
+  // ─── Auth ────────────────────────────────────────────────────────────────
   async function handleLogin(e) {
     e.preventDefault()
     if (!email) return
@@ -104,44 +190,85 @@ export default function Home() {
     setEmail('')
     loadUserTrades(result.user.email)
   }
-  
-  function handleLogout() { setUser(null); localStorage.removeItem('predi_user'); setUserTrades([]) }
-  
+
+  function handleLogout() {
+    setUser(null)
+    localStorage.removeItem('predi_user')
+    setUserTrades([])
+  }
+
+  // ─── Trade handlers ──────────────────────────────────────────────────────
   function openTradeModal(market) {
     if (!user) { setShowAuth(true); return }
-    if (market.isExpired) { alert('Este mercado está cerrado — pendiente de resolución.'); return }
     setSelectedMarket(market)
     setShowTradeModal(true)
+    setOrderMode('MARKET')
     loadPriceHistory(market.id)
     loadRecentActivity(market.id)
+    loadOrderBook(market.id)
   }
-  
+
   async function executeTrade() {
     if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid || processing) return
     setProcessing(true)
     const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount)
     setProcessing(false)
     if (result.success) {
-      setUser({ ...user, balance: result.new_balance })
-      localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: result.new_balance }))
-      setShowTradeModal(false); setTradeAmount(10); loadUserTrades(user.email); loadMarkets()
-      alert(`Posición abierta: ${result.shares.toFixed(1)} contratos ${tradeSide}\nCoste: ${tradeAmount} créditos\nRetorno si aciertas: ${result.shares.toFixed(2)}`)
-    } else { alert(result.error) }
+      const newUser = { ...user, balance: result.new_balance }
+      setUser(newUser)
+      localStorage.setItem('predi_user', JSON.stringify(newUser))
+      setShowTradeModal(false)
+      setTradeAmount(10)
+      loadUserTrades(user.email)
+      loadMarkets()
+    } else {
+      alert(result.error)
+    }
   }
-  
+
+  async function placeLimitOrder() {
+    if (!user || !selectedMarket || processing) return
+    setProcessing(true)
+    const { data, error } = await supabase.rpc('place_limit_order', {
+      p_email: user.email, p_market_id: selectedMarket.id,
+      p_side: tradeSide, p_amount: tradeAmount, p_target_price: limitPrice,
+    })
+    setProcessing(false)
+    if (error) { alert(error.message); return }
+    if (data && !data.success) { alert(data.error); return }
+    const newUser = { ...user, balance: data.new_balance }
+    setUser(newUser)
+    localStorage.setItem('predi_user', JSON.stringify(newUser))
+    loadOrderBook(selectedMarket.id)
+    loadUserTrades(user.email)
+  }
+
+  async function cancelOrder(orderId) {
+    const { data, error } = await supabase.rpc('cancel_limit_order', { p_order_id: orderId, p_email: user.email })
+    if (error) { alert(error.message); return }
+    if (data && !data.success) { alert(data.error); return }
+    const newUser = { ...user, balance: data.new_balance }
+    setUser(newUser)
+    localStorage.setItem('predi_user', JSON.stringify(newUser))
+    loadOrderBook(selectedMarket.id)
+  }
+
   async function handleSell(trade) {
-    if (trade.isExpired) { alert('Mercado expirado — pendiente resolución. No se puede vender.'); return }
-    if (!confirm(`¿Vender ${trade.shares.toFixed(1)} contratos ${trade.side} por ~${trade.currentValue.toFixed(2)} créditos?\n(Fee 2% incluido)`)) return
+    if (trade.isExpired) { alert('Mercado expirado — pendiente de resolución.'); return }
+    if (!confirm(`¿Vender ${trade.shares.toFixed(1)} contratos ${trade.side} por ~€${trade.currentValue.toFixed(2)}? (Fee 2% incluido)`)) return
     const result = await sellPosition(trade.id, user.email)
     if (result.success) {
-      const nb = result.new_balance
-      setUser({ ...user, balance: nb })
-      localStorage.setItem('predi_user', JSON.stringify({ ...user, balance: nb }))
-      loadUserTrades(user.email); loadMarkets()
-      alert(`Vendido por ${(result.net_payout || result.sell_value || 0).toFixed(2)} créditos (fee: ${(result.fee || 0).toFixed(2)})`)
-    } else { alert(result.error) }
+      const newUser = { ...user, balance: result.new_balance }
+      setUser(newUser)
+      localStorage.setItem('predi_user', JSON.stringify(newUser))
+      loadUserTrades(user.email)
+      loadMarkets()
+    } else {
+      alert(result.error)
+    }
   }
-  
+
+  // ─── Utilities ───────────────────────────────────────────────────────────
   function getTimeLeft(closeDate) {
     const diff = new Date(closeDate) - new Date()
     if (diff < 0) return 'Expirado'
@@ -153,15 +280,24 @@ export default function Home() {
 
   function isExpired(d) { return new Date(d) < new Date() }
 
-  function getTypeInfo(m) {
-    const t = m.market_type
-    if (t === 'FLASH' || t === 'DIARIO') return { label: '24h', icon: '⚡', color: C.warning }
-    if (t === 'SHORT' || t === 'SEMANAL') return { label: '7d', icon: '📊', color: C.accentLight }
-    if (t === 'LONG' || t === 'MENSUAL') return { label: 'Mes', icon: '🏛', color: '#a78bfa' }
-    return { label: '', icon: '', color: C.textDim }
+  function getCategoryColor(cat) {
+    const map = { ECONOMIA: '#8b5cf6', POLITICA: '#f59e0b', DEPORTES: '#34d399', ENERGIA: '#f87171', CLIMA: '#60a5fa', ACTUALIDAD: '#a78bfa' }
+    return map[cat] || C.textDim
   }
 
-  const filtered = markets.filter(m => {
+  function getTypeLabel(m) {
+    const t = m.market_type
+    if (t === 'FLASH' || t === 'DIARIO') return 'DIARIO'
+    if (t === 'SHORT' || t === 'SEMANAL') return 'SEMANAL'
+    if (t === 'LONG' || t === 'MENSUAL') return 'MENSUAL'
+    return t || ''
+  }
+
+  // ─── Computed ────────────────────────────────────────────────────────────
+  const activeMarkets = markets.filter(m => !m.isExpired)
+  const pendingMarkets = markets.filter(m => m.isExpired)
+
+  const filtered = activeMarkets.filter(m => {
     if (filter === 'ALL') return true
     const t = m.market_type
     if (filter === 'DIARIO') return t === 'FLASH' || t === 'DIARIO'
@@ -170,17 +306,16 @@ export default function Home() {
     return true
   })
 
-  const realizedTrades = userTrades.filter(t => t.status === 'WON' || t.status === 'LOST' || t.status === 'SOLD')
   const openTrades = userTrades.filter(t => t.status === 'OPEN')
-  const realizedPnL = realizedTrades.reduce((s, t) => s + (t.pnl || 0), 0)
-  const totalInvested = openTrades.reduce((s, t) => s + t.amount, 0)
+  const realizedTrades = userTrades.filter(t => t.status === 'WON' || t.status === 'LOST' || t.status === 'SOLD')
   const wonTrades = userTrades.filter(t => t.status === 'WON')
   const lostTrades = userTrades.filter(t => t.status === 'LOST')
   const soldTrades = userTrades.filter(t => t.status === 'SOLD')
+  const realizedPnL = realizedTrades.reduce((s, t) => s + (t.pnl || 0), 0)
+  const totalInvested = openTrades.reduce((s, t) => s + t.amount, 0)
   const winRate = (wonTrades.length + lostTrades.length) > 0
     ? (wonTrades.length / (wonTrades.length + lostTrades.length) * 100) : 0
-  
-  // Category breakdown
+
   const catBreakdown = {}
   userTrades.forEach(t => {
     const cat = t.markets?.category || 'OTRO'
@@ -190,164 +325,269 @@ export default function Home() {
     if (t.status === 'WON') catBreakdown[cat].won++
     if (t.status === 'LOST') catBreakdown[cat].lost++
   })
-  const catColors = { ECONOMIA: '#8b5cf6', POLITICA: '#f59e0b', DEPORTES: '#34d399', ENERGIA: '#f87171', CLIMA: '#60a5fa', ACTUALIDAD: '#a78bfa', OTRO: '#71717a' }
-  const catEmojis = { ECONOMIA: '📈', POLITICA: '🏛', DEPORTES: '⚽', ENERGIA: '⚡', CLIMA: '🌡', ACTUALIDAD: '📰', OTRO: '📋' }
 
-  const S = {
-    modal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)', zIndex: 50, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
-    closeBtn: { width: 36, height: 36, borderRadius: 10, background: C.surface, border: `1px solid ${C.cardBorder}`, color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-    panel: { background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 24 },
-  }
-
+  // ─── Render ──────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', fontSize: 14 }}>
-      
-      {/* ===== HEADER ===== */}
-      <header style={{ borderBottom: `1px solid ${C.cardBorder}`, background: `${C.bg}ee`, position: 'sticky', top: 0, zIndex: 50, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', fontSize: 14, lineHeight: 1.5 }}>
+
+      {/* ── HEADER ── */}
+      <header style={{ borderBottom: `1px solid ${C.cardBorder}`, background: `${C.bg}f0`, position: 'sticky', top: 0, zIndex: 40, backdropFilter: 'blur(20px)' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 54, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+          {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, background: C.accent, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff' }}>P</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em' }}>PrediMarket</div>
-              <div style={{ fontSize: 9, color: C.textDim, fontWeight: 500, letterSpacing: '0.08em' }}>BETA</div>
-            </div>
+            <div style={{ width: 27, height: 27, background: C.accent, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>P</div>
+            <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.025em' }}>PrediMarket</span>
+            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: C.textDim, background: `${C.accent}12`, border: `1px solid ${C.accent}25`, padding: '1px 5px', borderRadius: 3 }}>BETA</span>
           </div>
-          {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button onClick={() => { setShowProfile(true); loadUserTrades(user.email) }} style={{ padding: '6px 12px', border: `1px solid ${C.cardBorder}`, borderRadius: 8, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13 }}>👤</button>
-              <button onClick={() => { setShowPortfolio(true); loadUserTrades(user.email) }} style={{ padding: '6px 12px', border: `1px solid ${C.cardBorder}`, borderRadius: 8, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13 }}>
-                📊 {userTrades.filter(t => t.status === 'OPEN').length > 0 && <span style={{ marginLeft: 4, background: C.accent, color: '#fff', padding: '1px 6px', borderRadius: 10, fontSize: 11 }}>{userTrades.filter(t => t.status === 'OPEN').length}</span>}
+
+          {/* Nav right */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              onClick={() => { setShowLeaderboard(true); loadLeaderboard() }}
+              style={{ padding: '6px 13px', borderRadius: 6, background: 'transparent', border: `1px solid ${C.cardBorder}`, color: C.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+              Ranking
+            </button>
+
+            {user ? (
+              <>
+                <button
+                  onClick={() => { setShowPortfolio(true); loadUserTrades(user.email) }}
+                  style={{ padding: '6px 13px', borderRadius: 6, background: 'transparent', border: `1px solid ${C.cardBorder}`, color: C.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500, position: 'relative' }}>
+                  Posiciones
+                  {openTrades.length > 0 && (
+                    <span style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, background: C.accent, borderRadius: 8, fontSize: 9, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {openTrades.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => { setShowProfile(true); loadUserTrades(user.email) }}
+                  style={{ padding: '6px 13px', borderRadius: 6, background: 'transparent', border: `1px solid ${C.cardBorder}`, color: C.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+                  Perfil
+                </button>
+                <div style={{ padding: '6px 13px', background: `${C.accent}0f`, border: `1px solid ${C.accent}25`, borderRadius: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.accentLight }}>€{parseFloat(user.balance).toFixed(0)}</span>
+                </div>
+                <button onClick={handleLogout} style={{ padding: '6px 8px', borderRadius: 6, background: 'transparent', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>✕</button>
+              </>
+            ) : (
+              <button onClick={() => setShowAuth(true)} style={{ padding: '7px 18px', background: C.accent, borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#fff', border: 'none', cursor: 'pointer' }}>
+                Empezar
               </button>
-              <div style={{ padding: '6px 12px', background: `${C.accent}15`, border: `1px solid ${C.accent}30`, borderRadius: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>€{user.balance.toFixed(0)}</span>
-              </div>
-              <button onClick={handleLogout} style={{ color: C.textDim, cursor: 'pointer', background: 'none', border: 'none', fontSize: 16 }}>✕</button>
-            </div>
-          ) : (
-            <button onClick={() => setShowAuth(true)} style={{ padding: '8px 20px', background: C.accent, borderRadius: 8, fontWeight: 700, fontSize: 14, color: '#fff', border: 'none', cursor: 'pointer' }}>Empezar</button>
-          )}
+            )}
+          </div>
         </div>
       </header>
 
-      {/* ===== HERO ===== */}
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 16px 24px', textAlign: 'center' }}>
-        <h2 style={{ fontSize: 'clamp(28px, 5vw, 44px)', fontWeight: 700, marginBottom: 12, lineHeight: 1.15, letterSpacing: '-0.03em', color: '#fafafa' }}>
-          Predice eventos <br />
-          <span style={{ color: C.accentLight }}>verificables</span>
-        </h2>
-        <p style={{ fontSize: 15, color: C.textMuted, marginBottom: 20, maxWidth: 460, margin: '0 auto 20px', lineHeight: 1.5 }}>Mercados sobre indicadores económicos y actualidad española.</p>
-        {!user && <button onClick={() => setShowAuth(true)} style={{ padding: '10px 24px', background: C.accent, borderRadius: 8, fontWeight: 600, fontSize: 14, color: '#fff', border: 'none', cursor: 'pointer' }}>Empieza con 1.000 créditos gratis</button>}
+      {/* ── HERO ── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '52px 24px 36px' }}>
+        <h1 style={{ fontSize: 'clamp(28px, 5vw, 46px)', fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1.08, marginBottom: 12, color: C.text }}>
+          Mercados de predicción<br />
+          <span style={{ color: C.accent }}>verificables</span>
+        </h1>
+        <p style={{ fontSize: 14, color: C.textMuted, maxWidth: 440, lineHeight: 1.65, marginBottom: 0 }}>
+          Apuesta sobre indicadores económicos y actualidad española. Resolución automática por oráculo público.
+        </p>
+        {!user && (
+          <button onClick={() => setShowAuth(true)} style={{ marginTop: 22, padding: '10px 22px', background: C.accent, borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#fff', border: 'none', cursor: 'pointer' }}>
+            Empezar con 1.000 créditos
+          </button>
+        )}
       </div>
 
-      {/* ===== FILTERS ===== */}
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 16px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {[['ALL','Todos'],['DIARIO','⚡ Diario'],['SEMANAL','📊 Semanal'],['MENSUAL','🏛 Mensual']].map(([f, label]) => {
-          const count = f === 'ALL' ? markets.length : markets.filter(m => { const t = m.market_type; if (f === 'DIARIO') return t === 'FLASH' || t === 'DIARIO'; if (f === 'SEMANAL') return t === 'SHORT' || t === 'SEMANAL'; if (f === 'MENSUAL') return t === 'LONG' || t === 'MENSUAL'; return false }).length
-          return <button key={f} onClick={() => setFilter(f)} style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: filter === f ? C.accent : C.card, color: filter === f ? '#fff' : C.textMuted }}>{label} <span style={{ opacity: 0.7, fontSize: 11 }}>{count}</span></button>
-        })}
+      {/* ── FILTER TABS ── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
+        <div style={{ display: 'flex', borderBottom: `1px solid ${C.cardBorder}`, marginBottom: 24 }}>
+          {[
+            ['ALL', 'Todos', activeMarkets.length],
+            ['DIARIO', 'Diario', activeMarkets.filter(m => m.market_type === 'FLASH' || m.market_type === 'DIARIO').length],
+            ['SEMANAL', 'Semanal', activeMarkets.filter(m => m.market_type === 'SHORT' || m.market_type === 'SEMANAL').length],
+            ['MENSUAL', 'Mensual', activeMarkets.filter(m => m.market_type === 'LONG' || m.market_type === 'MENSUAL').length],
+          ].map(([f, label, count]) => (
+            <button key={f} onClick={() => setFilter(f)} style={{
+              padding: '9px 16px', fontSize: 13, fontWeight: filter === f ? 600 : 500,
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: filter === f ? C.text : C.textMuted,
+              borderBottom: `2px solid ${filter === f ? C.accent : 'transparent'}`,
+              marginBottom: -1, transition: 'color 0.15s',
+            }}>
+              {label}
+              <span style={{ marginLeft: 6, fontSize: 11, color: C.textDim, fontWeight: 400 }}>{count}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* ===== MARKET GRID ===== */}
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 80px' }}>
+      {/* ── MARKET GRID ── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px 56px' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: C.textMuted }}>Cargando mercados...</div>
+          <div style={{ textAlign: 'center', padding: '80px 0', color: C.textDim, fontSize: 13 }}>Cargando mercados...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '80px 0', color: C.textDim, fontSize: 13 }}>No hay mercados activos en este filtro.</div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-            {filtered.map((m) => {
-              const exp = m.isExpired
-              const ti = getTypeInfo(m)
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+            {filtered.map(m => {
               const oracle = getOracleDescription(m)
               return (
-                <div key={m.id} onClick={() => openTradeModal(m)} style={{ background: C.card, border: `1px solid ${exp ? '#27272a' : C.cardBorder}`, borderRadius: 12, padding: 20, cursor: 'pointer', transition: 'all 0.15s', opacity: exp ? 0.5 : 1 }}
-                  onMouseEnter={e => { if (!exp) { e.currentTarget.style.borderColor = C.accent + '60'; e.currentTarget.style.background = '#1f1f23' } }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = exp ? '#27272a' : C.cardBorder; e.currentTarget.style.background = C.card }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <span style={{ fontSize: 11, padding: '2px 8px', background: C.surface, color: C.textMuted, borderRadius: 6, fontWeight: 600 }}>{m.category}</span>
-                      {ti.label && <span style={{ fontSize: 11, padding: '2px 8px', background: `${ti.color}15`, color: ti.color, borderRadius: 6, fontWeight: 600 }}>{ti.icon} {ti.label}</span>}
+                <div
+                  key={m.id}
+                  onClick={() => openTradeModal(m)}
+                  style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: 20, cursor: 'pointer', transition: 'border-color 0.15s', display: 'flex', flexDirection: 'column' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = C.cardBorderHover}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = C.cardBorder}>
+
+                  {/* Top: badges + time */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <span style={badge(getCategoryColor(m.category))}>{m.category}</span>
+                      <span style={badge(C.textDim)}>{getTypeLabel(m)}</span>
                     </div>
-                    <span style={{ fontSize: 12, color: exp ? C.no : C.warning, fontWeight: 700 }}>{exp ? '🔒 Expirado' : `⏱ ${getTimeLeft(m.close_date)}`}</span>
+                    <span style={{ fontSize: 11, color: C.textDim, fontWeight: 500 }}>{getTimeLeft(m.close_date)}</span>
                   </div>
-                  <h4 style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, lineHeight: 1.4, minHeight: 42, color: '#fff' }}>{m.title}</h4>
-                  <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                    <div style={{ flex: 1, textAlign: 'center', padding: '10px 8px', background: C.yesBg, border: `1px solid ${C.yesBorder}`, borderRadius: 10 }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: C.yes }}>{m.prices.yes}¢</div>
-                      <div style={{ fontSize: 11, color: C.yes, fontWeight: 600, opacity: 0.8 }}>SÍ</div>
+
+                  {/* Title */}
+                  <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 16, lineHeight: 1.45, color: C.text, flex: 1 }}>{m.title}</p>
+
+                  {/* Prices */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                    <div style={{ padding: '10px 12px', background: C.yesBg, border: `1px solid ${C.yesBorder}`, borderRadius: 6, textAlign: 'center' }}>
+                      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.yes, marginBottom: 4 }}>SÍ</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.yes, lineHeight: 1 }}>{m.prices.yes}¢</div>
                     </div>
-                    <div style={{ flex: 1, textAlign: 'center', padding: '10px 8px', background: C.noBg, border: `1px solid ${C.noBorder}`, borderRadius: 10 }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: C.no }}>{m.prices.no}¢</div>
-                      <div style={{ fontSize: 11, color: C.no, fontWeight: 600, opacity: 0.8 }}>NO</div>
+                    <div style={{ padding: '10px 12px', background: C.noBg, border: `1px solid ${C.noBorder}`, borderRadius: 6, textAlign: 'center' }}>
+                      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.no, marginBottom: 4 }}>NO</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.no, lineHeight: 1 }}>{m.prices.no}¢</div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textDim, marginBottom: 8 }}>
-                    <span>Vol: €{(m.total_volume / 1000).toFixed(1)}K</span>
-                    <span>{m.active_traders || m.total_traders || 0} traders</span>
+
+                  {/* Meta row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13 }}>
+                    <span style={{ fontSize: 11, color: C.textDim }}>€{((m.total_volume || 0) / 1000).toFixed(1)}K · {m.active_traders || m.total_traders || 0} traders</span>
+                    <span style={{ fontSize: 10, color: C.textDim }}>{oracle.source}</span>
                   </div>
-                  <div style={{ fontSize: 10, color: C.textDim, textAlign: 'center', marginBottom: 10 }}>📡 {oracle.source}</div>
-                  <button style={{ width: '100%', padding: '9px 0', borderRadius: 8, fontWeight: 600, fontSize: 13, border: 'none', cursor: exp ? 'not-allowed' : 'pointer', background: exp ? '#27272a' : C.accent, color: exp ? C.textDim : '#fff', transition: 'all 0.15s' }}>
-                    {exp ? '⏱ Pendiente resolución' : 'Predecir'}
+
+                  <button style={{ width: '100%', padding: '8px 0', borderRadius: 6, fontWeight: 600, fontSize: 12, border: 'none', cursor: 'pointer', background: C.accent, color: '#fff', letterSpacing: '0.01em' }}>
+                    Predecir
                   </button>
                 </div>
               )
             })}
           </div>
         )}
+
+        {/* Pending resolution notice */}
+        {pendingMarkets.length > 0 && (
+          <div style={{ marginTop: 20, padding: '11px 16px', background: `${C.warning}07`, border: `1px solid ${C.warning}20`, borderRadius: 7, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 6, height: 6, borderRadius: 3, background: C.warning, flexShrink: 0, animation: 'pulse 2s infinite' }} />
+            <span style={{ fontSize: 12, color: C.warning, fontWeight: 500 }}>
+              {pendingMarkets.length} mercado{pendingMarkets.length > 1 ? 's' : ''} pendiente{pendingMarkets.length > 1 ? 's' : ''} de resolución por el oráculo
+            </span>
+          </div>
+        )}
+
+        {/* ── RESOLVED MARKETS ── */}
+        {resolvedMarkets.length > 0 && (
+          <div style={{ marginTop: 52 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: C.textDim, marginBottom: 5 }}>Últimos resultados</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Mercados resueltos</div>
+              </div>
+              <button
+                onClick={() => setShowResolved(!showResolved)}
+                style={{ fontSize: 12, color: C.textDim, background: 'none', border: `1px solid ${C.cardBorder}`, borderRadius: 5, padding: '4px 11px', cursor: 'pointer' }}>
+                {showResolved ? 'Ver menos' : 'Ver todos'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(showResolved ? resolvedMarkets : resolvedMarkets.slice(0, 4)).map(m => (
+                <div key={m.id} style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>{m.title}</div>
+                    <div style={{ fontSize: 11, color: C.textDim }}>
+                      {m.resolution_source || getOracleDescription(m).source}
+                      {m.close_date && ` · ${new Date(m.close_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}`}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'ui-monospace, monospace' }}>€{(((m.total_volume || 0) - 5000) / 1000).toFixed(1)}K</span>
+                    <span style={badge(m.resolved_outcome ? C.yes : C.no)}>
+                      {m.resolved_outcome ? 'SÍ' : 'NO'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ===== AUTH MODAL ===== */}
+      {/* ── AUTH MODAL ── */}
       {showAuth && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ ...S.panel, maxWidth: 400, width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800 }}>Empezar</h2>
-              <button onClick={() => setShowAuth(false)} style={S.closeBtn}>✕</button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ ...panel, maxWidth: 380, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.025em' }}>Empezar</h2>
+              <button onClick={() => setShowAuth(false)} style={closeBtn}>✕</button>
             </div>
             <form onSubmit={handleLogin}>
-              <label style={{ display: 'block', fontSize: 13, color: C.textMuted, marginBottom: 6 }}>Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 10, padding: '10px 14px', color: '#fff', fontSize: 15, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} placeholder="tu@email.com" required />
-              <button type="submit" style={{ width: '100%', background: C.accent, color: '#fff', fontWeight: 700, padding: '12px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 15 }}>Empezar con 1.000 créditos</button>
+              <label style={{ display: 'block', fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, marginBottom: 7 }}>Email</label>
+              <input
+                type="email" value={email} onChange={e => setEmail(e.target.value)}
+                style={{ ...inputStyle, marginBottom: 12 }} placeholder="tu@email.com" required />
+              <button type="submit" style={{ width: '100%', background: C.accent, color: '#fff', fontWeight: 600, padding: '11px 0', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 14 }}>
+                Empezar con 1.000 créditos
+              </button>
             </form>
-            <div style={{ marginTop: 16, padding: 12, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: 10 }}>
-              <p style={{ fontSize: 12, color: C.accentLight, margin: 0 }}>💡 <strong>Créditos virtuales.</strong> Practica sin riesgo.</p>
-            </div>
+            <p style={{ fontSize: 11, color: C.textDim, marginTop: 14, textAlign: 'center', lineHeight: 1.5 }}>Créditos virtuales · Sin riesgo real</p>
           </div>
         </div>
       )}
 
-      {/* ===== TRADE MODAL ===== */}
+      {/* ── TRADE MODAL ── */}
       {showTradeModal && selectedMarket && (
-        <div style={S.modal}>
-          <div style={{ minHeight: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 16 }}>
-            <div style={{ ...S.panel, maxWidth: 700, width: '100%', margin: '20px 0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div style={modal}>
+          <div style={{ minHeight: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px' }}>
+            <div style={{ ...panel, maxWidth: 660, width: '100%' }}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 16 }}>
                 <div style={{ flex: 1 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6, lineHeight: 1.3 }}>{selectedMarket.title}</h2>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: isExpired(selectedMarket.close_date) ? C.no : C.warning, fontWeight: 600 }}>{isExpired(selectedMarket.close_date) ? '🔒 Expirado' : `⏱ ${getTimeLeft(selectedMarket.close_date)}`}</span>
-                    <span style={{ fontSize: 12, color: C.textDim }}>{selectedMarket.category}</span>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
+                    <span style={badge(getCategoryColor(selectedMarket.category))}>{selectedMarket.category}</span>
+                    <span style={badge(C.textDim)}>{getTypeLabel(selectedMarket)}</span>
+                    <span style={{ fontSize: 11, color: isExpired(selectedMarket.close_date) ? C.no : C.textDim, fontWeight: 500 }}>
+                      {isExpired(selectedMarket.close_date) ? 'Expirado' : getTimeLeft(selectedMarket.close_date)}
+                    </span>
                   </div>
+                  <h2 style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.35, letterSpacing: '-0.02em', color: C.text }}>{selectedMarket.title}</h2>
                 </div>
-                <button onClick={() => setShowTradeModal(false)} style={{ ...S.closeBtn, marginLeft: 12 }}>✕</button>
+                <button onClick={() => setShowTradeModal(false)} style={closeBtn}>✕</button>
               </div>
 
-              {/* Oracle description */}
+              {/* Oracle */}
               {(() => {
                 const oracle = getOracleDescription(selectedMarket)
                 return (
-                  <div style={{ marginBottom: 16, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 14 }}>
-                    <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Oráculo de resolución</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.accentLight, marginBottom: 4 }}>{oracle.source}</div>
-                    <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.4, marginBottom: oracle.url ? 6 : 0 }}>{oracle.method}</div>
-                    {oracle.url && <a href={oracle.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.accent, textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Ver fuente ↗</a>}
+                  <div style={{ marginBottom: 16, padding: '12px 14px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
+                    {sectionLabel('Oráculo de resolución')}
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.accentLight, marginBottom: 4 }}>{oracle.source}</div>
+                    <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.55 }}>{oracle.method}</div>
+                    {oracle.url && (
+                      <a href={oracle.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display: 'inline-block', marginTop: 7, fontSize: 11, color: C.accent, textDecoration: 'none' }}>
+                        Ver fuente ↗
+                      </a>
+                    )}
                   </div>
                 )
               })()}
-              
-              {/* Chart */}
+
+              {/* Price chart */}
               {(() => {
                 const rawPrices = priceHistory.map(p => parseFloat(p.yes_price))
                 const currentPrice = parseFloat(selectedMarket.prices.yes)
-                // Always start from 50% baseline + add current price
                 const prices = rawPrices.length > 0 ? [50, ...rawPrices, currentPrice] : [50, currentPrice]
                 if (prices.length < 2) return null
                 const minP = Math.max(0, Math.min(...prices) - 3)
@@ -355,203 +595,322 @@ export default function Home() {
                 const range = maxP - minP || 1
                 const first = prices[0], last = prices[prices.length - 1]
                 const trend = last > first ? C.yes : last < first ? C.no : C.accent
-                const firstTime = priceHistory.length > 0 ? priceHistory[0].created_at : selectedMarket.open_date
-                const lastTime = priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].created_at : new Date().toISOString()
                 return (
-                  <div style={{ marginBottom: 16, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <div style={{ fontSize: 12, color: C.textDim }}>Evolución del precio</div>
-                      <div style={{ fontSize: 12 }}>
-                        <span style={{ color: trend, fontWeight: 700 }}>{last.toFixed(1)}%</span>
-                        <span style={{ color: C.textDim }}> SÍ</span>
-                        <span style={{ color: C.textDim, marginLeft: 8, fontSize: 11 }}>({last > first ? '+' : ''}{(last - first).toFixed(1)})</span>
+                  <div style={{ marginBottom: 16, padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      {sectionLabel('Precio SÍ')}
+                      <div style={{ fontSize: 12, display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                        <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: trend }}>{last.toFixed(1)}%</span>
+                        <span style={{ color: C.textDim, fontSize: 11 }}>{last > first ? '+' : ''}{(last - first).toFixed(1)} pts</span>
                       </div>
                     </div>
-                    <div style={{ height: 140, position: 'relative' }}>
-                      <div style={{ position: 'absolute', left: 0, top: 0, fontSize: 9, color: C.textDim }}>{maxP.toFixed(0)}%</div>
-                      <div style={{ position: 'absolute', left: 0, bottom: 0, fontSize: 9, color: C.textDim }}>{minP.toFixed(0)}%</div>
-                      {minP < 50 && maxP > 50 && (
-                        <div style={{ position: 'absolute', left: 20, right: 0, top: `${((maxP - 50) / range) * 100}%`, borderTop: `1px dashed ${C.cardBorder}`, zIndex: 0 }}>
-                          <span style={{ position: 'absolute', left: -18, top: -7, fontSize: 9, color: C.textDim }}>50</span>
-                        </div>
-                      )}
-                      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ paddingLeft: 20 }}>
+                    <div style={{ height: 96, position: 'relative' }}>
+                      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
                         <polygon
-                          points={`${0},100 ${prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')} ${100},100`}
-                          fill={`${trend}15`} stroke="none"
+                          points={`0,100 ${prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')} 100,100`}
+                          fill={`${trend}10`} stroke="none"
                         />
                         <polyline
                           points={prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')}
-                          fill="none" stroke={trend} strokeWidth="2.5" vectorEffect="non-scaling-stroke"
+                          fill="none" stroke={trend} strokeWidth="2" vectorEffect="non-scaling-stroke"
                         />
                       </svg>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: C.textDim, marginTop: 4, paddingLeft: 20 }}>
-                      <span>Inicio (50%)</span>
-                      <span>Ahora ({currentPrice.toFixed(1)}%)</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: C.textDim, marginTop: 5 }}>
+                      <span>Apertura 50%</span>
+                      <span>Ahora {currentPrice.toFixed(1)}%</span>
                     </div>
                   </div>
                 )
               })()}
-              
+
+              {/* Trade controls OR expired state */}
               {!isExpired(selectedMarket.close_date) ? (
                 <>
-                  {/* YES/NO */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-                    {['YES','NO'].map(side => (
-                      <button key={side} onClick={() => setTradeSide(side)} style={{ padding: '14px 8px', borderRadius: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: tradeSide === side ? (side === 'YES' ? C.yes : C.no) : C.surface, color: tradeSide === side ? '#fff' : C.textMuted, boxShadow: tradeSide === side ? `0 4px 16px ${side === 'YES' ? C.yes : C.no}40` : 'none' }}>
-                        <div style={{ fontSize: 24, marginBottom: 2 }}>{side === 'YES' ? selectedMarket.prices.yes : selectedMarket.prices.no}¢</div>
-                        <div style={{ fontSize: 11 }}>{side === 'YES' ? 'SÍ' : 'NO'}</div>
+                  {/* Order type toggle */}
+                  <div style={{ display: 'flex', background: C.surface, borderRadius: 7, padding: 3, marginBottom: 16 }}>
+                    {['MARKET', 'LIMIT'].map(mode => (
+                      <button key={mode} onClick={() => setOrderMode(mode)} style={{ flex: 1, padding: '7px 0', borderRadius: 5, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: orderMode === mode ? C.card : 'transparent', color: orderMode === mode ? C.text : C.textDim, transition: 'all 0.15s' }}>
+                        {mode === 'MARKET' ? 'Mercado' : 'Límite'}
                       </button>
                     ))}
                   </div>
-                  {/* Amount */}
-                  <div style={{ marginBottom: 16 }}>
-                    <label style={{ display: 'block', fontSize: 12, color: C.textMuted, marginBottom: 6 }}>Cantidad (créditos)</label>
-                    <input type="number" value={tradeAmount} onChange={e => setTradeAmount(Math.max(1, Number(e.target.value)))} style={{ width: '100%', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 10, padding: '10px 14px', color: '#fff', fontSize: 18, fontWeight: 700, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }} min="1" max={user?.balance || 1000} />
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 8 }}>
-                      {[10, 25, 50, 100].map(v => <button key={v} onClick={() => setTradeAmount(v)} style={{ padding: '6px 0', fontSize: 13, background: C.surface, color: C.textMuted, borderRadius: 8, border: `1px solid ${C.cardBorder}`, cursor: 'pointer', fontWeight: 600 }}>{v}</button>)}
-                    </div>
+
+                  {/* YES / NO selector */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                    {['YES', 'NO'].map(side => (
+                      <button key={side} onClick={() => setTradeSide(side)} style={{
+                        padding: '14px 8px', borderRadius: 7, fontWeight: 700, cursor: 'pointer',
+                        border: `2px solid ${tradeSide === side ? (side === 'YES' ? C.yes : C.no) : C.cardBorder}`,
+                        background: tradeSide === side ? (side === 'YES' ? C.yesBg : C.noBg) : 'transparent',
+                        color: tradeSide === side ? (side === 'YES' ? C.yes : C.no) : C.textMuted,
+                        transition: 'all 0.15s',
+                      }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.09em', marginBottom: 5 }}>{side === 'YES' ? 'SÍ' : 'NO'}</div>
+                        <div style={{ fontSize: 22, fontFamily: 'ui-monospace, monospace', lineHeight: 1 }}>
+                          {side === 'YES' ? selectedMarket.prices.yes : selectedMarket.prices.no}¢
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                  {/* Summary */}
-                  <div style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Resumen</div>
-                    {tradeImpact && tradeImpact.valid ? (
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <span style={{ fontSize: 13, color: C.textMuted }}>Contratos</span>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{tradeImpact.shares.toFixed(1)}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <span style={{ fontSize: 13, color: C.textMuted }}>Precio medio</span>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>€{tradeImpact.avgPrice.toFixed(3)}</span>
-                        </div>
-                        <div style={{ borderTop: `1px solid ${C.cardBorder}`, paddingTop: 10, marginTop: 10 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <span style={{ fontSize: 13, color: C.textMuted }}>Si aciertas</span>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 800, color: C.yes, fontSize: 18 }}>€{tradeImpact.potentialWinnings.toFixed(2)}</span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: 13, fontWeight: 600 }}>Retorno</span>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 800, color: tradeImpact.potentialProfit > 0 ? C.yes : C.no }}>{tradeImpact.potentialProfit > 0 ? '+' : ''}{tradeImpact.potentialProfit.toFixed(2)}€ ({tradeImpact.roi > 0 ? '+' : ''}{tradeImpact.roi.toFixed(0)}%)</span>
-                          </div>
-                        </div>
+
+                  {/* Limit price */}
+                  {orderMode === 'LIMIT' && (
+                    <div style={{ marginBottom: 16, padding: 14, background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
+                      {sectionLabel('Precio límite')}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <input
+                          type="range"
+                          min="5"
+                          max={Math.max(6, parseInt(tradeSide === 'YES' ? selectedMarket.prices.yes : selectedMarket.prices.no) - 1)}
+                          value={limitPrice * 100}
+                          onChange={e => setLimitPrice(e.target.value / 100)}
+                          style={{ flex: 1, accentColor: C.accent }} />
+                        <span style={{ minWidth: 48, textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontWeight: 700, fontSize: 16, color: C.accentLight }}>
+                          {(limitPrice * 100).toFixed(0)}¢
+                        </span>
                       </div>
-                    ) : <div style={{ fontSize: 13, color: C.no }}>{tradeImpact?.error || 'Calculando...'}</div>}
-                  </div>
-                  {/* Execute */}
-                  <button onClick={executeTrade} disabled={!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing}
-                    style={{ width: '100%', padding: '14px 0', borderRadius: 12, fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer', background: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? '#374151' : (tradeSide === 'YES' ? C.yes : C.no), color: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? C.textDim : '#fff' }}>
-                    {processing ? 'Procesando...' : !tradeImpact ? 'Calculando...' : !tradeImpact.valid ? tradeImpact.error : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente' : `Predecir ${tradeSide === 'YES' ? 'SÍ' : 'NO'} — ${tradeAmount} créditos`}
-                  </button>
-                </>
-              ) : (
-                <div style={{ padding: 20, background: `${C.no}10`, border: `1px solid ${C.no}25`, borderRadius: 12, textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>🔒</div>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Mercado cerrado</div>
-                  <div style={{ fontSize: 13, color: C.textMuted }}>Pendiente de resolución automática por el oráculo.</div>
-                </div>
-              )}
-              
-              {/* Liquidity / Order Book */}
-              {selectedMarket && (
-                <div style={{ marginTop: 20, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontSize: 11, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Liquidez del mercado</div>
-                  {/* Pool visualization */}
-                  {(() => {
-                    const yesPool = parseFloat(selectedMarket.yes_pool)
-                    const noPool = parseFloat(selectedMarket.no_pool)
-                    const total = yesPool + noPool
-                    const yesPct = (yesPool / total * 100).toFixed(1)
-                    const noPct = (noPool / total * 100).toFixed(1)
-                    return (
-                      <div>
-                        <div style={{ display: 'flex', gap: 2, marginBottom: 12, height: 8, borderRadius: 4, overflow: 'hidden' }}>
-                          <div style={{ width: `${yesPct}%`, background: C.yes, borderRadius: '4px 0 0 4px', transition: 'width 0.3s' }} />
-                          <div style={{ width: `${noPct}%`, background: C.no, borderRadius: '0 4px 4px 0', transition: 'width 0.3s' }} />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                          <div style={{ background: C.yesBg, border: `1px solid ${C.yesBorder}`, borderRadius: 8, padding: 12, textAlign: 'center' }}>
-                            <div style={{ fontSize: 10, color: C.yes, marginBottom: 4, fontWeight: 600 }}>POOL SÍ</div>
-                            <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'monospace', color: C.yes }}>€{yesPool.toFixed(0)}</div>
-                            <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{yesPct}% del total</div>
-                          </div>
-                          <div style={{ background: C.noBg, border: `1px solid ${C.noBorder}`, borderRadius: 8, padding: 12, textAlign: 'center' }}>
-                            <div style={{ fontSize: 10, color: C.no, marginBottom: 4, fontWeight: 600 }}>POOL NO</div>
-                            <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'monospace', color: C.no }}>€{noPool.toFixed(0)}</div>
-                            <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{noPct}% del total</div>
-                          </div>
-                        </div>
-                        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textDim }}>
-                          <span>Pool total: €{total.toFixed(0)}</span>
-                          <span>Vol: €{parseFloat(selectedMarket.total_volume).toFixed(0)}</span>
-                        </div>
-                      </div>
-                    )
-                  })()}
-                  {/* Recent trades below */}
-                  {recentActivity.length > 0 && (
-                    <div style={{ marginTop: 14, borderTop: `1px solid ${C.cardBorder}`, paddingTop: 12 }}>
-                      <div style={{ fontSize: 10, color: C.textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Últimas operaciones</div>
-                      <div style={{ maxHeight: 140, overflowY: 'auto' }}>
-                        {recentActivity.slice(0, 10).map((a, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 11 }}>
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                              <span style={{ padding: '1px 5px', borderRadius: 3, fontWeight: 700, fontSize: 9, background: a.side === 'YES' ? C.yesBg : C.noBg, color: a.side === 'YES' ? C.yes : C.no }}>{a.side}</span>
-                              <span style={{ color: C.textDim }}>{parseFloat(a.amount).toFixed(0)}€</span>
-                            </div>
-                            <span style={{ color: C.textDim, fontSize: 10 }}>{new Date(a.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                        ))}
+                      <div style={{ marginTop: 8, fontSize: 11, color: C.textDim }}>
+                        Actual: {tradeSide === 'YES' ? selectedMarket.prices.yes : selectedMarket.prices.no}¢ · Retorno estimado: +{((1 / limitPrice - 1) * 100).toFixed(0)}%
                       </div>
                     </div>
                   )}
+
+                  {/* Amount */}
+                  <div style={{ marginBottom: 16 }}>
+                    {sectionLabel('Cantidad')}
+                    <input
+                      type="number" value={tradeAmount}
+                      onChange={e => setTradeAmount(Math.max(1, Number(e.target.value)))}
+                      style={{ ...inputStyle, fontSize: 18, fontWeight: 700, fontFamily: 'ui-monospace, monospace', marginBottom: 8 }}
+                      min="1" max={user?.balance || 1000} />
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                      {[10, 25, 50, 100].map(v => (
+                        <button key={v} onClick={() => setTradeAmount(v)} style={{ padding: '6px 0', fontSize: 12, fontWeight: 600, background: 'transparent', color: tradeAmount === v ? C.text : C.textDim, borderRadius: 6, border: `1px solid ${tradeAmount === v ? C.accent : C.cardBorder}`, cursor: 'pointer' }}>
+                          {v}€
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 7, padding: '14px 16px', marginBottom: 14 }}>
+                    {sectionLabel('Resumen')}
+                    {orderMode === 'MARKET' ? (
+                      tradeImpact && tradeImpact.valid ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                          {[
+                            ['Contratos', `${tradeImpact.shares.toFixed(2)}`],
+                            ['Precio medio', `${(tradeImpact.avgPrice * 100).toFixed(1)}¢`],
+                            ['Impacto en precio', `${tradeImpact.priceImpactPercent}¢`],
+                          ].map(([k, v]) => (
+                            <div key={k} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: 12, color: C.textMuted }}>{k}</span>
+                              <span style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}>{v}</span>
+                            </div>
+                          ))}
+                          <div style={{ borderTop: `1px solid ${C.cardBorder}`, paddingTop: 10, marginTop: 3 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                              <span style={{ fontSize: 12, fontWeight: 600 }}>Si aciertas</span>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: 18, fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: C.yes }}>€{tradeImpact.potentialWinnings.toFixed(2)}</div>
+                                <div style={{ fontSize: 11, color: tradeImpact.potentialProfit > 0 ? C.yes : C.no, fontFamily: 'ui-monospace, monospace' }}>
+                                  {tradeImpact.potentialProfit > 0 ? '+' : ''}{tradeImpact.potentialProfit.toFixed(2)}€ ({tradeImpact.roi > 0 ? '+' : ''}{tradeImpact.roi.toFixed(0)}%)
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: C.no }}>{tradeImpact?.error || 'Introduce una cantidad'}</div>
+                      )
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                        {[
+                          ['Fondos a reservar', `€${tradeAmount}`],
+                          ['Ejecutar cuando', `${tradeSide} ≤ ${(limitPrice * 100).toFixed(0)}¢`],
+                          ['Contratos estimados', `${(tradeAmount / limitPrice).toFixed(1)}`],
+                          ['Retorno potencial', `+${((1 / limitPrice - 1) * 100).toFixed(0)}%`],
+                        ].map(([k, v]) => (
+                          <div key={k} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 12, color: C.textMuted }}>{k}</span>
+                            <span style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', fontWeight: 600, color: k === 'Retorno potencial' ? C.yes : C.text }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Execute button */}
+                  {orderMode === 'MARKET' ? (
+                    <button
+                      onClick={executeTrade}
+                      disabled={!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing}
+                      style={{
+                        width: '100%', padding: '12px 0', borderRadius: 7, fontWeight: 600, fontSize: 14,
+                        border: 'none', cursor: 'pointer', letterSpacing: '-0.01em', transition: 'all 0.15s',
+                        background: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? C.cardBorder : (tradeSide === 'YES' ? C.yes : C.no),
+                        color: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? C.textDim : '#0a0a0a',
+                      }}>
+                      {processing ? 'Procesando...'
+                        : !tradeImpact ? 'Calculando...'
+                        : !tradeImpact.valid ? tradeImpact.error
+                        : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente'
+                        : `Comprar ${tradeSide === 'YES' ? 'SÍ' : 'NO'} — €${tradeAmount}`}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={placeLimitOrder}
+                      disabled={processing || tradeAmount > (user?.balance || 0)}
+                      style={{
+                        width: '100%', padding: '12px 0', borderRadius: 7, fontWeight: 600, fontSize: 14,
+                        border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                        background: (processing || tradeAmount > (user?.balance || 0)) ? C.cardBorder : C.accent,
+                        color: (processing || tradeAmount > (user?.balance || 0)) ? C.textDim : '#fff',
+                      }}>
+                      {processing ? 'Procesando...' : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente' : `Colocar límite ${tradeSide} a ${(limitPrice * 100).toFixed(0)}¢`}
+                    </button>
+                  )}
+
+                  {/* My pending orders */}
+                  {userOrders.length > 0 && (
+                    <div style={{ marginTop: 16, padding: '12px 14px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
+                      {sectionLabel('Mis órdenes pendientes')}
+                      {userOrders.map(o => (
+                        <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${C.divider}` }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span style={badge(o.side === 'YES' ? C.yes : C.no)}>{o.side}</span>
+                            <span style={{ fontSize: 12, color: C.textMuted }}>€{o.amount} a {(o.target_price * 100).toFixed(0)}¢</span>
+                          </div>
+                          <button onClick={() => cancelOrder(o.id)} style={{ fontSize: 11, color: C.no, background: 'none', border: `1px solid ${C.no}35`, borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
+                            Cancelar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ padding: 24, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.textMuted, marginBottom: 5 }}>Mercado cerrado</div>
+                  <div style={{ fontSize: 12, color: C.textDim }}>Pendiente de resolución automática por el oráculo.</div>
                 </div>
               )}
+
+              {/* Order book / Liquidity */}
+              <div style={{ marginTop: 20, padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
+                {sectionLabel('Liquidez del mercado')}
+                {(() => {
+                  const yp = parseFloat(selectedMarket.yes_pool), np = parseFloat(selectedMarket.no_pool)
+                  const total = yp + np
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', gap: 2, height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
+                        <div style={{ width: `${yp / total * 100}%`, background: C.yes }} />
+                        <div style={{ width: `${np / total * 100}%`, background: C.no }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textDim }}>
+                        <span>Pool SÍ: <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600, color: C.yes }}>€{yp.toFixed(0)}</span></span>
+                        <span>Pool NO: <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600, color: C.no }}>€{np.toFixed(0)}</span></span>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {orderBook.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      {['YES', 'NO'].map(side => {
+                        const sideOrders = orderBook.filter(o => o.side === side).sort((a, b) => b.target_price - a.target_price)
+                        const maxAmt = Math.max(...orderBook.map(x => x.total_amount))
+                        return (
+                          <div key={side}>
+                            <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: side === 'YES' ? C.yes : C.no, marginBottom: 6 }}>
+                              Límites {side === 'YES' ? 'SÍ' : 'NO'}
+                            </div>
+                            {sideOrders.length === 0 ? (
+                              <div style={{ fontSize: 11, color: C.textDim }}>Sin órdenes</div>
+                            ) : sideOrders.map((o, i) => (
+                              <div key={i} style={{ position: 'relative', marginBottom: 2, padding: '4px 6px', borderRadius: 3 }}>
+                                <div style={{ position: 'absolute', [side === 'YES' ? 'left' : 'right']: 0, top: 0, bottom: 0, width: `${(o.total_amount / maxAmt) * 100}%`, background: `${side === 'YES' ? C.yes : C.no}10`, borderRadius: 3 }} />
+                                <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                                  <span style={{ color: side === 'YES' ? C.yes : C.no, fontFamily: 'ui-monospace, monospace' }}>{(o.target_price * 100).toFixed(0)}¢</span>
+                                  <span style={{ color: C.textDim, fontFamily: 'ui-monospace, monospace' }}>€{parseFloat(o.total_amount).toFixed(0)}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent trades */}
+                {recentActivity.length > 0 && (
+                  <div style={{ marginTop: 14, borderTop: `1px solid ${C.divider}`, paddingTop: 12 }}>
+                    {sectionLabel('Últimas operaciones')}
+                    <div style={{ maxHeight: 100, overflowY: 'auto' }}>
+                      {recentActivity.slice(0, 8).map((a, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', fontSize: 11 }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span style={badge(a.side === 'YES' ? C.yes : C.no)}>{a.side}</span>
+                            <span style={{ color: C.textDim, fontFamily: 'ui-monospace, monospace' }}>€{parseFloat(a.amount).toFixed(0)}</span>
+                          </div>
+                          <span style={{ color: C.textDim, fontSize: 10 }}>
+                            {new Date(a.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ===== PORTFOLIO MODAL ===== */}
+      {/* ── PORTFOLIO MODAL ── */}
       {showPortfolio && (
-        <div style={S.modal}>
-          <div style={{ minHeight: '100%', padding: 16 }}>
-            <div style={{ ...S.panel, maxWidth: 700, margin: '20px auto' }}>
+        <div style={modal}>
+          <div style={{ minHeight: '100%', padding: '24px 16px' }}>
+            <div style={{ ...panel, maxWidth: 640, margin: '0 auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <h2 style={{ fontSize: 20, fontWeight: 800 }}>Mis posiciones</h2>
-                <button onClick={() => setShowPortfolio(false)} style={S.closeBtn}>✕</button>
+                <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.025em' }}>Posiciones abiertas</h2>
+                <button onClick={() => setShowPortfolio(false)} style={closeBtn}>✕</button>
               </div>
-              {userTrades.filter(t => t.status === 'OPEN').length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: C.textDim }}>No tienes posiciones abiertas</div>
+
+              {openTrades.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: C.textDim, fontSize: 13 }}>Sin posiciones abiertas</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {userTrades.filter(t => t.status === 'OPEN').map(trade => (
-                    <div key={trade.id} style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: 16 }}>
-                      <h3 style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, lineHeight: 1.4 }}>{trade.markets.title}</h3>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, fontWeight: 700, background: trade.side === 'YES' ? C.yesBg : C.noBg, color: trade.side === 'YES' ? C.yes : C.no }}>{trade.side} {trade.side === 'YES' ? trade.currentPrice.yes : trade.currentPrice.no}¢</span>
-                        <span style={{ fontSize: 11, padding: '2px 8px', background: C.card, color: C.textDim, borderRadius: 6 }}>{trade.shares.toFixed(1)} contratos</span>
-                        {trade.isExpired && <span style={{ fontSize: 11, padding: '2px 8px', background: `${C.no}15`, color: C.no, borderRadius: 6, fontWeight: 600 }}>🔒 Expirado</span>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {openTrades.map(trade => (
+                    <div key={trade.id} style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: 16 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, lineHeight: 1.4 }}>{trade.markets.title}</div>
+                      <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
+                        <span style={badge(trade.side === 'YES' ? C.yes : C.no)}>{trade.side}</span>
+                        <span style={badge(C.textDim)}>{trade.shares.toFixed(1)} contratos</span>
+                        {trade.isExpired && <span style={badge(C.warning)}>PENDIENTE</span>}
                       </div>
-                      {!trade.isExpired ? (
-                        <button onClick={() => handleSell(trade)} style={{ width: '100%', padding: '8px 0', background: C.no, color: '#fff', borderRadius: 8, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', marginBottom: 12 }}>Vender</button>
-                      ) : (
-                        <div style={{ width: '100%', padding: '8px 0', background: '#374151', color: C.textDim, borderRadius: 8, fontWeight: 600, fontSize: 13, textAlign: 'center', marginBottom: 12 }}>⏱ Pendiente resolución</div>
-                      )}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
                         {[
-                          ['Invertido', `€${trade.amount.toFixed(2)}`, null],
-                          ['Valor venta', `€${trade.currentValue.toFixed(2)}`, null],
-                          ['Si aciertas', `€${trade.potentialPayout.toFixed(2)}`, C.yes],
-                          ['P/L', `${trade.profit > 0 ? '+' : ''}€${trade.profit.toFixed(2)}`, trade.profit > 0 ? C.yes : C.no],
-                        ].map(([label, val, col], i) => (
-                          <div key={i}>
-                            <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>{label}</div>
-                            <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: col || C.text }}>{val}</div>
+                          ['Invertido', `€${trade.amount.toFixed(0)}`, null],
+                          ['Valor actual', `€${trade.currentValue.toFixed(1)}`, null],
+                          ['Si acierta', `€${trade.potentialPayout.toFixed(1)}`, C.yes],
+                          ['P&L', `${trade.profit > 0 ? '+' : ''}€${trade.profit.toFixed(1)}`, trade.profit > 0 ? C.yes : C.no],
+                        ].map(([label, val, col]) => (
+                          <div key={label}>
+                            <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.textDim, marginBottom: 3 }}>{label}</div>
+                            <div style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 700, fontSize: 13, color: col || C.text }}>{val}</div>
                           </div>
                         ))}
                       </div>
+                      {!trade.isExpired && (
+                        <button onClick={() => handleSell(trade)} style={{ width: '100%', padding: '8px 0', background: 'transparent', color: C.no, border: `1px solid ${C.no}35`, borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                          Vender ~€{trade.currentValue.toFixed(2)}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -561,95 +920,79 @@ export default function Home() {
         </div>
       )}
 
-      {/* ===== PROFILE MODAL ===== */}
+      {/* ── PROFILE MODAL ── */}
       {showProfile && user && (
-        <div style={S.modal}>
-          <div style={{ minHeight: '100%', padding: 16 }}>
-            <div style={{ ...S.panel, maxWidth: 560, margin: '20px auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <h2 style={{ fontSize: 18, fontWeight: 700 }}>Mi perfil</h2>
-                <button onClick={() => setShowProfile(false)} style={S.closeBtn}>✕</button>
+        <div style={modal}>
+          <div style={{ minHeight: '100%', padding: '24px 16px' }}>
+            <div style={{ ...panel, maxWidth: 520, margin: '0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.025em' }}>Mi perfil</h2>
+                <button onClick={() => setShowProfile(false)} style={closeBtn}>✕</button>
               </div>
-              
+
               {/* User header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24, padding: 16, background: C.surface, borderRadius: 10 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 24, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, padding: '14px 16px', background: C.surface, borderRadius: 8, border: `1px solid ${C.cardBorder}` }}>
+                <div style={{ width: 42, height: 42, borderRadius: 8, background: `${C.accent}18`, border: `1px solid ${C.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: C.accent }}>
+                  {(user.display_name || user.email || '?')[0].toUpperCase()}
+                </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600 }}>{user.display_name || user.email.split('@')[0]}</div>
-                  <div style={{ fontSize: 12, color: C.textDim }}>{user.email}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{user.display_name || user.email.split('@')[0]}</div>
+                  <div style={{ fontSize: 11, color: C.textDim }}>{user.email}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace' }}>€{user.balance.toFixed(0)}</div>
-                  <div style={{ fontSize: 10, color: C.textDim }}>Saldo actual</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.accentLight }}>€{parseFloat(user.balance).toFixed(0)}</div>
+                  <div style={{ fontSize: 9, color: C.textDim, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Saldo</div>
                 </div>
               </div>
 
-              {/* KPIs row */}
+              {/* KPI cards */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
-                <div style={{ background: C.surface, borderRadius: 10, padding: 14, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>P/L Realizado</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: realizedPnL >= 0 ? C.yes : C.no }}>
-                    {realizedPnL >= 0 ? '+' : ''}€{realizedPnL.toFixed(0)}
+                {[
+                  { label: 'P/L realizado', value: `${realizedPnL >= 0 ? '+' : ''}€${realizedPnL.toFixed(0)}`, color: realizedPnL >= 0 ? C.yes : C.no, sub: 'Solo cerrados' },
+                  { label: 'Win rate', value: `${winRate.toFixed(0)}%`, color: winRate >= 50 ? C.yes : C.no, sub: `${wonTrades.length}G · ${lostTrades.length}P` },
+                  { label: 'Retorno', value: `${((user.balance - 1000) / 10).toFixed(1)}%`, color: user.balance >= 1000 ? C.yes : C.no, sub: 'vs 1.000 inicial' },
+                ].map(({ label, value, color, sub }) => (
+                  <div key={label} style={{ background: C.surface, borderRadius: 7, padding: '12px 14px', border: `1px solid ${C.cardBorder}` }}>
+                    <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim, marginBottom: 7 }}>{label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color, lineHeight: 1 }}>{value}</div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 5 }}>{sub}</div>
                   </div>
-                  <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>Solo trades cerrados</div>
-                </div>
-                <div style={{ background: C.surface, borderRadius: 10, padding: 14, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>Win Rate</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: winRate >= 50 ? C.yes : C.no }}>
-                    {winRate.toFixed(0)}%
-                  </div>
-                  <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>{wonTrades.length}W / {lostTrades.length}L</div>
-                </div>
-                <div style={{ background: C.surface, borderRadius: 10, padding: 14, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>YTD Return</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: (user.balance - 1000) >= 0 ? C.yes : C.no }}>
-                    {((user.balance - 1000) / 10).toFixed(1)}%
-                  </div>
-                  <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>vs 1.000 inicial</div>
-                </div>
+                ))}
               </div>
 
               {/* Open exposure */}
               {openTrades.length > 0 && (
-                <div style={{ background: `${C.warning}08`, border: `1px solid ${C.warning}20`, borderRadius: 10, padding: 14, marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: C.warning }}>Posiciones abiertas</div>
-                      <div style={{ fontSize: 11, color: C.textDim }}>{openTrades.length} trades · €{totalInvested.toFixed(0)} expuesto</div>
-                    </div>
-                    <div style={{ fontSize: 11, color: C.textMuted }}>Pendiente resolución</div>
+                <div style={{ padding: '12px 14px', background: `${C.warning}07`, border: `1px solid ${C.warning}20`, borderRadius: 7, marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.warning }}>Exposición abierta</div>
+                    <div style={{ fontSize: 11, color: C.textDim }}>{openTrades.length} posiciones · €{totalInvested.toFixed(0)} en juego</div>
                   </div>
+                  <span style={badge(C.warning)}>PENDIENTE</span>
                 </div>
               )}
 
               {/* Category breakdown */}
               {Object.keys(catBreakdown).length > 0 && (
-                <div style={{ background: C.surface, borderRadius: 10, padding: 16, marginBottom: 16 }}>
-                  <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Desglose por categoría</div>
-                  {/* Bar chart */}
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', gap: 1 }}>
-                      {Object.entries(catBreakdown).map(([cat, data]) => (
-                        <div key={cat} style={{ flex: data.count, background: catColors[cat] || C.textDim, minWidth: 4, transition: 'flex 0.3s' }} title={`${cat}: ${data.count} trades`} />
-                      ))}
-                    </div>
+                <div style={{ padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}`, marginBottom: 14 }}>
+                  {sectionLabel('Por categoría')}
+                  <div style={{ display: 'flex', height: 5, borderRadius: 3, overflow: 'hidden', gap: 1, marginBottom: 14 }}>
+                    {Object.entries(catBreakdown).map(([cat, data]) => (
+                      <div key={cat} style={{ flex: data.count, background: getCategoryColor(cat), minWidth: 4 }} />
+                    ))}
                   </div>
-                  {/* Category list */}
                   {Object.entries(catBreakdown).sort((a, b) => b[1].count - a[1].count).map(([cat, data]) => {
-                    const catWr = (data.won + data.lost) > 0 ? (data.won / (data.won + data.lost) * 100) : 0
+                    const wr = (data.won + data.lost) > 0 ? (data.won / (data.won + data.lost) * 100) : 0
                     return (
-                      <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.cardBorder}` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 14 }}>{catEmojis[cat] || '📋'}</span>
+                      <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${C.divider}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: 2, background: getCategoryColor(cat), flexShrink: 0 }} />
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: 600 }}>{cat}</div>
-                            <div style={{ fontSize: 10, color: C.textDim }}>{data.count} trades · WR {catWr.toFixed(0)}%</div>
+                            <div style={{ fontSize: 12, fontWeight: 500 }}>{cat}</div>
+                            <div style={{ fontSize: 10, color: C.textDim }}>{data.count} trades · WR {wr.toFixed(0)}%</div>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace', color: data.pnl >= 0 ? C.yes : C.no }}>
-                            {data.pnl >= 0 ? '+' : ''}€{data.pnl.toFixed(0)}
-                          </div>
+                        <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 700, color: data.pnl >= 0 ? C.yes : C.no }}>
+                          {data.pnl >= 0 ? '+' : ''}€{data.pnl.toFixed(0)}
                         </div>
                       </div>
                     )
@@ -657,24 +1000,23 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Detailed stats */}
-              <div style={{ background: C.surface, borderRadius: 10, padding: 16 }}>
-                <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Estadísticas detalladas</div>
+              {/* Stats */}
+              <div style={{ padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
+                {sectionLabel('Estadísticas')}
                 {[
-                  ['Total operaciones', userTrades.length],
+                  ['Total operaciones', userTrades.length, null],
                   ['Ganadas', wonTrades.length, C.yes],
                   ['Perdidas', lostTrades.length, C.no],
-                  ['Vendidas antes', soldTrades.length, C.accentLight],
-                  ['Abiertas', openTrades.length, C.warning],
-                  ['Mayor ganancia', realizedTrades.length > 0 ? '€' + Math.max(0, ...realizedTrades.map(t => t.pnl || 0)).toFixed(0) : '—', C.yes],
-                  ['Mayor pérdida', realizedTrades.length > 0 ? '€' + Math.min(0, ...realizedTrades.map(t => t.pnl || 0)).toFixed(0) : '—', C.no],
-                  ['Avg por trade', realizedTrades.length > 0 ? '€' + (realizedPnL / realizedTrades.length).toFixed(1) : '—'],
-                  ['Capital inicial', '€1.000'],
-                  ['Saldo actual', '€' + user.balance.toFixed(0), user.balance >= 1000 ? C.yes : C.no],
-                ].map(([label, val, col], i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 9 ? `1px solid ${C.cardBorder}` : 'none' }}>
+                  ['Vendidas (anticipado)', soldTrades.length, C.accentLight],
+                  ['Mayor ganancia', realizedTrades.length > 0 ? `+€${Math.max(0, ...realizedTrades.map(t => t.pnl || 0)).toFixed(0)}` : '—', C.yes],
+                  ['Mayor pérdida', realizedTrades.length > 0 ? `-€${Math.abs(Math.min(0, ...realizedTrades.map(t => t.pnl || 0))).toFixed(0)}` : '—', C.no],
+                  ['Avg por trade', realizedTrades.length > 0 ? `${realizedPnL >= 0 ? '+' : ''}€${(realizedPnL / realizedTrades.length).toFixed(1)}` : '—', null],
+                  ['Capital inicial', '€1.000', null],
+                  ['Saldo actual', `€${parseFloat(user.balance).toFixed(0)}`, user.balance >= 1000 ? C.yes : C.no],
+                ].map(([label, val, col], i, arr) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: i < arr.length - 1 ? `1px solid ${C.divider}` : 'none' }}>
                     <span style={{ fontSize: 12, color: C.textMuted }}>{label}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'monospace', color: col || C.text }}>{val}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'ui-monospace, monospace', color: col || C.text }}>{val}</span>
                   </div>
                 ))}
               </div>
@@ -682,6 +1024,73 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* ── LEADERBOARD MODAL ── */}
+      {showLeaderboard && (
+        <div style={modal}>
+          <div style={{ minHeight: '100%', padding: '24px 16px' }}>
+            <div style={{ ...panel, maxWidth: 540, margin: '0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+                <div>
+                  <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.025em', marginBottom: 4 }}>Ranking</h2>
+                  <div style={{ fontSize: 11, color: C.textDim }}>P/L realizado · Trades cerrados (WON / LOST / SOLD)</div>
+                </div>
+                <button onClick={() => setShowLeaderboard(false)} style={closeBtn}>✕</button>
+              </div>
+
+              {leaderboard.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: C.textDim, fontSize: 13 }}>Cargando ranking...</div>
+              ) : (
+                <div>
+                  {/* Table header */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 80px 56px 44px', gap: 8, padding: '0 8px 10px', borderBottom: `1px solid ${C.cardBorder}` }}>
+                    {[['#', 'left'], ['Trader', 'left'], ['P/L', 'right'], ['WR', 'right'], ['Trades', 'right']].map(([h, align]) => (
+                      <div key={h} style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, textAlign: align }}>{h}</div>
+                    ))}
+                  </div>
+
+                  {/* Table rows */}
+                  {leaderboard.map((entry, i) => {
+                    const pnl = parseFloat(entry.realized_pnl ?? entry.pnl ?? 0)
+                    const wr = parseFloat(entry.win_rate ?? 0)
+                    const trades = entry.total_trades ?? entry.closed_trades ?? 0
+                    const name = entry.display_name || entry.user_email?.split('@')[0] || `Trader ${i + 1}`
+                    const rank = entry.rank_position ?? i + 1
+                    const isMe = user && entry.user_email === user.email
+                    const rankColor = rank === 1 ? '#f59e0b' : rank === 2 ? '#9ca3af' : rank === 3 ? '#cd7f32' : C.textDim
+                    return (
+                      <div key={entry.user_email || i} style={{
+                        display: 'grid', gridTemplateColumns: '28px 1fr 80px 56px 44px', gap: 8,
+                        padding: '10px 8px', borderBottom: `1px solid ${C.divider}`, alignItems: 'center',
+                        background: isMe ? `${C.accent}05` : 'transparent',
+                      }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: rankColor, fontFamily: 'ui-monospace, monospace' }}>{rank}</div>
+                        <div style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {entry.emoji && <span style={{ fontSize: 14, flexShrink: 0 }}>{entry.emoji}</span>}
+                          <div style={{ overflow: 'hidden' }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                            {isMe && <span style={badge(C.accent)}>tú</span>}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontSize: 13, fontWeight: 700, color: pnl >= 0 ? C.yes : C.no }}>
+                          {pnl >= 0 ? '+' : ''}€{pnl.toFixed(0)}
+                        </div>
+                        <div style={{ textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontSize: 12, color: C.textMuted }}>
+                          {wr.toFixed(0)}%
+                        </div>
+                        <div style={{ textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontSize: 12, color: C.textDim }}>
+                          {trades}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
