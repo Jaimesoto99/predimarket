@@ -282,6 +282,12 @@ async function createRecurringMarkets() {
 
 export default async function handler(req, res) {
   try {
+    // Precios inyectados externamente (desde GitHub Actions que sí puede fetchear APIs gov)
+    // ?luz=95.5  →  fuerza precio electricidad a 95.5 EUR/MWh
+    // ?ibex=true →  fuerza IBEX cierra en verde
+    const injectedLuz = req.query.luz ? parseFloat(req.query.luz) : null
+    const injectedIbex = req.query.ibex !== undefined ? req.query.ibex === 'true' : null
+
     const { data: pendingMarkets, error } = await supabase
       .from('markets').select('*').in('status', ['CLOSED', 'ACTIVE']).lt('close_date', new Date().toISOString())
     if (error) return res.status(500).json({ error: error.message })
@@ -291,7 +297,20 @@ export default async function handler(req, res) {
       if (market.resolved_outcome !== null) continue
       const oracle = getOracleForMarket(market)
       if (!oracle) { results.push({ id: market.id, title: market.title, status: 'NO_ORACLE' }); continue }
-      const oracleResult = await oracle.fn()
+
+      // Usar precio inyectado si el oráculo es de un tipo con dato externo disponible
+      let oracleResult = null
+      const t = market.title.toLowerCase()
+      if (oracle.type === 'LUZ' && injectedLuz !== null && !isNaN(injectedLuz)) {
+        const m = t.match(/>(\d+)/)
+        const thr = m ? parseInt(m[1]) : 100
+        oracleResult = { outcome: injectedLuz > thr, source: `GitHub Actions / REE — Precio medio luz: ${injectedLuz.toFixed(2)} EUR/MWh. Umbral: ${thr} EUR/MWh.`, value: injectedLuz }
+      } else if (oracle.type === 'IBEX' && injectedIbex !== null) {
+        oracleResult = { outcome: injectedIbex, source: `GitHub Actions / Yahoo Finance — IBEX cierra ${injectedIbex ? 'en verde' : 'en rojo'}.` }
+      } else {
+        oracleResult = await oracle.fn()
+      }
+
       if (!oracleResult) { results.push({ id: market.id, title: market.title, status: 'ORACLE_UNAVAILABLE', type: oracle.type }); continue }
       const { error: rErr } = await supabase.rpc('resolve_market_manual', { p_market_id: market.id, p_outcome: oracleResult.outcome, p_source: oracleResult.source })
       if (!rErr) {
