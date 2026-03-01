@@ -44,30 +44,61 @@ async function checkIBEXVerde() {
 }
 
 async function checkPrecioLuz(threshold = 100) {
+  const today = new Date().toISOString().split('T')[0]
+
+  // 1. ESIOS REE — indicador 600 (precio mercado spot diario, Península)
   try {
-    const res = await fetch('https://api.preciodelaluz.org/v1/prices/avg?zone=PCB')
+    const res = await fetch(
+      `https://api.esios.ree.es/indicators/600?start_date=${today}T00:00:00&end_date=${today}T23:59:59&locale=es`,
+      { headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
+    )
+    if (res.ok) {
+      const data = await res.json()
+      // geo_id 3 = Península; si no hay geo, usamos todos
+      const values = (data?.indicator?.values || []).filter(v => !v.geo_id || v.geo_id === 3)
+      if (values.length > 0) {
+        const avg = values.reduce((sum, v) => sum + v.value, 0) / values.length
+        return {
+          outcome: avg > threshold,
+          source: `ESIOS REE — Precio spot medio: ${avg.toFixed(2)} EUR/MWh. Umbral: ${threshold} EUR/MWh.`,
+          value: avg,
+          oracleUrl: 'https://www.esios.ree.es/es/mercados-y-precios'
+        }
+      }
+    }
+  } catch (e) { console.error('ESIOS error:', e.message) }
+
+  // 2. preciodelaluz.org
+  try {
+    const res = await fetch('https://api.preciodelaluz.org/v1/prices/avg?zone=PCB',
+      { headers: { 'User-Agent': 'Mozilla/5.0' } })
     const data = await res.json()
     const avgPrice = data?.price
-    if (avgPrice === undefined || avgPrice === null) throw new Error('No data')
-    return {
-      outcome: avgPrice > threshold,
-      source: `preciodelaluz.org — Precio medio pool electrico: ${avgPrice.toFixed(2)} EUR/MWh. Umbral: ${threshold} EUR/MWh.`,
-      value: avgPrice,
-      oracleUrl: 'https://www.preciodelaluz.org'
-    }
-  } catch (err) {
-    try {
-      const today = new Date().toISOString().split('T')[0]
-      const res = await fetch(`https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date=${today}T00:00&end_date=${today}T23:59&time_trunc=day`)
-      const data = await res.json()
-      const values = data?.included?.[0]?.attributes?.values
-      if (values && values.length > 0) {
-        const avg = values.reduce((sum, v) => sum + v.value, 0) / values.length
-        return { outcome: avg > threshold, source: `REE — Precio medio: ${avg.toFixed(2)} EUR/MWh.`, value: avg, oracleUrl: 'https://www.ree.es/es/datos/mercados' }
+    if (avgPrice !== undefined && avgPrice !== null) {
+      return {
+        outcome: avgPrice > threshold,
+        source: `preciodelaluz.org — Precio medio: ${avgPrice.toFixed(2)} EUR/MWh. Umbral: ${threshold} EUR/MWh.`,
+        value: avgPrice,
+        oracleUrl: 'https://www.preciodelaluz.org'
       }
-    } catch (e) {}
-    return null
-  }
+    }
+  } catch (e) { console.error('preciodelaluz error:', e.message) }
+
+  // 3. REE apidatos (tiempo real)
+  try {
+    const res = await fetch(
+      `https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date=${today}T00:00&end_date=${today}T23:59&time_trunc=day`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    )
+    const data = await res.json()
+    const values = data?.included?.[0]?.attributes?.values
+    if (values && values.length > 0) {
+      const avg = values.reduce((sum, v) => sum + v.value, 0) / values.length
+      return { outcome: avg > threshold, source: `REE apidatos — Precio medio: ${avg.toFixed(2)} EUR/MWh.`, value: avg, oracleUrl: 'https://www.ree.es/es/datos/mercados' }
+    }
+  } catch (e) { console.error('REE apidatos error:', e.message) }
+
+  return null
 }
 
 async function checkTemperatura(threshold = 30) {
