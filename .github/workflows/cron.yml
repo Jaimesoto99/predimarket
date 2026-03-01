@@ -1,101 +1,68 @@
-name: Cron — Resolver y crear mercados
+name: Cron - Resolver y crear mercados
 
 on:
   schedule:
-    # Cada hora en punto (UTC) — GitHub Actions no bloquea las APIs gov españolas
     - cron: '0 * * * *'
   workflow_dispatch:
-    inputs:
-      debug:
-        description: 'Mostrar respuestas completas'
-        required: false
-        default: 'false'
 
 jobs:
   run-cron:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    continue-on-error: true
 
     steps:
-      # ── 1. Obtener precio electricidad (REE) ──────────────────────────────
       - name: Fetch precio luz REE
         id: luz
+        continue-on-error: true
         run: |
           TODAY=$(date -u +%Y-%m-%d)
-          RESPONSE=$(curl -s --max-time 15 \
-            "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date=${TODAY}T00:00&end_date=${TODAY}T23:59&time_trunc=hour&geo_trunc=electric_system&geo_limit=peninsular&geo_ids=8741" \
-            -H "Accept: application/json" \
-            -H "User-Agent: Mozilla/5.0")
-          # Extraer valores numéricos y calcular media
-          AVG=$(echo "$RESPONSE" | python3 -c "
-          import json, sys
-          try:
-            data = json.load(sys.stdin)
-            datasets = data.get('included', [])
-            for ds in datasets:
-              vals = ds.get('attributes', {}).get('values', [])
-              nums = [v['value'] for v in vals if isinstance(v.get('value'), (int, float)) and v['value'] > 0]
-              if len(nums) >= 4:
-                avg = sum(nums) / len(nums)
-                print(f'{avg:.2f}')
-                break
-          except Exception as e:
-            print('ERROR')
-          " 2>/dev/null || echo "ERROR")
-          echo "avg_luz=$AVG" >> $GITHUB_OUTPUT
-          echo "Precio luz medio: $AVG EUR/MWh"
+          RESPONSE=$(curl -sf --max-time 15 \
+            "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date=${TODAY}T00:00&end_date=${TODAY}T23:59&time_trunc=hour" \
+            -H "Accept: application/json" -H "User-Agent: Mozilla/5.0" || echo "{}")
+          AVG=$(echo "$RESPONSE" | grep -o '"value":[0-9.]*' | grep -o '[0-9.]*' | awk '
+            BEGIN { sum=0; n=0 }
+            { v=$1+0; if(v>5 && v<500) { sum+=v; n++ } }
+            END { if(n>3) printf "%.2f", sum/n; else print "ERROR" }
+          ')
+          echo "avg_luz=$AVG" >> "$GITHUB_OUTPUT"
+          echo "Precio luz: $AVG EUR/MWh"
 
-      # ── 2. Obtener IBEX 35 (Yahoo Finance) ───────────────────────────────
-      - name: Fetch IBEX 35 Yahoo Finance
+      - name: Fetch IBEX 35
         id: ibex
+        continue-on-error: true
         run: |
-          RESPONSE=$(curl -s --max-time 15 \
+          RESPONSE=$(curl -sf --max-time 15 \
             "https://query1.finance.yahoo.com/v8/finance/chart/%5EIBEX?interval=1d&range=1d" \
-            -H "User-Agent: Mozilla/5.0")
-          IBEX_VERDE=$(echo "$RESPONSE" | python3 -c "
-          import json, sys
-          try:
-            data = json.load(sys.stdin)
-            result = data['chart']['result'][0]
-            meta = result['meta']
-            prev = meta.get('previousClose') or meta.get('chartPreviousClose')
-            current = meta.get('regularMarketPrice')
-            if prev and current:
-              print('true' if current > prev else 'false')
-            else:
-              print('unknown')
-          except:
-            print('unknown')
-          " 2>/dev/null || echo "unknown")
-          echo "ibex_verde=$IBEX_VERDE" >> $GITHUB_OUTPUT
-          echo "IBEX en verde: $IBEX_VERDE"
+            -H "User-Agent: Mozilla/5.0" || echo "{}")
+          PREV=$(echo "$RESPONSE" | grep -o '"previousClose":[0-9.]*' | grep -o '[0-9.]*' | head -1)
+          CURR=$(echo "$RESPONSE" | grep -o '"regularMarketPrice":[0-9.]*' | grep -o '[0-9.]*' | head -1)
+          if [ -n "$PREV" ] && [ -n "$CURR" ]; then
+            VERDE=$(awk "BEGIN { print ($CURR > $PREV) ? \"true\" : \"false\" }")
+          else
+            VERDE="unknown"
+          fi
+          echo "ibex_verde=$VERDE" >> "$GITHUB_OUTPUT"
+          echo "IBEX verde: $VERDE (prev=$PREV curr=$CURR)"
 
-      # ── 3. Llamar resolve-markets con datos pre-fetcheados ────────────────
       - name: Resolver mercados expirados
+        continue-on-error: true
         run: |
+          BASE="${{ secrets.SITE_URL }}/api/resolve-markets"
           LUZ="${{ steps.luz.outputs.avg_luz }}"
           IBEX="${{ steps.ibex.outputs.ibex_verde }}"
-
-          # Construir URL con parámetros disponibles
-          URL="${{ secrets.SITE_URL }}/api/resolve-markets"
           PARAMS=""
-          if [[ "$LUZ" != "ERROR" && "$LUZ" != "" ]]; then
-            PARAMS="?luz=${LUZ}"
+          if [ "$LUZ" != "ERROR" ] && [ -n "$LUZ" ]; then
+            PARAMS="${PARAMS}?luz=${LUZ}"
           fi
-          if [[ "$IBEX" == "true" || "$IBEX" == "false" ]]; then
-            if [[ "$PARAMS" == "" ]]; then PARAMS="?ibex=${IBEX}"; else PARAMS="${PARAMS}&ibex=${IBEX}"; fi
+          if [ "$IBEX" = "true" ] || [ "$IBEX" = "false" ]; then
+            if [ -z "$PARAMS" ]; then PARAMS="?ibex=${IBEX}"; else PARAMS="${PARAMS}&ibex=${IBEX}"; fi
           fi
+          echo "Llamando: ${BASE}${PARAMS}"
+          curl -s --max-time 30 "${BASE}${PARAMS}"
 
-          echo "Llamando: $URL$PARAMS"
-          RESULT=$(curl -s --max-time 30 "${URL}${PARAMS}")
-          echo "$RESULT"
-
-          RESOLVED=$(echo "$RESULT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('resolved',0)+d.get('redistributed',0))" 2>/dev/null || echo "0")
-          echo "Mercados resueltos/redistribuidos: $RESOLVED"
-
-      # ── 4. Crear mercados trending ────────────────────────────────────────
       - name: Crear mercados trending
+        continue-on-error: true
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
-            "${{ secrets.SITE_URL }}/api/create-markets?mode=trending&key=${{ secrets.ADMIN_API_KEY }}")
-          echo "create-markets HTTP $STATUS"
+          curl -s --max-time 30 \
+            "${{ secrets.SITE_URL }}/api/create-markets?mode=trending&key=${{ secrets.ADMIN_API_KEY }}"
