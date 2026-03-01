@@ -361,7 +361,8 @@ export default async function handler(req, res) {
       details: results,
       redistributed_details: redistributed,
       recurring,
-      expired_orders: expiredOrders
+      expired_orders: expiredOrders,
+      _debug: { injectedLuz, injectedIbex, query: req.query }
     })
   } catch (err) {
     return res.status(500).json({ error: err.message })
