@@ -5,6 +5,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// ─── Oracle: IBEX 35 ─────────────────────────────────────────────────────
 async function checkIBEXVerde() {
   try {
     const res = await fetch(
@@ -43,6 +44,30 @@ async function checkIBEXVerde() {
   }
 }
 
+// ─── Oracle: IBEX threshold ───────────────────────────────────────────────
+async function checkIBEXThreshold(threshold) {
+  try {
+    const res = await fetch(
+      'https://query1.finance.yahoo.com/v8/finance/chart/%5EIBEX?interval=1d&range=2d',
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    )
+    const data = await res.json()
+    const meta = data?.chart?.result?.[0]?.meta
+    const price = meta?.regularMarketPrice || meta?.previousClose
+    if (!price) return null
+    return {
+      outcome: price > threshold,
+      source: `Yahoo Finance — IBEX 35: ${price.toFixed(2)} puntos. Umbral: ${threshold}.`,
+      value: price,
+      oracleUrl: 'https://finance.yahoo.com/quote/%5EIBEX/'
+    }
+  } catch (err) {
+    console.error('Error IBEX threshold:', err)
+    return null
+  }
+}
+
+// ─── Oracle: Precio luz ───────────────────────────────────────────────────
 async function checkPrecioLuz(threshold = 100) {
   const today = new Date().toISOString().split('T')[0]
   const headers = {
@@ -50,7 +75,7 @@ async function checkPrecioLuz(threshold = 100) {
     'Accept': 'application/json',
   }
 
-  // 1. REE apidatos — granularidad horaria (más fiable desde servidores)
+  // 1. REE apidatos
   try {
     const res = await fetch(
       `https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date=${today}T00:00&end_date=${today}T23:59&time_trunc=hour&geo_trunc=electric_system&geo_limit=peninsular&geo_ids=8741`,
@@ -58,7 +83,6 @@ async function checkPrecioLuz(threshold = 100) {
     )
     if (res.ok) {
       const data = await res.json()
-      // included[0] = PVPC, included[1] = spot. Usamos PVPC (precio regulado)
       for (const dataset of (data?.included || [])) {
         const values = dataset?.attributes?.values
         if (values && values.length >= 4) {
@@ -93,30 +117,10 @@ async function checkPrecioLuz(threshold = 100) {
     }
   } catch (e) { console.error('preciodelaluz error:', e.message) }
 
-  // 3. ESIOS REE — indicador 1001 (PVPC, requiere token pero intentamos)
-  try {
-    const res = await fetch(
-      `https://api.esios.ree.es/indicators/1001?start_date=${today}T00:00:00&end_date=${today}T23:59:59`,
-      { headers: { ...headers, 'x-api-key': process.env.ESIOS_API_KEY || '' } }
-    )
-    if (res.ok) {
-      const data = await res.json()
-      const values = (data?.indicator?.values || []).filter(v => v.geo_id === 3 || !v.geo_id)
-      if (values.length > 0) {
-        const avg = values.reduce((s, v) => s + v.value, 0) / values.length
-        return {
-          outcome: avg > threshold,
-          source: `ESIOS PVPC medio ${today}: ${avg.toFixed(2)} EUR/MWh. Umbral: ${threshold} EUR/MWh.`,
-          value: avg,
-          oracleUrl: 'https://www.esios.ree.es'
-        }
-      }
-    }
-  } catch (e) { console.error('ESIOS error:', e.message) }
-
   return null
 }
 
+// ─── Oracle: Temperatura ─────────────────────────────────────────────────
 async function checkTemperatura(threshold = 30) {
   try {
     const ciudades = [
@@ -126,7 +130,6 @@ async function checkTemperatura(threshold = 30) {
       { name: 'Murcia', lat: 37.98, lon: -1.13 },
       { name: 'Zaragoza', lat: 41.65, lon: -0.88 },
       { name: 'Valencia', lat: 39.47, lon: -0.38 },
-      { name: 'Badajoz', lat: 38.88, lon: -6.97 },
     ]
     let maxTemp = -Infinity, maxCiudad = ''
     for (const c of ciudades) {
@@ -138,36 +141,39 @@ async function checkTemperatura(threshold = 30) {
     if (maxTemp === -Infinity) return null
     return {
       outcome: maxTemp > threshold,
-      source: `Open-Meteo (AEMET) — Maxima: ${maxTemp.toFixed(1)}C en ${maxCiudad}. Umbral: ${threshold}C.`,
+      source: `Open-Meteo (AEMET) — Maxima: ${maxTemp.toFixed(1)}°C en ${maxCiudad}. Umbral: ${threshold}°C.`,
       value: maxTemp,
       oracleUrl: 'https://open-meteo.com'
     }
   } catch (err) { return null }
 }
 
-async function checkTrendingSpain(keyword) {
+// ─── Oracle: Bitcoin price ────────────────────────────────────────────────
+async function checkBitcoin(threshold = 100000) {
   try {
     const res = await fetch(
-      `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}+trending+Espa%C3%B1a&hl=es&gl=ES&ceid=ES:es`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
+      { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
     )
-    const text = await res.text()
-    const mentionCount = (text.match(new RegExp(keyword, 'gi')) || []).length
-    const isTrending = mentionCount >= 5
+    if (!res.ok) return null
+    const data = await res.json()
+    const price = data?.bitcoin?.usd
+    if (!price) return null
     return {
-      outcome: isTrending,
-      source: `Google News RSS — "${keyword}" mencionado ${mentionCount} veces en noticias ES. Umbral: 5.`,
-      value: mentionCount,
-      oracleUrl: `https://news.google.com/search?q=${encodeURIComponent(keyword)}%20Espa%C3%B1a&hl=es`
+      outcome: price > threshold,
+      source: `CoinGecko — Bitcoin: $${price.toLocaleString('en-US')} USD. Umbral: $${threshold.toLocaleString('en-US')}.`,
+      value: price,
+      oracleUrl: 'https://www.coingecko.com/en/coins/bitcoin'
     }
-  } catch (err) { return null }
+  } catch (err) {
+    console.error('Error Bitcoin oracle:', err)
+    return null
+  }
 }
 
-async function checkFootballResult(teamName) {
+// ─── Oracle: Football results ─────────────────────────────────────────────
+async function checkFootballResult(teamId, teamName) {
   try {
-    const teamMap = { 'real madrid': 86, 'barcelona': 81 }
-    const teamId = teamMap[teamName.toLowerCase()]
-    if (!teamId) return null
     const apiKey = process.env.FOOTBALL_DATA_API_KEY
     if (!apiKey) return null
     const res = await fetch(
@@ -192,40 +198,21 @@ async function checkFootballResult(teamName) {
   } catch (err) { return null }
 }
 
-async function checkMinistroControversia() {
-  try {
-    const res = await fetch(
-      `https://news.google.com/rss/search?q=ministro+pol%C3%A9mica+Espa%C3%B1a&hl=es&gl=ES&ceid=ES:es`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' } }
-    )
-    const text = await res.text()
-    const items = (text.match(/<item>/g) || []).length
-    const isControversy = items >= 3
-    return {
-      outcome: isControversy,
-      source: `Google News RSS — ${items} noticias sobre polemicas ministeriales. Umbral: 3.`,
-      value: items,
-      oracleUrl: 'https://news.google.com/search?q=ministro%20pol%C3%A9mica%20Espa%C3%B1a&hl=es'
-    }
-  } catch (err) { return null }
-}
-
+// ─── Oracle: Idealista vivienda ───────────────────────────────────────────
 async function checkIdealista() {
   try {
     const res = await fetch('https://www.idealista.com/sala-de-prensa/informes-precio-vivienda/', {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
     })
     const html = await res.text()
-    // Look for price per m2 pattern: "X.XXX €/m2" or "X.XXX €/m²"
     const priceMatch = html.match(/([\d.]+)\s*€\/m[2²]/i)
-    // Look for monthly variation: "+ X,X %" or "- X,X %"
     const varMatch = html.match(/([+-])\s*([\d,]+)\s*%\s*(?:Evolución frente|frente a)/i)
-    
+
     if (priceMatch) {
       const price = parseFloat(priceMatch[1].replace('.', ''))
       const isUp = varMatch ? varMatch[1] === '+' : null
       const variation = varMatch ? parseFloat(varMatch[2].replace(',', '.')) : null
-      
+
       if (isUp !== null) {
         return {
           outcome: isUp,
@@ -235,7 +222,6 @@ async function checkIdealista() {
         }
       }
     }
-    console.log('Idealista: no se encontró dato de precio')
     return null
   } catch (err) {
     console.error('Error Idealista:', err)
@@ -243,19 +229,65 @@ async function checkIdealista() {
   }
 }
 
+// ─── Oracle router ────────────────────────────────────────────────────────
 function getOracleForMarket(market) {
   const t = market.title.toLowerCase()
-  if (t.includes('ibex') && (t.includes('verde') || t.includes('cierra'))) return { fn: checkIBEXVerde, type: 'IBEX' }
-  if (t.includes('luz') || t.includes('mwh')) { const m = t.match(/>(\d+)/); return { fn: () => checkPrecioLuz(m ? parseInt(m[1]) : 100), type: 'LUZ' } }
-  if (t.includes('grados') || t.includes('temperatura') || t.includes('30°') || t.includes('30 c')) { const m = t.match(/>?(\d+)/); return { fn: () => checkTemperatura(m ? parseInt(m[1]) : 30), type: 'TEMP' } }
-  if (t.includes('trending') || t.includes('topic')) { const kw = t.includes('nchez') ? 'Sánchez' : 'España'; return { fn: () => checkTrendingSpain(kw), type: 'TRENDING' } }
-  if (t.includes('real madrid') && t.includes('gana')) return { fn: () => checkFootballResult('Real Madrid'), type: 'FUTBOL' }
-  if ((t.includes('barça') || t.includes('barcelona')) && t.includes('gana')) return { fn: () => checkFootballResult('Barcelona'), type: 'FUTBOL' }
-  if (t.includes('ministro') && (t.includes('polémica') || t.includes('polemica'))) return { fn: checkMinistroControversia, type: 'NOTICIAS' }
-  if (t.includes('vivienda') || t.includes('idealista')) return { fn: checkIdealista, type: 'VIVIENDA' }
+
+  // IBEX: "cierra en verde" → verde oracle; "> X puntos" → threshold oracle
+  if (t.includes('ibex')) {
+    const thresholdMatch = t.match(/>\s*([\d.]+)\s*(puntos|pts)?/)
+    if (thresholdMatch) {
+      const thr = parseFloat(thresholdMatch[1])
+      return { fn: () => checkIBEXThreshold(thr), type: 'IBEX' }
+    }
+    return { fn: checkIBEXVerde, type: 'IBEX' }
+  }
+
+  // Precio luz
+  if (t.includes('luz') || t.includes('mwh') || t.includes('pvpc')) {
+    const m = t.match(/>?\s*([\d]+)\s*(eur|€)?\/?(mwh)?/)
+    const thr = m ? parseInt(m[1]) : 100
+    return { fn: () => checkPrecioLuz(thr), type: 'LUZ' }
+  }
+
+  // Temperatura
+  if (t.includes('grados') || t.includes('temperatura') || t.includes('30°') || t.includes('35°')) {
+    const m = t.match(/([\d]+)\s*°?c?\s*(grados|°)?/)
+    const thr = m ? parseInt(m[1]) : 30
+    return { fn: () => checkTemperatura(thr), type: 'TEMP' }
+  }
+
+  // Bitcoin
+  if (t.includes('bitcoin') || t.includes('btc')) {
+    const m = t.match(/([\d.]+)\s*[k$]?\s*(usd|dólares|dolares)?/)
+    // Parse threshold: "100.000$" or "100k" etc.
+    let thr = 100000
+    const numMatch = market.title.match(/\$?([\d.,]+)\s*[kK]?/)
+    if (numMatch) {
+      const raw = parseFloat(numMatch[1].replace(/\./g, '').replace(',', '.'))
+      thr = raw
+      // Check if market title has K suffix
+      if (market.title.match(/\d+\s*[kK]\b/)) thr = raw * 1000
+    }
+    return { fn: () => checkBitcoin(thr), type: 'BITCOIN' }
+  }
+
+  // Football
+  if (t.includes('real madrid') && (t.includes('gana') || t.includes('victoria')))
+    return { fn: () => checkFootballResult(86, 'Real Madrid'), type: 'FUTBOL' }
+  if ((t.includes('barça') || t.includes('barcelona')) && (t.includes('gana') || t.includes('victoria')))
+    return { fn: () => checkFootballResult(81, 'FC Barcelona'), type: 'FUTBOL' }
+  if (t.includes('atlético') && t.includes('gana'))
+    return { fn: () => checkFootballResult(78, 'Atlético de Madrid'), type: 'FUTBOL' }
+
+  // Vivienda
+  if (t.includes('vivienda') || t.includes('idealista'))
+    return { fn: checkIdealista, type: 'VIVIENDA' }
+
   return null
 }
 
+// ─── Create recurring daily markets ──────────────────────────────────────
 async function createRecurringMarkets() {
   const now = new Date()
   const day = now.getUTCDay()
@@ -270,7 +302,7 @@ async function createRecurringMarkets() {
     if (hoursUntilClose > 1) {
       const { data, error } = await supabase.rpc('create_market', {
         p_title: '¿El IBEX 35 cierra en verde hoy?',
-        p_description: 'El IBEX 35 cierra con variacion positiva. Resolucion: Yahoo Finance tras cierre BME 17:35. Fuente: finance.yahoo.com/quote/%5EIBEX/',
+        p_description: 'El IBEX 35 cierra con variacion positiva respecto a la apertura. Resolucion: Yahoo Finance tras cierre BME 17:35h. Fuente verificable: finance.yahoo.com/quote/%5EIBEX/',
         p_category: 'ECONOMIA', p_market_type: 'DIARIO', p_duration_hours: hoursUntilClose, p_initial_pool: 5000
       })
       results.push(error ? { action: 'ERROR', market: 'IBEX', error: error.message } : { action: 'CREATED', market: 'IBEX diario' })
@@ -280,13 +312,13 @@ async function createRecurringMarkets() {
   return results
 }
 
+// ─── Main handler ─────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   try {
-    // Precios inyectados externamente (desde GitHub Actions que sí puede fetchear APIs gov)
-    // ?luz=95.5  →  fuerza precio electricidad a 95.5 EUR/MWh
-    // ?ibex=true →  fuerza IBEX cierra en verde
+    // Prices injected externally (e.g., from GitHub Actions)
     const injectedLuz = req.query.luz ? parseFloat(req.query.luz) : null
     const injectedIbex = req.query.ibex !== undefined ? req.query.ibex === 'true' : null
+    const injectedBtc = req.query.btc ? parseFloat(req.query.btc) : null
 
     const { data: pendingMarkets, error } = await supabase
       .from('markets').select('*').in('status', ['CLOSED', 'ACTIVE']).lt('close_date', new Date().toISOString())
@@ -296,22 +328,60 @@ export default async function handler(req, res) {
     for (const market of (pendingMarkets || [])) {
       if (market.resolved_outcome !== null) continue
       const oracle = getOracleForMarket(market)
-      if (!oracle) { results.push({ id: market.id, title: market.title, status: 'NO_ORACLE' }); continue }
 
-      // Usar precio inyectado si el oráculo es de un tipo con dato externo disponible
+      // No oracle found — check if market has been expired > 24h and issue refund
+      if (!oracle) {
+        const closedHoursAgo = (Date.now() - new Date(market.close_date).getTime()) / 3600000
+        if (closedHoursAgo > 24) {
+          try {
+            await supabase.rpc('refund_market', { p_market_id: market.id })
+            results.push({ id: market.id, title: market.title, status: 'REFUNDED', reason: 'No oracle available after 24h' })
+          } catch (e) {
+            results.push({ id: market.id, title: market.title, status: 'NO_ORACLE', closedHoursAgo: closedHoursAgo.toFixed(1) })
+          }
+        } else {
+          results.push({ id: market.id, title: market.title, status: 'NO_ORACLE', closedHoursAgo: closedHoursAgo.toFixed(1) })
+        }
+        continue
+      }
+
+      // Use injected prices if oracle type matches
       let oracleResult = null
       const t = market.title.toLowerCase()
       if (oracle.type === 'LUZ' && injectedLuz !== null && !isNaN(injectedLuz)) {
-        const m = t.match(/>(\d+)/)
+        const m = t.match(/([\d]+)\s*(eur|€)?\/?(mwh)?/)
         const thr = m ? parseInt(m[1]) : 100
         oracleResult = { outcome: injectedLuz > thr, source: `GitHub Actions / REE — Precio medio luz: ${injectedLuz.toFixed(2)} EUR/MWh. Umbral: ${thr} EUR/MWh.`, value: injectedLuz }
       } else if (oracle.type === 'IBEX' && injectedIbex !== null) {
         oracleResult = { outcome: injectedIbex, source: `GitHub Actions / Yahoo Finance — IBEX cierra ${injectedIbex ? 'en verde' : 'en rojo'}.` }
+      } else if (oracle.type === 'BITCOIN' && injectedBtc !== null && !isNaN(injectedBtc)) {
+        const numMatch = market.title.match(/\$?([\d.,]+)\s*[kK]?/)
+        let thr = 100000
+        if (numMatch) {
+          const raw = parseFloat(numMatch[1].replace(/\./g, '').replace(',', '.'))
+          thr = market.title.match(/\d+\s*[kK]\b/) ? raw * 1000 : raw
+        }
+        oracleResult = { outcome: injectedBtc > thr, source: `GitHub Actions / CoinGecko — Bitcoin: $${injectedBtc.toLocaleString('en-US')}. Umbral: $${thr.toLocaleString('en-US')}.`, value: injectedBtc }
       } else {
         oracleResult = await oracle.fn()
       }
 
-      if (!oracleResult) { results.push({ id: market.id, title: market.title, status: 'ORACLE_UNAVAILABLE', type: oracle.type }); continue }
+      // If oracle still unavailable and market has been expired > 24h, refund
+      if (!oracleResult) {
+        const closedHoursAgo = (Date.now() - new Date(market.close_date).getTime()) / 3600000
+        if (closedHoursAgo > 24) {
+          try {
+            await supabase.rpc('refund_market', { p_market_id: market.id })
+            results.push({ id: market.id, title: market.title, status: 'REFUNDED', type: oracle.type, reason: 'Oracle unavailable after 24h' })
+          } catch (e) {
+            results.push({ id: market.id, title: market.title, status: 'ORACLE_UNAVAILABLE', type: oracle.type, closedHoursAgo: closedHoursAgo.toFixed(1) })
+          }
+        } else {
+          results.push({ id: market.id, title: market.title, status: 'ORACLE_UNAVAILABLE', type: oracle.type })
+        }
+        continue
+      }
+
       const { error: rErr } = await supabase.rpc('resolve_market_manual', { p_market_id: market.id, p_outcome: oracleResult.outcome, p_source: oracleResult.source })
       if (!rErr) {
         try { await supabase.rpc('distribute_winnings', { p_market_id: market.id }) } catch (e) { console.error('Error distributing winnings:', market.id, e) }
@@ -321,8 +391,7 @@ export default async function handler(req, res) {
         : { id: market.id, title: market.title, status: 'RESOLVED', outcome: oracleResult.outcome, source: oracleResult.source })
     }
 
-    // Redistribuir ganancias en mercados ya RESOLVED pero con trades aún OPEN
-    // (mercados resueltos antes de que existiera la llamada a distribute_winnings)
+    // Redistribute winnings in already-RESOLVED markets that still have OPEN trades
     const redistributed = []
     try {
       const { data: resolvedWithOpenTrades } = await supabase
@@ -356,13 +425,13 @@ export default async function handler(req, res) {
     return res.status(200).json({
       timestamp: new Date().toISOString(),
       resolved: results.filter(r => r.status === 'RESOLVED').length,
-      pending: results.filter(r => r.status !== 'RESOLVED').length,
+      refunded: results.filter(r => r.status === 'REFUNDED').length,
+      pending: results.filter(r => !['RESOLVED', 'REFUNDED'].includes(r.status)).length,
       redistributed: redistributed.length,
       details: results,
       redistributed_details: redistributed,
       recurring,
       expired_orders: expiredOrders,
-      _debug: { injectedLuz, injectedIbex, query: req.query }
     })
   } catch (err) {
     return res.status(500).json({ error: err.message })

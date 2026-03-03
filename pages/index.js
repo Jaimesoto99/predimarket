@@ -27,37 +27,35 @@ export default function Home() {
   const [processing, setProcessing] = useState(false)
   const [recentActivity, setRecentActivity] = useState([])
   const [filter, setFilter] = useState('ALL')
+  const [catFilter, setCatFilter] = useState('ALL')
+  const [tradeHistoryFilter, setTradeHistoryFilter] = useState('ALL')
   const [orderBook, setOrderBook] = useState([])
   const [userOrders, setUserOrders] = useState([])
   const [orderMode, setOrderMode] = useState('MARKET')
   const [limitPrice, setLimitPrice] = useState(0.40)
 
-  // ─── Colors ──────────────────────────────────────────────────────────────
+  // ─── Design tokens ───────────────────────────────────────────────────────
   const C = {
-    bg: '#09090b',
-    card: '#18181b',
-    cardBorder: '#27272a',
-    cardBorderHover: '#3f3f46',
-    accent: '#8b5cf6',
+    bg: '#08080a',
+    card: '#101012',
+    cardBorder: '#1e1e22',
+    cardBorderHover: '#2e2e34',
+    accent: '#7c3aed',
     accentLight: '#a78bfa',
-    yes: '#34d399',
-    yesBg: 'rgba(52,211,153,0.06)',
-    yesBorder: 'rgba(52,211,153,0.14)',
-    no: '#f87171',
-    noBg: 'rgba(248,113,113,0.06)',
-    noBorder: 'rgba(248,113,113,0.14)',
-    text: '#fafafa',
+    yes: '#10b981',
+    no: '#ef4444',
+    text: '#f4f4f5',
     textMuted: '#a1a1aa',
-    textDim: '#71717a',
-    surface: '#0f0f12',
-    warning: '#f59e0b',
-    divider: '#1f1f23',
+    textDim: '#52525b',
+    surface: '#0c0c0e',
+    warning: '#d97706',
+    divider: '#18181b',
   }
 
   // ─── Style helpers ───────────────────────────────────────────────────────
   const modal = {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
-    backdropFilter: 'blur(12px)', zIndex: 50, overflowY: 'auto',
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
+    backdropFilter: 'blur(20px)', zIndex: 50, overflowY: 'auto',
     WebkitOverflowScrolling: 'touch',
   }
   const panel = {
@@ -65,9 +63,9 @@ export default function Home() {
     borderRadius: 12, padding: 24,
   }
   const closeBtn = {
-    width: 32, height: 32, borderRadius: 6, background: 'transparent',
-    border: `1px solid ${C.cardBorder}`, color: C.textMuted, cursor: 'pointer',
-    fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 28, height: 28, borderRadius: 6, background: 'transparent',
+    border: `1px solid ${C.cardBorder}`, color: C.textDim, cursor: 'pointer',
+    fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   }
   const inputStyle = {
@@ -75,6 +73,8 @@ export default function Home() {
     borderRadius: 7, padding: '10px 14px', color: C.text, fontSize: 14,
     outline: 'none', boxSizing: 'border-box',
   }
+
+  // Status badge — colored (YES/NO/WON/LOST/etc)
   function badge(color) {
     return {
       fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 600,
@@ -83,6 +83,32 @@ export default function Home() {
       display: 'inline-block',
     }
   }
+
+  // Neutral badge — for type labels, time labels
+  function neutralBadge() {
+    return {
+      fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 400,
+      letterSpacing: '0.05em', textTransform: 'uppercase',
+      border: `1px solid ${C.cardBorder}`, color: C.textDim, background: 'transparent',
+      display: 'inline-block',
+    }
+  }
+
+  // Category badge — gray with colored dot
+  function catBadge(cat) {
+    return (
+      <span key={cat} style={{
+        fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 500,
+        letterSpacing: '0.05em', textTransform: 'uppercase',
+        border: `1px solid ${C.cardBorder}`, color: C.textDim, background: 'transparent',
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+      }}>
+        <span style={{ width: 4, height: 4, borderRadius: 2, background: getCategoryColor(cat), display: 'inline-block', flexShrink: 0 }} />
+        {getCategoryLabel(cat)}
+      </span>
+    )
+  }
+
   function sectionLabel(text) {
     return (
       <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10 }}>
@@ -94,13 +120,15 @@ export default function Home() {
   // ─── Oracle descriptions ─────────────────────────────────────────────────
   function getOracleDescription(market) {
     const t = (market.title || '').toLowerCase()
-    if (t.includes('ibex')) return { source: 'Yahoo Finance — IBEX 35', url: 'https://finance.yahoo.com/quote/%5EIBEX/', method: 'Se resuelve SÍ si el IBEX 35 cierra con variación positiva respecto a la apertura en BME. Dato verificable tras las 17:35h.' }
-    if (t.includes('luz') || t.includes('mwh')) return { source: 'OMIE / preciodelaluz.org', url: 'https://www.preciodelaluz.org', method: 'Se resuelve SÍ si el precio medio del pool eléctrico diario supera el umbral indicado (€/MWh).' }
+    if (t.includes('ibex')) return { source: 'Yahoo Finance — IBEX 35', url: 'https://finance.yahoo.com/quote/%5EIBEX/', method: 'Se resuelve SÍ si el IBEX 35 supera el umbral o cierra en verde según dato de BME. Verificable tras las 17:35h.' }
+    if (t.includes('luz') || t.includes('mwh') || t.includes('pvpc')) return { source: 'OMIE / REE apidatos', url: 'https://www.preciodelaluz.org', method: 'Se resuelve SÍ si el precio medio del pool eléctrico diario supera el umbral indicado (€/MWh). Fuente: REE.' }
+    if (t.includes('bitcoin') || t.includes('btc')) return { source: 'CoinGecko API', url: 'https://www.coingecko.com', method: 'Se resuelve SÍ si el precio de Bitcoin supera el umbral indicado en USD a la fecha de cierre. Fuente: CoinGecko.' }
+    if (t.includes('euríbor') || t.includes('euribor')) return { source: 'BCE / Banco de España', url: 'https://www.bde.es', method: 'Se resuelve SÍ según el tipo Euríbor 12M publicado por el BCE al cierre del período indicado.' }
     if (t.includes('grados') || t.includes('temperatura') || t.includes('°c')) return { source: 'Open-Meteo (AEMET)', url: 'https://open-meteo.com', method: 'Se resuelve SÍ si la temperatura máxima en alguna capital de provincia española supera el umbral.' }
-    if (t.includes('trending') || t.includes('sánchez') || t.includes('sanchez') || t.includes('topic')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Se resuelve SÍ si el término aparece en 5+ noticias españolas del día.' }
-    if (t.includes('real madrid') || t.includes('barça') || t.includes('barcelona')) return { source: 'football-data.org', url: 'https://www.football-data.org', method: 'Se resuelve SÍ si el equipo gana su próximo partido oficial. Empate = NO.' }
-    if (t.includes('ministro')) return { source: 'Google News RSS', url: 'https://news.google.com', method: 'Se resuelve SÍ si se detectan 3+ noticias sobre polémicas ministeriales en el periodo.' }
+    if (t.includes('real madrid') || t.includes('barça') || t.includes('barcelona') || t.includes('atlético')) return { source: 'football-data.org', url: 'https://www.football-data.org', method: 'Se resuelve SÍ si el equipo gana su próximo partido oficial. Empate = NO.' }
     if (t.includes('vivienda') || t.includes('idealista')) return { source: 'Idealista / INE', url: 'https://www.idealista.com/informes/', method: 'Se resuelve al publicarse el dato mensual de Idealista o el trimestral del INE.' }
+    if (t.includes('ipc') || t.includes('inflación') || t.includes('inflacion')) return { source: 'INE — IPC', url: 'https://www.ine.es', method: 'Se resuelve SÍ según el dato de variación del IPC publicado por el INE para el período indicado.' }
+    if (t.includes('paro') || t.includes('desempleo') || t.includes('epa')) return { source: 'INE — EPA', url: 'https://www.ine.es', method: 'Se resuelve SÍ según la tasa de paro publicada por el INE en la Encuesta de Población Activa (EPA).' }
     return { source: 'Fuente verificable', url: '', method: 'Resolución basada en datos oficiales públicos y verificables.' }
   }
 
@@ -281,16 +309,41 @@ export default function Home() {
   function isExpired(d) { return new Date(d) < new Date() }
 
   function getCategoryColor(cat) {
-    const map = { ECONOMIA: '#8b5cf6', POLITICA: '#f59e0b', DEPORTES: '#34d399', ENERGIA: '#f87171', CLIMA: '#60a5fa', ACTUALIDAD: '#a78bfa' }
+    const map = {
+      ECONOMIA: '#818cf8', POLITICA: '#fbbf24', DEPORTES: '#34d399',
+      ENERGIA: '#fb923c', CLIMA: '#38bdf8', ACTUALIDAD: '#a78bfa',
+      CRIPTO: '#2dd4bf', GEOPOLITICA: '#f472b6',
+    }
     return map[cat] || C.textDim
+  }
+
+  function getCategoryLabel(cat) {
+    const map = {
+      ECONOMIA: 'Economía', POLITICA: 'Política', DEPORTES: 'Deportes',
+      ENERGIA: 'Energía', CLIMA: 'Clima', ACTUALIDAD: 'Actualidad',
+      CRIPTO: 'Cripto', GEOPOLITICA: 'Geopolítica',
+    }
+    return map[cat] || cat
   }
 
   function getTypeLabel(m) {
     const t = m.market_type
-    if (t === 'FLASH' || t === 'DIARIO') return 'DIARIO'
-    if (t === 'SHORT' || t === 'SEMANAL') return 'SEMANAL'
-    if (t === 'LONG' || t === 'MENSUAL') return 'MENSUAL'
+    if (t === 'FLASH' || t === 'DIARIO') return 'Diario'
+    if (t === 'SHORT' || t === 'SEMANAL') return 'Semanal'
+    if (t === 'LONG' || t === 'MENSUAL') return 'Mensual'
     return t || ''
+  }
+
+  function getTradeStatusLabel(status) {
+    const map = { OPEN: 'Abierto', WON: 'Ganado', LOST: 'Perdido', SOLD: 'Vendido' }
+    return map[status] || status
+  }
+
+  function getTradeStatusColor(status) {
+    if (status === 'WON') return C.yes
+    if (status === 'LOST') return C.no
+    if (status === 'SOLD') return C.accentLight
+    return C.textDim
   }
 
   // ─── Computed ────────────────────────────────────────────────────────────
@@ -298,13 +351,17 @@ export default function Home() {
   const pendingMarkets = markets.filter(m => m.isExpired)
 
   const filtered = activeMarkets.filter(m => {
-    if (filter === 'ALL') return true
-    const t = m.market_type
-    if (filter === 'DIARIO') return t === 'FLASH' || t === 'DIARIO'
-    if (filter === 'SEMANAL') return t === 'SHORT' || t === 'SEMANAL'
-    if (filter === 'MENSUAL') return t === 'LONG' || t === 'MENSUAL'
+    if (filter !== 'ALL') {
+      const t = m.market_type
+      if (filter === 'DIARIO' && t !== 'FLASH' && t !== 'DIARIO') return false
+      if (filter === 'SEMANAL' && t !== 'SHORT' && t !== 'SEMANAL') return false
+      if (filter === 'MENSUAL' && t !== 'LONG' && t !== 'MENSUAL') return false
+    }
+    if (catFilter !== 'ALL' && m.category !== catFilter) return false
     return true
   })
+
+  const availableCategories = ['ALL', ...new Set(activeMarkets.map(m => m.category).filter(Boolean))]
 
   const openTrades = userTrades.filter(t => t.status === 'OPEN')
   const realizedTrades = userTrades.filter(t => t.status === 'WON' || t.status === 'LOST' || t.status === 'SOLD')
@@ -326,48 +383,57 @@ export default function Home() {
     if (t.status === 'LOST') catBreakdown[cat].lost++
   })
 
+  const filteredHistory = userTrades.filter(t => {
+    if (tradeHistoryFilter === 'ALL') return true
+    return t.status === tradeHistoryFilter
+  })
+
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', fontSize: 14, lineHeight: 1.5 }}>
 
       {/* ── HEADER ── */}
       <header style={{ borderBottom: `1px solid ${C.cardBorder}`, background: `${C.bg}f0`, position: 'sticky', top: 0, zIndex: 40, backdropFilter: 'blur(20px)' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 54, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 27, height: 27, background: C.accent, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>P</div>
-            <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.025em' }}>PrediMarket</span>
-            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: C.textDim, background: `${C.accent}12`, border: `1px solid ${C.accent}25`, padding: '1px 5px', borderRadius: 3 }}>BETA</span>
+            <div style={{ width: 26, height: 26, background: C.accent, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>P</div>
+            <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em' }}>PrediMarket</span>
+            <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: '0.08em', color: C.textDim, border: `1px solid ${C.cardBorder}`, padding: '1px 5px', borderRadius: 3 }}>BETA</span>
           </div>
 
           {/* Nav right */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             {user ? (
               <>
                 <button
+                  onClick={() => { setShowLeaderboard(true); loadLeaderboard() }}
+                  style={{ padding: '5px 12px', borderRadius: 6, background: 'transparent', border: `1px solid ${C.cardBorder}`, color: C.textDim, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+                  Ranking
+                </button>
+                <button
                   onClick={() => { setShowPortfolio(true); loadUserTrades(user.email) }}
-                  style={{ padding: '6px 13px', borderRadius: 6, background: 'transparent', border: `1px solid ${C.cardBorder}`, color: C.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500, position: 'relative' }}>
+                  style={{ padding: '5px 12px', borderRadius: 6, background: 'transparent', border: `1px solid ${C.cardBorder}`, color: C.textDim, cursor: 'pointer', fontSize: 12, fontWeight: 500, position: 'relative' }}>
                   Posiciones
                   {openTrades.length > 0 && (
-                    <span style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, background: C.accent, borderRadius: 8, fontSize: 9, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ position: 'absolute', top: -5, right: -5, width: 14, height: 14, background: C.accent, borderRadius: 7, fontSize: 8, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {openTrades.length}
                     </span>
                   )}
                 </button>
                 <button
                   onClick={() => { setShowProfile(true); loadUserTrades(user.email) }}
-                  style={{ padding: '6px 13px', borderRadius: 6, background: 'transparent', border: `1px solid ${C.cardBorder}`, color: C.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+                  style={{ padding: '5px 12px', borderRadius: 6, background: 'transparent', border: `1px solid ${C.cardBorder}`, color: C.textDim, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
                   Perfil
                 </button>
-                <div style={{ padding: '6px 13px', background: `${C.accent}0f`, border: `1px solid ${C.accent}25`, borderRadius: 6 }}>
+                <div style={{ padding: '5px 12px', background: `${C.accent}0a`, border: `1px solid ${C.accent}20`, borderRadius: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.accentLight }}>€{parseFloat(user.balance).toFixed(0)}</span>
                 </div>
-                <button onClick={handleLogout} style={{ padding: '6px 8px', borderRadius: 6, background: 'transparent', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>✕</button>
+                <button onClick={handleLogout} style={{ padding: '5px 8px', borderRadius: 6, background: 'transparent', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>✕</button>
               </>
             ) : (
-              <button onClick={() => setShowAuth(true)} style={{ padding: '7px 18px', background: C.accent, borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#fff', border: 'none', cursor: 'pointer' }}>
+              <button onClick={() => setShowAuth(true)} style={{ padding: '7px 16px', background: C.accent, borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#fff', border: 'none', cursor: 'pointer' }}>
                 Empezar
               </button>
             )}
@@ -376,16 +442,16 @@ export default function Home() {
       </header>
 
       {/* ── HERO ── */}
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '52px 24px 36px' }}>
-        <h1 style={{ fontSize: 'clamp(28px, 5vw, 46px)', fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1.08, marginBottom: 12, color: C.text }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 24px 28px' }}>
+        <h1 style={{ fontSize: 'clamp(20px, 3.5vw, 32px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 10, color: C.text }}>
           Mercados de predicción<br />
-          <span style={{ color: C.accent }}>verificables</span>
+          <span style={{ color: C.accentLight, fontWeight: 600 }}>verificables</span>
         </h1>
-        <p style={{ fontSize: 14, color: C.textMuted, maxWidth: 440, lineHeight: 1.65, marginBottom: 0 }}>
+        <p style={{ fontSize: 13, color: C.textMuted, maxWidth: 400, lineHeight: 1.65, marginBottom: 0 }}>
           Apuesta sobre indicadores económicos y actualidad española. Resolución automática por oráculo público.
         </p>
         {!user && (
-          <button onClick={() => setShowAuth(true)} style={{ marginTop: 22, padding: '10px 22px', background: C.accent, borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#fff', border: 'none', cursor: 'pointer' }}>
+          <button onClick={() => setShowAuth(true)} style={{ marginTop: 20, padding: '9px 20px', background: C.accent, borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#fff', border: 'none', cursor: 'pointer' }}>
             Empezar con 1.000 créditos
           </button>
         )}
@@ -393,7 +459,8 @@ export default function Home() {
 
       {/* ── FILTER TABS ── */}
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
-        <div style={{ display: 'flex', borderBottom: `1px solid ${C.cardBorder}`, marginBottom: 24 }}>
+        {/* Time filter */}
+        <div style={{ display: 'flex', borderBottom: `1px solid ${C.cardBorder}` }}>
           {[
             ['ALL', 'Todos', activeMarkets.length],
             ['DIARIO', 'Diario', activeMarkets.filter(m => m.market_type === 'FLASH' || m.market_type === 'DIARIO').length],
@@ -401,14 +468,34 @@ export default function Home() {
             ['MENSUAL', 'Mensual', activeMarkets.filter(m => m.market_type === 'LONG' || m.market_type === 'MENSUAL').length],
           ].map(([f, label, count]) => (
             <button key={f} onClick={() => setFilter(f)} style={{
-              padding: '9px 16px', fontSize: 13, fontWeight: filter === f ? 600 : 500,
+              padding: '9px 16px', fontSize: 13, fontWeight: filter === f ? 600 : 400,
               background: 'transparent', border: 'none', cursor: 'pointer',
-              color: filter === f ? C.text : C.textMuted,
+              color: filter === f ? C.text : C.textDim,
               borderBottom: `2px solid ${filter === f ? C.accent : 'transparent'}`,
               marginBottom: -1, transition: 'color 0.15s',
             }}>
               {label}
-              <span style={{ marginLeft: 6, fontSize: 11, color: C.textDim, fontWeight: 400 }}>{count}</span>
+              {count > 0 && <span style={{ marginLeft: 5, fontSize: 10, color: C.textDim, fontWeight: 400 }}>{count}</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* Category filter pills */}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', padding: '10px 0 18px' }}>
+          {availableCategories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCatFilter(cat)}
+              style={{
+                padding: '4px 11px', fontSize: 11, fontWeight: catFilter === cat ? 600 : 400,
+                letterSpacing: '0.03em', borderRadius: 20, cursor: 'pointer', transition: 'all 0.12s',
+                border: `1px solid ${catFilter === cat ? C.cardBorderHover : C.cardBorder}`,
+                background: catFilter === cat ? C.card : 'transparent',
+                color: catFilter === cat ? C.text : C.textDim,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+              {cat !== 'ALL' && <span style={{ width: 5, height: 5, borderRadius: 3, background: getCategoryColor(cat), display: 'inline-block', flexShrink: 0 }} />}
+              {cat === 'ALL' ? 'Todas' : getCategoryLabel(cat)}
             </button>
           ))}
         </div>
@@ -421,38 +508,43 @@ export default function Home() {
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: C.textDim, fontSize: 13 }}>No hay mercados activos en este filtro.</div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
             {filtered.map(m => {
               const oracle = getOracleDescription(m)
               return (
                 <div
                   key={m.id}
                   onClick={() => openTradeModal(m)}
-                  style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: 20, cursor: 'pointer', transition: 'border-color 0.15s', display: 'flex', flexDirection: 'column' }}
+                  style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: 18, cursor: 'pointer', transition: 'border-color 0.12s', display: 'flex', flexDirection: 'column' }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = C.cardBorderHover}
                   onMouseLeave={e => e.currentTarget.style.borderColor = C.cardBorder}>
 
-                  {/* Top: badges + time */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                    <div style={{ display: 'flex', gap: 5 }}>
-                      <span style={badge(getCategoryColor(m.category))}>{m.category}</span>
-                      <span style={badge(C.textDim)}>{getTypeLabel(m)}</span>
+                  {/* Top: category badge + type + time */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {catBadge(m.category)}
+                      <span style={neutralBadge()}>{getTypeLabel(m)}</span>
                     </div>
-                    <span style={{ fontSize: 11, color: C.textDim, fontWeight: 500 }}>{getTimeLeft(m.close_date)}</span>
+                    <span style={{ fontSize: 11, color: C.textDim, fontWeight: 400, flexShrink: 0, marginLeft: 8 }}>{getTimeLeft(m.close_date)}</span>
                   </div>
 
                   {/* Title */}
-                  <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 16, lineHeight: 1.45, color: C.text, flex: 1 }}>{m.title}</p>
+                  <p style={{ fontWeight: 500, fontSize: 14, marginBottom: 16, lineHeight: 1.5, color: C.text, flex: 1 }}>{m.title}</p>
 
-                  {/* Prices */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                    <div style={{ padding: '10px 12px', background: C.yesBg, border: `1px solid ${C.yesBorder}`, borderRadius: 6, textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.yes, marginBottom: 4 }}>SÍ</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.yes, lineHeight: 1 }}>{m.prices.yes}¢</div>
+                  {/* Prices — clean text rows, no colored boxes */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                      <span style={{ fontSize: 10, color: C.textDim, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>SÍ</span>
+                      <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.yes, lineHeight: 1 }}>{m.prices.yes}¢</span>
                     </div>
-                    <div style={{ padding: '10px 12px', background: C.noBg, border: `1px solid ${C.noBorder}`, borderRadius: 6, textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.no, marginBottom: 4 }}>NO</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.no, lineHeight: 1 }}>{m.prices.no}¢</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                      <span style={{ fontSize: 10, color: C.textDim, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>NO</span>
+                      <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.no, lineHeight: 1 }}>{m.prices.no}¢</span>
+                    </div>
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                      <div style={{ width: 44, height: 2, borderRadius: 2, overflow: 'hidden', background: `${C.no}30` }}>
+                        <div style={{ width: `${m.prices.yes}%`, height: '100%', background: C.yes, opacity: 0.7 }} />
+                      </div>
                     </div>
                   </div>
 
@@ -462,7 +554,10 @@ export default function Home() {
                     <span style={{ fontSize: 10, color: C.textDim }}>{oracle.source}</span>
                   </div>
 
-                  <button style={{ width: '100%', padding: '8px 0', borderRadius: 6, fontWeight: 600, fontSize: 12, border: 'none', cursor: 'pointer', background: C.accent, color: '#fff', letterSpacing: '0.01em' }}>
+                  <button
+                    style={{ width: '100%', padding: '7px 0', borderRadius: 6, fontWeight: 500, fontSize: 12, border: `1px solid ${C.cardBorder}`, cursor: 'pointer', background: 'transparent', color: C.textMuted, letterSpacing: '0.01em', transition: 'all 0.12s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = C.accent }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.textMuted; e.currentTarget.style.borderColor = C.cardBorder }}>
                     Predecir
                   </button>
                 </div>
@@ -473,8 +568,8 @@ export default function Home() {
 
         {/* Pending resolution notice */}
         {pendingMarkets.length > 0 && (
-          <div style={{ marginTop: 20, padding: '11px 16px', background: `${C.warning}07`, border: `1px solid ${C.warning}20`, borderRadius: 7, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 6, height: 6, borderRadius: 3, background: C.warning, flexShrink: 0, animation: 'pulse 2s infinite' }} />
+          <div style={{ marginTop: 20, padding: '11px 16px', background: `${C.warning}07`, border: `1px solid ${C.warning}18`, borderRadius: 7, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 5, height: 5, borderRadius: 3, background: C.warning, flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: C.warning, fontWeight: 500 }}>
               {pendingMarkets.length} mercado{pendingMarkets.length > 1 ? 's' : ''} pendiente{pendingMarkets.length > 1 ? 's' : ''} de resolución por el oráculo
             </span>
@@ -483,10 +578,10 @@ export default function Home() {
 
         {/* ── RESOLVED MARKETS ── */}
         {resolvedMarkets.length > 0 && (
-          <div style={{ marginTop: 52 }}>
+          <div style={{ marginTop: 56 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16 }}>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: C.textDim, marginBottom: 5 }}>Últimos resultados</div>
+                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: C.textDim, marginBottom: 5 }}>Historial</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Mercados resueltos</div>
               </div>
               <button
@@ -496,11 +591,11 @@ export default function Home() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {(showResolved ? resolvedMarkets : resolvedMarkets.slice(0, 4)).map(m => (
-                <div key={m.id} style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div key={m.id} style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>{m.title}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{m.title}</div>
                     <div style={{ fontSize: 11, color: C.textDim }}>
                       {m.resolution_source || getOracleDescription(m).source}
                       {m.close_date && ` · ${new Date(m.close_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}`}
@@ -521,10 +616,10 @@ export default function Home() {
 
       {/* ── AUTH MODAL ── */}
       {showAuth && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ ...panel, maxWidth: 380, width: '100%' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ ...panel, maxWidth: 360, width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.025em' }}>Empezar</h2>
+              <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.025em' }}>Empezar</h2>
               <button onClick={() => setShowAuth(false)} style={closeBtn}>✕</button>
             </div>
             <form onSubmit={handleLogin}>
@@ -551,13 +646,13 @@ export default function Home() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 16 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
-                    <span style={badge(getCategoryColor(selectedMarket.category))}>{selectedMarket.category}</span>
-                    <span style={badge(C.textDim)}>{getTypeLabel(selectedMarket)}</span>
-                    <span style={{ fontSize: 11, color: isExpired(selectedMarket.close_date) ? C.no : C.textDim, fontWeight: 500 }}>
+                    {catBadge(selectedMarket.category)}
+                    <span style={neutralBadge()}>{getTypeLabel(selectedMarket)}</span>
+                    <span style={{ fontSize: 11, color: isExpired(selectedMarket.close_date) ? C.no : C.textDim, fontWeight: 400 }}>
                       {isExpired(selectedMarket.close_date) ? 'Expirado' : getTimeLeft(selectedMarket.close_date)}
                     </span>
                   </div>
-                  <h2 style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.35, letterSpacing: '-0.02em', color: C.text }}>{selectedMarket.title}</h2>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.4, letterSpacing: '-0.02em', color: C.text }}>{selectedMarket.title}</h2>
                 </div>
                 <button onClick={() => setShowTradeModal(false)} style={closeBtn}>✕</button>
               </div>
@@ -599,15 +694,15 @@ export default function Home() {
                         <span style={{ color: C.textDim, fontSize: 11 }}>{last > first ? '+' : ''}{(last - first).toFixed(1)} pts</span>
                       </div>
                     </div>
-                    <div style={{ height: 96, position: 'relative' }}>
+                    <div style={{ height: 80, position: 'relative' }}>
                       <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
                         <polygon
                           points={`0,100 ${prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')} 100,100`}
-                          fill={`${trend}10`} stroke="none"
+                          fill={`${trend}08`} stroke="none"
                         />
                         <polyline
                           points={prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')}
-                          fill="none" stroke={trend} strokeWidth="2" vectorEffect="non-scaling-stroke"
+                          fill="none" stroke={trend} strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeOpacity="0.8"
                         />
                       </svg>
                     </div>
@@ -625,7 +720,7 @@ export default function Home() {
                   {/* Order type toggle */}
                   <div style={{ display: 'flex', background: C.surface, borderRadius: 7, padding: 3, marginBottom: 16 }}>
                     {['MARKET', 'LIMIT'].map(mode => (
-                      <button key={mode} onClick={() => setOrderMode(mode)} style={{ flex: 1, padding: '7px 0', borderRadius: 5, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: orderMode === mode ? C.card : 'transparent', color: orderMode === mode ? C.text : C.textDim, transition: 'all 0.15s' }}>
+                      <button key={mode} onClick={() => setOrderMode(mode)} style={{ flex: 1, padding: '7px 0', borderRadius: 5, fontSize: 12, fontWeight: 500, border: 'none', cursor: 'pointer', background: orderMode === mode ? C.card : 'transparent', color: orderMode === mode ? C.text : C.textDim, transition: 'all 0.12s' }}>
                         {mode === 'MARKET' ? 'Mercado' : 'Límite'}
                       </button>
                     ))}
@@ -635,11 +730,11 @@ export default function Home() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
                     {['YES', 'NO'].map(side => (
                       <button key={side} onClick={() => setTradeSide(side)} style={{
-                        padding: '14px 8px', borderRadius: 7, fontWeight: 700, cursor: 'pointer',
-                        border: `2px solid ${tradeSide === side ? (side === 'YES' ? C.yes : C.no) : C.cardBorder}`,
-                        background: tradeSide === side ? (side === 'YES' ? C.yesBg : C.noBg) : 'transparent',
+                        padding: '14px 8px', borderRadius: 7, fontWeight: 600, cursor: 'pointer',
+                        border: `1px solid ${tradeSide === side ? (side === 'YES' ? C.yes : C.no) : C.cardBorder}`,
+                        background: tradeSide === side ? (side === 'YES' ? `${C.yes}08` : `${C.no}08`) : 'transparent',
                         color: tradeSide === side ? (side === 'YES' ? C.yes : C.no) : C.textMuted,
-                        transition: 'all 0.15s',
+                        transition: 'all 0.12s',
                       }}>
                         <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.09em', marginBottom: 5 }}>{side === 'YES' ? 'SÍ' : 'NO'}</div>
                         <div style={{ fontSize: 22, fontFamily: 'ui-monospace, monospace', lineHeight: 1 }}>
@@ -681,7 +776,7 @@ export default function Home() {
                       min="1" max={user?.balance || 1000} />
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
                       {[10, 25, 50, 100].map(v => (
-                        <button key={v} onClick={() => setTradeAmount(v)} style={{ padding: '6px 0', fontSize: 12, fontWeight: 600, background: 'transparent', color: tradeAmount === v ? C.text : C.textDim, borderRadius: 6, border: `1px solid ${tradeAmount === v ? C.accent : C.cardBorder}`, cursor: 'pointer' }}>
+                        <button key={v} onClick={() => setTradeAmount(v)} style={{ padding: '6px 0', fontSize: 12, fontWeight: 500, background: 'transparent', color: tradeAmount === v ? C.text : C.textDim, borderRadius: 6, border: `1px solid ${tradeAmount === v ? C.accent : C.cardBorder}`, cursor: 'pointer' }}>
                           {v}€
                         </button>
                       ))}
@@ -706,7 +801,7 @@ export default function Home() {
                           ))}
                           <div style={{ borderTop: `1px solid ${C.cardBorder}`, paddingTop: 10, marginTop: 3 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                              <span style={{ fontSize: 12, fontWeight: 600 }}>Si aciertas</span>
+                              <span style={{ fontSize: 12, fontWeight: 500 }}>Si aciertas</span>
                               <div style={{ textAlign: 'right' }}>
                                 <div style={{ fontSize: 18, fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: C.yes }}>€{tradeImpact.potentialWinnings.toFixed(2)}</div>
                                 <div style={{ fontSize: 11, color: tradeImpact.potentialProfit > 0 ? C.yes : C.no, fontFamily: 'ui-monospace, monospace' }}>
@@ -743,7 +838,7 @@ export default function Home() {
                       disabled={!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing}
                       style={{
                         width: '100%', padding: '12px 0', borderRadius: 7, fontWeight: 600, fontSize: 14,
-                        border: 'none', cursor: 'pointer', letterSpacing: '-0.01em', transition: 'all 0.15s',
+                        border: 'none', cursor: 'pointer', letterSpacing: '-0.01em', transition: 'all 0.12s',
                         background: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? C.cardBorder : (tradeSide === 'YES' ? C.yes : C.no),
                         color: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? C.textDim : '#0a0a0a',
                       }}>
@@ -759,7 +854,7 @@ export default function Home() {
                       disabled={processing || tradeAmount > (user?.balance || 0)}
                       style={{
                         width: '100%', padding: '12px 0', borderRadius: 7, fontWeight: 600, fontSize: 14,
-                        border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                        border: 'none', cursor: 'pointer', transition: 'all 0.12s',
                         background: (processing || tradeAmount > (user?.balance || 0)) ? C.cardBorder : C.accent,
                         color: (processing || tradeAmount > (user?.balance || 0)) ? C.textDim : '#fff',
                       }}>
@@ -777,7 +872,7 @@ export default function Home() {
                             <span style={badge(o.side === 'YES' ? C.yes : C.no)}>{o.side}</span>
                             <span style={{ fontSize: 12, color: C.textMuted }}>€{o.amount} a {(o.target_price * 100).toFixed(0)}¢</span>
                           </div>
-                          <button onClick={() => cancelOrder(o.id)} style={{ fontSize: 11, color: C.no, background: 'none', border: `1px solid ${C.no}35`, borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
+                          <button onClick={() => cancelOrder(o.id)} style={{ fontSize: 11, color: C.no, background: 'none', border: `1px solid ${C.no}30`, borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
                             Cancelar
                           </button>
                         </div>
@@ -787,12 +882,12 @@ export default function Home() {
                 </>
               ) : (
                 <div style={{ padding: 24, background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8, textAlign: 'center' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.textMuted, marginBottom: 5 }}>Mercado cerrado</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: C.textMuted, marginBottom: 5 }}>Mercado cerrado</div>
                   <div style={{ fontSize: 12, color: C.textDim }}>Pendiente de resolución automática por el oráculo.</div>
                 </div>
               )}
 
-              {/* Order book / Liquidity */}
+              {/* Liquidity & Order book */}
               <div style={{ marginTop: 20, padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
                 {sectionLabel('Liquidez del mercado')}
                 {(() => {
@@ -800,9 +895,9 @@ export default function Home() {
                   const total = yp + np
                   return (
                     <div>
-                      <div style={{ display: 'flex', gap: 2, height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
-                        <div style={{ width: `${yp / total * 100}%`, background: C.yes }} />
-                        <div style={{ width: `${np / total * 100}%`, background: C.no }} />
+                      <div style={{ display: 'flex', gap: 2, height: 3, borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
+                        <div style={{ width: `${yp / total * 100}%`, background: C.yes, opacity: 0.7 }} />
+                        <div style={{ width: `${np / total * 100}%`, background: C.no, opacity: 0.7 }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textDim }}>
                         <span>Pool SÍ: <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600, color: C.yes }}>€{yp.toFixed(0)}</span></span>
@@ -813,11 +908,12 @@ export default function Home() {
                 })()}
 
                 {orderBook.length > 0 && (
-                  <div style={{ marginTop: 14 }}>
+                  <div style={{ marginTop: 16, borderTop: `1px solid ${C.divider}`, paddingTop: 14 }}>
+                    {sectionLabel('Libro de órdenes límite')}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       {['YES', 'NO'].map(side => {
                         const sideOrders = orderBook.filter(o => o.side === side).sort((a, b) => b.target_price - a.target_price)
-                        const maxAmt = Math.max(...orderBook.map(x => x.total_amount))
+                        const maxAmt = Math.max(...orderBook.map(x => x.total_amount), 1)
                         return (
                           <div key={side}>
                             <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: side === 'YES' ? C.yes : C.no, marginBottom: 6 }}>
@@ -827,7 +923,7 @@ export default function Home() {
                               <div style={{ fontSize: 11, color: C.textDim }}>Sin órdenes</div>
                             ) : sideOrders.map((o, i) => (
                               <div key={i} style={{ position: 'relative', marginBottom: 2, padding: '4px 6px', borderRadius: 3 }}>
-                                <div style={{ position: 'absolute', [side === 'YES' ? 'left' : 'right']: 0, top: 0, bottom: 0, width: `${(o.total_amount / maxAmt) * 100}%`, background: `${side === 'YES' ? C.yes : C.no}10`, borderRadius: 3 }} />
+                                <div style={{ position: 'absolute', [side === 'YES' ? 'left' : 'right']: 0, top: 0, bottom: 0, width: `${(o.total_amount / maxAmt) * 100}%`, background: `${side === 'YES' ? C.yes : C.no}0c`, borderRadius: 3 }} />
                                 <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                                   <span style={{ color: side === 'YES' ? C.yes : C.no, fontFamily: 'ui-monospace, monospace' }}>{(o.target_price * 100).toFixed(0)}¢</span>
                                   <span style={{ color: C.textDim, fontFamily: 'ui-monospace, monospace' }}>€{parseFloat(o.total_amount).toFixed(0)}</span>
@@ -879,13 +975,13 @@ export default function Home() {
               {openTrades.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '48px 0', color: C.textDim, fontSize: 13 }}>Sin posiciones abiertas</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {openTrades.map(trade => (
                     <div key={trade.id} style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: 16 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, lineHeight: 1.4 }}>{trade.markets.title}</div>
+                      <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 10, lineHeight: 1.45 }}>{trade.markets.title}</div>
                       <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
-                        <span style={badge(trade.side === 'YES' ? C.yes : C.no)}>{trade.side}</span>
-                        <span style={badge(C.textDim)}>{trade.shares.toFixed(1)} contratos</span>
+                        <span style={badge(trade.side === 'YES' ? C.yes : C.no)}>{trade.side === 'YES' ? 'SÍ' : 'NO'}</span>
+                        <span style={neutralBadge()}>{trade.shares.toFixed(1)} contratos</span>
                         {trade.isExpired && <span style={badge(C.warning)}>PENDIENTE</span>}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
@@ -902,7 +998,7 @@ export default function Home() {
                         ))}
                       </div>
                       {!trade.isExpired && (
-                        <button onClick={() => handleSell(trade)} style={{ width: '100%', padding: '8px 0', background: 'transparent', color: C.no, border: `1px solid ${C.no}35`, borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                        <button onClick={() => handleSell(trade)} style={{ width: '100%', padding: '7px 0', background: 'transparent', color: C.no, border: `1px solid ${C.no}30`, borderRadius: 6, fontWeight: 500, fontSize: 12, cursor: 'pointer' }}>
                           Vender ~€{trade.currentValue.toFixed(2)}
                         </button>
                       )}
@@ -919,7 +1015,7 @@ export default function Home() {
       {showProfile && user && (
         <div style={modal}>
           <div style={{ minHeight: '100%', padding: '24px 16px' }}>
-            <div style={{ ...panel, maxWidth: 520, margin: '0 auto' }}>
+            <div style={{ ...panel, maxWidth: 560, margin: '0 auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.025em' }}>Mi perfil</h2>
                 <button onClick={() => setShowProfile(false)} style={closeBtn}>✕</button>
@@ -927,7 +1023,7 @@ export default function Home() {
 
               {/* User header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, padding: '14px 16px', background: C.surface, borderRadius: 8, border: `1px solid ${C.cardBorder}` }}>
-                <div style={{ width: 42, height: 42, borderRadius: 8, background: `${C.accent}18`, border: `1px solid ${C.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: C.accent }}>
+                <div style={{ width: 40, height: 40, borderRadius: 8, background: `${C.accent}15`, border: `1px solid ${C.accent}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: C.accent }}>
                   {(user.display_name || user.email || '?')[0].toUpperCase()}
                 </div>
                 <div style={{ flex: 1 }}>
@@ -957,12 +1053,12 @@ export default function Home() {
 
               {/* Open exposure */}
               {openTrades.length > 0 && (
-                <div style={{ padding: '12px 14px', background: `${C.warning}07`, border: `1px solid ${C.warning}20`, borderRadius: 7, marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '11px 14px', background: `${C.warning}06`, border: `1px solid ${C.warning}18`, borderRadius: 7, marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.warning }}>Exposición abierta</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: C.warning }}>Exposición abierta</div>
                     <div style={{ fontSize: 11, color: C.textDim }}>{openTrades.length} posiciones · €{totalInvested.toFixed(0)} en juego</div>
                   </div>
-                  <span style={badge(C.warning)}>PENDIENTE</span>
+                  <span style={badge(C.warning)}>ABIERTO</span>
                 </div>
               )}
 
@@ -970,9 +1066,9 @@ export default function Home() {
               {Object.keys(catBreakdown).length > 0 && (
                 <div style={{ padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}`, marginBottom: 14 }}>
                   {sectionLabel('Por categoría')}
-                  <div style={{ display: 'flex', height: 5, borderRadius: 3, overflow: 'hidden', gap: 1, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', height: 3, borderRadius: 3, overflow: 'hidden', gap: 1, marginBottom: 14 }}>
                     {Object.entries(catBreakdown).map(([cat, data]) => (
-                      <div key={cat} style={{ flex: data.count, background: getCategoryColor(cat), minWidth: 4 }} />
+                      <div key={cat} style={{ flex: data.count, background: getCategoryColor(cat), minWidth: 4, opacity: 0.7 }} />
                     ))}
                   </div>
                   {Object.entries(catBreakdown).sort((a, b) => b[1].count - a[1].count).map(([cat, data]) => {
@@ -980,9 +1076,9 @@ export default function Home() {
                     return (
                       <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${C.divider}` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: 2, background: getCategoryColor(cat), flexShrink: 0 }} />
+                          <div style={{ width: 6, height: 6, borderRadius: 2, background: getCategoryColor(cat), flexShrink: 0, opacity: 0.8 }} />
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: 500 }}>{cat}</div>
+                            <div style={{ fontSize: 12, fontWeight: 500 }}>{getCategoryLabel(cat)}</div>
                             <div style={{ fontSize: 10, color: C.textDim }}>{data.count} trades · WR {wr.toFixed(0)}%</div>
                           </div>
                         </div>
@@ -996,7 +1092,7 @@ export default function Home() {
               )}
 
               {/* Stats */}
-              <div style={{ padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
+              <div style={{ padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}`, marginBottom: 14 }}>
                 {sectionLabel('Estadísticas')}
                 {[
                   ['Total operaciones', userTrades.length, null],
@@ -1014,6 +1110,68 @@ export default function Home() {
                     <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'ui-monospace, monospace', color: col || C.text }}>{val}</span>
                   </div>
                 ))}
+              </div>
+
+              {/* ── Trade history ── */}
+              <div style={{ padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  {sectionLabel('Historial de trades')}
+                  <span style={{ fontSize: 11, color: C.textDim, marginBottom: 10 }}>{filteredHistory.length} operaciones</span>
+                </div>
+
+                {/* Filter tabs */}
+                <div style={{ display: 'flex', background: C.bg, borderRadius: 6, padding: 2, marginBottom: 12 }}>
+                  {[['ALL', 'Todos'], ['OPEN', 'Abiertos'], ['WON', 'Ganados'], ['LOST', 'Perdidos'], ['SOLD', 'Vendidos']].map(([f, l]) => (
+                    <button key={f} onClick={() => setTradeHistoryFilter(f)} style={{
+                      flex: 1, padding: '5px 0', borderRadius: 4, fontSize: 10, fontWeight: tradeHistoryFilter === f ? 600 : 400,
+                      border: 'none', cursor: 'pointer',
+                      background: tradeHistoryFilter === f ? C.card : 'transparent',
+                      color: tradeHistoryFilter === f ? C.text : C.textDim,
+                      transition: 'all 0.12s',
+                    }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+
+                {filteredHistory.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: C.textDim, fontSize: 12 }}>Sin trades en este filtro</div>
+                ) : (
+                  <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {filteredHistory.map(trade => {
+                      const pnl = trade.pnl || 0
+                      const statusColor = getTradeStatusColor(trade.status)
+                      return (
+                        <div key={trade.id} style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 6, padding: '10px 12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: C.text, flex: 1, marginRight: 8, lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                              {trade.markets?.title}
+                            </div>
+                            <span style={{ ...badge(statusColor), flexShrink: 0 }}>{getTradeStatusLabel(trade.status)}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                            <span style={badge(trade.side === 'YES' ? C.yes : C.no)}>{trade.side === 'YES' ? 'SÍ' : 'NO'}</span>
+                            <span style={{ fontSize: 11, color: C.textDim }}>€{trade.amount.toFixed(0)} invertido</span>
+                            {trade.status !== 'OPEN' && (
+                              <span style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace', fontWeight: 600, color: pnl >= 0 ? C.yes : C.no, marginLeft: 'auto' }}>
+                                {pnl >= 0 ? '+' : ''}€{pnl.toFixed(1)}
+                              </span>
+                            )}
+                            {trade.status === 'OPEN' && (
+                              <span style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace', color: trade.profit >= 0 ? C.yes : C.no, marginLeft: 'auto' }}>
+                                {trade.profit >= 0 ? '+' : ''}€{trade.profit.toFixed(1)} (ahora)
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 5 }}>
+                            {new Date(trade.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {trade.markets?.category && ` · ${getCategoryLabel(trade.markets.category)}`}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
