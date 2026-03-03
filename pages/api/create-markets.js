@@ -12,14 +12,35 @@ const supabase = createClient(
 //          /api/create-markets?mode=trending     → trending (desactivado, usa objective)
 // ============================================================
 
+// ─── Obtener precios actuales para umbrales calibrados ───────────────────
+async function fetchCurrentPrices() {
+  const prices = { ibex: null, btc: null, brent: null }
+  try {
+    const r = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EIBEX?interval=1d&range=1d', { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    const d = await r.json()
+    prices.ibex = d?.chart?.result?.[0]?.meta?.regularMarketPrice
+  } catch (e) { console.error('IBEX fetch error:', e.message) }
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    const d = await r.json()
+    prices.btc = d?.bitcoin?.usd
+  } catch (e) { console.error('BTC fetch error:', e.message) }
+  try {
+    const r = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/BZ%3DF?interval=1d&range=1d', { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    const d = await r.json()
+    prices.brent = d?.chart?.result?.[0]?.meta?.regularMarketPrice
+  } catch (e) { console.error('Brent fetch error:', e.message) }
+  return prices
+}
+
 // ─── Mercados objetivos curados ───────────────────────────────────────────
 // Cada mercado tiene:
 // - Fuente verificable concreta
-// - Umbral numérico cuando aplica
+// - Umbral numérico calibrado con precio actual ±1-2%
 // - Fecha de resolución clara
 // - Resultado binario 100% objetivo (SÍ o NO)
 
-function getObjectiveMarkets() {
+function getObjectiveMarkets(prices = {}) {
   const now = new Date()
   const nextMonday = new Date(now)
   nextMonday.setDate(now.getDate() + (8 - now.getDay()) % 7 || 7)
@@ -34,18 +55,37 @@ function getObjectiveMarkets() {
   const hoursToEndOfMonth = Math.max(24, Math.ceil((endOfMonth - now) / 3600000))
   const hoursToNextMonday = Math.max(24, Math.ceil((nextMonday - now) / 3600000))
 
-  return [
-    // ── ECONOMÍA ──────────────────────────────────────────────────────────
-    {
-      title: '¿El IBEX 35 supera los 13.000 puntos esta semana?',
-      description: 'Se resuelve SÍ si el IBEX 35 cierra por encima de 13.000 puntos en alguna sesión de esta semana. Fuente: Yahoo Finance (finance.yahoo.com/quote/%5EIBEX/). Dato verificable tras las 17:35h de cada día hábil.',
+  // Umbrales dinámicos basados en precio actual ±1% (redondeados a valores limpios)
+  const ibexThreshold = prices.ibex
+    ? Math.round(prices.ibex * 1.008 / 25) * 25  // +0.8%, redondear a múltiplo de 25
+    : null
+  const btcThreshold = prices.btc
+    ? Math.round(prices.btc * 1.015 / 500) * 500  // +1.5%, redondear a múltiplo de $500
+    : null
+  const brentThreshold = prices.brent
+    ? Math.round(prices.brent * 1.01 * 4) / 4     // +1%, redondear a $0.25
+    : null
+
+  const markets = []
+
+  // ── ECONOMÍA ──────────────────────────────────────────────────────────
+  markets.push({
+    title: '¿El IBEX 35 cierra en verde esta semana?',
+    description: 'Se resuelve SÍ si el IBEX 35 acumula una variación positiva al cierre del viernes respecto al lunes. Fuente: Yahoo Finance. Resolución: viernes 17:35h.',
+    category: 'ECONOMIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
+  })
+
+  if (ibexThreshold) {
+    const ibexRounded = ibexThreshold.toLocaleString('es-ES')
+    const ibexCurrent = Math.round(prices.ibex).toLocaleString('es-ES')
+    markets.push({
+      title: `¿El IBEX 35 supera los ${ibexRounded} puntos esta semana?`,
+      description: `Se resuelve SÍ si el IBEX 35 cierra por encima de ${ibexRounded} puntos en alguna sesión de esta semana. Cotización actual: ~${ibexCurrent}. Fuente: Yahoo Finance (finance.yahoo.com/quote/%5EIBEX/). Dato verificable tras las 17:35h de cada día hábil.`,
       category: 'ECONOMIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
-    },
-    {
-      title: '¿El IBEX 35 cierra en verde esta semana?',
-      description: 'Se resuelve SÍ si el IBEX 35 acumula una variación positiva al cierre del viernes respecto al lunes. Fuente: Yahoo Finance. Resolución: viernes 17:35h.',
-      category: 'ECONOMIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
-    },
+    })
+  }
+
+  markets.push(
     {
       title: '¿El precio medio del PVPC supera 80 €/MWh esta semana?',
       description: 'Se resuelve SÍ si el precio medio del PVPC (Precio Voluntario para el Pequeño Consumidor) acumula una media superior a 80 €/MWh durante esta semana. Fuente: REE apidatos (apidatos.ree.es). Dato oficial.',
@@ -55,34 +95,48 @@ function getObjectiveMarkets() {
       title: '¿El precio medio de la luz supera 60 €/MWh hoy?',
       description: 'Se resuelve SÍ si el precio medio del pool eléctrico diario supera 60 €/MWh hoy. Fuente: OMIE / REE (apidatos.ree.es). Dato oficial publicado diariamente.',
       category: 'ENERGIA', type: 'DIARIO', hours: 20,
-    },
-    {
-      title: '¿Bitcoin supera los 100.000$ esta semana?',
-      description: 'Se resuelve SÍ si el precio de Bitcoin (BTC) supera los 100.000 USD en algún momento durante esta semana. Fuente: CoinGecko API (api.coingecko.com). Dato de precio spot en tiempo real.',
+    }
+  )
+
+  // ── CRIPTO ────────────────────────────────────────────────────────────
+  if (btcThreshold) {
+    const btcRounded = btcThreshold.toLocaleString('es-ES')
+    const btcCurrent = Math.round(prices.btc).toLocaleString('es-ES')
+    markets.push({
+      title: `¿Bitcoin supera los ${btcRounded}$ esta semana?`,
+      description: `Se resuelve SÍ si el precio de Bitcoin (BTC) supera ${btcRounded} USD en algún momento durante esta semana. Precio actual: ~$${btcCurrent}. Umbral calibrado a +1.5% del precio actual. Fuente: CoinGecko API (api.coingecko.com). Precio spot en tiempo real.`,
       category: 'CRIPTO', type: 'SEMANAL', hours: hoursToEndOfWeek,
-    },
-    {
-      title: '¿Bitcoin supera los 90.000$ esta semana?',
-      description: 'Se resuelve SÍ si el precio de Bitcoin supera los 90.000 USD durante esta semana. Fuente: CoinGecko API. Umbral: $90.000.',
+    })
+  } else {
+    // Fallback sin precio en vivo
+    markets.push({
+      title: '¿Bitcoin sube más de un 3% esta semana?',
+      description: 'Se resuelve SÍ si el precio de Bitcoin (BTC/USD) sube más de un 3% de lunes a viernes. Fuente: CoinGecko API. Dato spot público.',
       category: 'CRIPTO', type: 'SEMANAL', hours: hoursToEndOfWeek,
-    },
+    })
+  }
+
+  // ── ECONOMÍA (mensuales) ───────────────────────────────────────────────
+  markets.push(
     {
-      title: '¿El Euríbor 12M baja del 2,5% este mes?',
-      description: 'Se resuelve SÍ si la tasa Euríbor a 12 meses publicada por el BCE cierra por debajo del 2,5% al final del mes en curso. Fuente: Banco de España / BCE. Dato oficial mensual.',
+      title: '¿El Euríbor 12M baja del 2,40% este mes?',
+      description: 'Se resuelve SÍ si la tasa Euríbor a 12 meses publicada por el BCE cierra por debajo del 2,40% al final del mes en curso. Tasa actual: ~2,41%. Fuente: Banco de España / BCE. Dato oficial mensual.',
       category: 'ECONOMIA', type: 'MENSUAL', hours: hoursToEndOfMonth,
     },
     {
       title: '¿El IPC interanual de España supera el 3% este mes?',
-      description: 'Se resuelve SÍ si el dato de IPC interanual publicado por el INE para el mes en curso supera el 3%. Fuente: INE (ine.es). Dato oficial mensual.',
+      description: 'Se resuelve SÍ si el dato de IPC interanual publicado por el INE para el mes en curso supera el 3%. Último dato conocido: 2,8%. Fuente: INE (ine.es). Dato oficial mensual.',
       category: 'ECONOMIA', type: 'MENSUAL', hours: hoursToEndOfMonth,
     },
     {
       title: '¿El precio medio de vivienda en España sube en el informe Idealista de este mes?',
       description: 'Se resuelve SÍ si el informe mensual de precios de vivienda de Idealista muestra una variación positiva respecto al mes anterior. Fuente: Idealista Sala de Prensa (idealista.com/sala-de-prensa/informes-precio-vivienda/).',
       category: 'ECONOMIA', type: 'MENSUAL', hours: hoursToEndOfMonth,
-    },
+    }
+  )
 
-    // ── DEPORTES ──────────────────────────────────────────────────────────
+  // ── DEPORTES ──────────────────────────────────────────────────────────
+  markets.push(
     {
       title: '¿El Real Madrid gana su próximo partido oficial?',
       description: 'Se resuelve SÍ si el Real Madrid obtiene victoria (3 puntos) en su próximo partido oficial (Liga, Champions, Copa). Empate = NO. Fuente: football-data.org API.',
@@ -92,22 +146,33 @@ function getObjectiveMarkets() {
       title: '¿El FC Barcelona gana su próximo partido oficial?',
       description: 'Se resuelve SÍ si el FC Barcelona obtiene victoria en su próximo partido oficial. Empate = NO. Fuente: football-data.org API.',
       category: 'DEPORTES', type: 'SEMANAL', hours: hoursToNextMonday,
-    },
+    }
+  )
 
-    // ── POLÍTICA (hechos verificables, no opiniones) ──────────────────────
-    {
-      title: '¿El Congreso aprueba algún proyecto de ley esta semana?',
-      description: 'Se resuelve SÍ si el Boletín Oficial del Estado (BOE) publica la aprobación de algún proyecto de ley o real decreto-ley durante esta semana. Fuente: BOE (boe.es). Dato verificable y binario.',
-      category: 'POLITICA', type: 'SEMANAL', hours: hoursToEndOfWeek,
-    },
+  // ── POLÍTICA ──────────────────────────────────────────────────────────
+  markets.push({
+    title: '¿El Congreso aprueba algún proyecto de ley esta semana?',
+    description: 'Se resuelve SÍ si el Boletín Oficial del Estado (BOE) publica la aprobación de algún proyecto de ley o real decreto-ley durante esta semana. Fuente: BOE (boe.es). Dato verificable y binario.',
+    category: 'POLITICA', type: 'SEMANAL', hours: hoursToEndOfWeek,
+  })
 
-    // ── ENERGÍA ───────────────────────────────────────────────────────────
-    {
-      title: '¿El Brent supera los 85$ por barril esta semana?',
-      description: 'Se resuelve SÍ si el precio del petróleo Brent supera los 85 USD/barril en algún momento durante esta semana. Fuente: Yahoo Finance (BZ=F). Dato de mercado verificable.',
+  // ── ENERGÍA (Brent) ───────────────────────────────────────────────────
+  if (brentThreshold) {
+    const brentCurrent = prices.brent.toFixed(2)
+    markets.push({
+      title: `¿El Brent supera los ${brentThreshold}$ por barril esta semana?`,
+      description: `Se resuelve SÍ si el precio del petróleo Brent supera ${brentThreshold} USD/barril en algún momento durante esta semana. Precio actual: ~$${brentCurrent}. Fuente: Yahoo Finance (BZ=F). Dato de mercado verificable.`,
       category: 'ENERGIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
-    },
-  ]
+    })
+  } else {
+    markets.push({
+      title: '¿El Brent sube más de un 2% esta semana?',
+      description: 'Se resuelve SÍ si el precio del petróleo Brent sube más de un 2% de lunes a viernes. Fuente: Yahoo Finance (BZ=F).',
+      category: 'ENERGIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
+    })
+  }
+
+  return markets
 }
 
 // ─── Deduplicación por título ─────────────────────────────────────────────
@@ -121,7 +186,8 @@ function titlesAreSimilar(a, b) {
 
 // ─── Crear mercados objetivos curados ────────────────────────────────────
 async function createObjectiveMarkets() {
-  const markets = getObjectiveMarkets()
+  const prices = await fetchCurrentPrices()
+  const markets = getObjectiveMarkets(prices)
 
   // Obtener mercados existentes activos/cerrados para evitar duplicados
   const { data: existing } = await supabase
@@ -226,8 +292,9 @@ export default async function handler(req, res) {
 
   // Ver qué mercados se crearían (sin crearlos)
   if (mode === 'preview') {
-    const markets = getObjectiveMarkets()
-    return res.status(200).json({ mode: 'preview', markets, count: markets.length })
+    const prices = await fetchCurrentPrices()
+    const markets = getObjectiveMarkets(prices)
+    return res.status(200).json({ mode: 'preview', markets, count: markets.length, prices })
   }
 
   return res.status(400).json({ error: 'Modo no válido. Usa: objective, manual, preview' })

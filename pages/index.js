@@ -40,8 +40,8 @@ export default function Home() {
     card: '#101012',
     cardBorder: '#1e1e22',
     cardBorderHover: '#2e2e34',
-    accent: '#7c3aed',
-    accentLight: '#a78bfa',
+    accent: '#2563eb',
+    accentLight: '#60a5fa',
     yes: '#10b981',
     no: '#ef4444',
     text: '#f4f4f5',
@@ -115,6 +115,26 @@ export default function Home() {
         {text}
       </div>
     )
+  }
+
+  // ─── AMM synthetic order book ────────────────────────────────────────────
+  function computeAMMBook(yes_pool, no_pool) {
+    const yp = parseFloat(yes_pool) || 5000
+    const np = parseFloat(no_pool) || 5000
+    const k = yp * np
+    const cur = np / (yp + np) * 100
+    const amts = [50, 200, 500, 2000]
+    // ASK: buying YES → NO pool grows → YES price rises
+    const asks = amts.map(a => {
+      const np2 = np + a, yp2 = k / np2
+      return { price: np2 / (yp2 + np2) * 100, amount: a, synthetic: true }
+    }).filter(l => l.price > cur + 0.2 && l.price < 99).sort((a, b) => a.price - b.price)
+    // BID: buying NO → YES pool grows → YES price falls
+    const bids = amts.map(a => {
+      const yp2 = yp + a, np2 = k / yp2
+      return { price: np2 / (yp2 + np2) * 100, amount: a, synthetic: true }
+    }).filter(l => l.price < cur - 0.2 && l.price > 1).sort((a, b) => b.price - a.price)
+    return { bids, asks, mid: cur }
   }
 
   // ─── Oracle descriptions ─────────────────────────────────────────────────
@@ -887,76 +907,107 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Liquidity & Order book */}
-              <div style={{ marginTop: 20, padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
-                {sectionLabel('Liquidez del mercado')}
-                {(() => {
-                  const yp = parseFloat(selectedMarket.yes_pool), np = parseFloat(selectedMarket.no_pool)
-                  const total = yp + np
-                  return (
-                    <div>
-                      <div style={{ display: 'flex', gap: 2, height: 3, borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
-                        <div style={{ width: `${yp / total * 100}%`, background: C.yes, opacity: 0.7 }} />
-                        <div style={{ width: `${np / total * 100}%`, background: C.no, opacity: 0.7 }} />
+              {/* ── ORDER BOOK (always visible) ── */}
+              {(() => {
+                const yp = parseFloat(selectedMarket.yes_pool)
+                const np = parseFloat(selectedMarket.no_pool)
+                const ammBook = computeAMMBook(yp, np)
+                const hasBids = orderBook.some(o => o.side === 'YES')
+                const hasAsks = orderBook.some(o => o.side === 'NO')
+                const bidLevels = hasBids
+                  ? orderBook.filter(o => o.side === 'YES').sort((a, b) => b.target_price - a.target_price)
+                      .map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount), count: o.order_count }))
+                  : ammBook.bids
+                const askLevels = hasAsks
+                  ? orderBook.filter(o => o.side === 'NO').sort((a, b) => a.target_price - b.target_price)
+                      .map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount), count: o.order_count }))
+                  : ammBook.asks
+                const maxAmt = Math.max(1, ...bidLevels.map(l => l.amount), ...askLevels.map(l => l.amount))
+                return (
+                  <div style={{ marginTop: 20, padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      {sectionLabel('Libro de órdenes')}
+                      <span style={{ fontSize: 9, color: C.textDim, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 500 }}>
+                        {(hasBids || hasAsks) ? 'Órdenes límite' : 'AMM'}
+                      </span>
+                    </div>
+
+                    {/* Spread row */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '8px 0 10px', borderBottom: `1px solid ${C.divider}`, marginBottom: 10 }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.yes, marginBottom: 2 }}>SÍ</div>
+                        <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.yes, lineHeight: 1 }}>{selectedMarket.prices.yes}¢</div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textDim }}>
-                        <span>Pool SÍ: <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600, color: C.yes }}>€{yp.toFixed(0)}</span></span>
-                        <span>Pool NO: <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600, color: C.no }}>€{np.toFixed(0)}</span></span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                        <div style={{ width: 40, height: 2, borderRadius: 1, background: `linear-gradient(to right, ${C.yes}, ${C.no})`, opacity: 0.4 }} />
+                        <div style={{ fontSize: 9, color: C.textDim }}>spread {Math.abs(selectedMarket.prices.yes - selectedMarket.prices.no)}¢</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.no, marginBottom: 2 }}>NO</div>
+                        <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.no, lineHeight: 1 }}>{selectedMarket.prices.no}¢</div>
                       </div>
                     </div>
-                  )
-                })()}
 
-                {orderBook.length > 0 && (
-                  <div style={{ marginTop: 16, borderTop: `1px solid ${C.divider}`, paddingTop: 14 }}>
-                    {sectionLabel('Libro de órdenes límite')}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      {['YES', 'NO'].map(side => {
-                        const sideOrders = orderBook.filter(o => o.side === side).sort((a, b) => b.target_price - a.target_price)
-                        const maxAmt = Math.max(...orderBook.map(x => x.total_amount), 1)
-                        return (
-                          <div key={side}>
-                            <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: side === 'YES' ? C.yes : C.no, marginBottom: 6 }}>
-                              Límites {side === 'YES' ? 'SÍ' : 'NO'}
-                            </div>
-                            {sideOrders.length === 0 ? (
-                              <div style={{ fontSize: 11, color: C.textDim }}>Sin órdenes</div>
-                            ) : sideOrders.map((o, i) => (
-                              <div key={i} style={{ position: 'relative', marginBottom: 2, padding: '4px 6px', borderRadius: 3 }}>
-                                <div style={{ position: 'absolute', [side === 'YES' ? 'left' : 'right']: 0, top: 0, bottom: 0, width: `${(o.total_amount / maxAmt) * 100}%`, background: `${side === 'YES' ? C.yes : C.no}0c`, borderRadius: 3 }} />
-                                <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                                  <span style={{ color: side === 'YES' ? C.yes : C.no, fontFamily: 'ui-monospace, monospace' }}>{(o.target_price * 100).toFixed(0)}¢</span>
-                                  <span style={{ color: C.textDim, fontFamily: 'ui-monospace, monospace' }}>€{parseFloat(o.total_amount).toFixed(0)}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Recent trades */}
-                {recentActivity.length > 0 && (
-                  <div style={{ marginTop: 14, borderTop: `1px solid ${C.divider}`, paddingTop: 12 }}>
-                    {sectionLabel('Últimas operaciones')}
-                    <div style={{ maxHeight: 100, overflowY: 'auto' }}>
-                      {recentActivity.slice(0, 8).map((a, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', fontSize: 11 }}>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <span style={badge(a.side === 'YES' ? C.yes : C.no)}>{a.side}</span>
-                            <span style={{ color: C.textDim, fontFamily: 'ui-monospace, monospace' }}>€{parseFloat(a.amount).toFixed(0)}</span>
-                          </div>
-                          <span style={{ color: C.textDim, fontSize: 10 }}>
-                            {new Date(a.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                    {/* Two-column BID / ASK */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      {/* BID column */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.yes, marginBottom: 5 }}>
+                          <span>Precio</span><span>Vol</span>
                         </div>
-                      ))}
+                        {bidLevels.slice(0, 5).map((level, i) => (
+                          <div key={i} style={{ position: 'relative', marginBottom: 2, borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${(level.amount / maxAmt) * 100}%`, background: `${C.yes}14` }} />
+                            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', padding: '3px 5px', fontSize: 11 }}>
+                              <span style={{ fontFamily: 'ui-monospace, monospace', color: C.yes }}>{level.price.toFixed(0)}¢</span>
+                              <span style={{ fontFamily: 'ui-monospace, monospace', color: C.textDim }}>€{level.amount.toFixed(0)}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {bidLevels.length === 0 && <div style={{ fontSize: 11, color: C.textDim, paddingTop: 2 }}>—</div>}
+                      </div>
+
+                      {/* ASK column */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.no, marginBottom: 5 }}>
+                          <span>Vol</span><span>Precio</span>
+                        </div>
+                        {askLevels.slice(0, 5).map((level, i) => (
+                          <div key={i} style={{ position: 'relative', marginBottom: 2, borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(level.amount / maxAmt) * 100}%`, background: `${C.no}14` }} />
+                            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', padding: '3px 5px', fontSize: 11 }}>
+                              <span style={{ fontFamily: 'ui-monospace, monospace', color: C.textDim }}>€{level.amount.toFixed(0)}</span>
+                              <span style={{ fontFamily: 'ui-monospace, monospace', color: C.no }}>{level.price.toFixed(0)}¢</span>
+                            </div>
+                          </div>
+                        ))}
+                        {askLevels.length === 0 && <div style={{ fontSize: 11, color: C.textDim, paddingTop: 2, textAlign: 'right' }}>—</div>}
+                      </div>
                     </div>
+
+                    {/* Recent trades */}
+                    {recentActivity.length > 0 && (
+                      <div style={{ marginTop: 14, borderTop: `1px solid ${C.divider}`, paddingTop: 12 }}>
+                        {sectionLabel('Últimas operaciones')}
+                        <div style={{ maxHeight: 80, overflowY: 'auto' }}>
+                          {recentActivity.slice(0, 5).map((a, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', fontSize: 11 }}>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <span style={badge(a.side === 'YES' ? C.yes : C.no)}>{a.side}</span>
+                                <span style={{ color: C.textDim, fontFamily: 'ui-monospace, monospace' }}>€{parseFloat(a.amount).toFixed(0)}</span>
+                              </div>
+                              <span style={{ color: C.textDim, fontSize: 10 }}>
+                                {new Date(a.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                )
+              })()}
             </div>
           </div>
         </div>
