@@ -37,19 +37,22 @@ export default function Home() {
   // ─── Design tokens ───────────────────────────────────────────────────────
   const C = {
     bg: '#08080a',
-    card: '#101012',
-    cardBorder: '#1e1e22',
-    cardBorderHover: '#2e2e34',
+    card: '#0f0f11',
+    cardAlt: '#111114',
+    cardBorder: '#1c1c20',
+    cardBorderHover: '#2a2a32',
     accent: '#2563eb',
     accentLight: '#60a5fa',
     yes: '#10b981',
     no: '#ef4444',
     text: '#f4f4f5',
     textMuted: '#a1a1aa',
-    textDim: '#52525b',
-    surface: '#0c0c0e',
+    textDim: '#4a4a54',
+    surface: '#0a0a0c',
     warning: '#d97706',
-    divider: '#18181b',
+    divider: '#16161a',
+    shadow: '0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)',
+    shadowHover: '0 8px 24px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4)',
   }
 
   // ─── Style helpers ───────────────────────────────────────────────────────
@@ -381,7 +384,9 @@ export default function Home() {
     return true
   })
 
-  const availableCategories = ['ALL', ...new Set(activeMarkets.map(m => m.category).filter(Boolean))]
+  const ALL_CATS = ['ECONOMIA', 'POLITICA', 'DEPORTES', 'ENERGIA', 'CRIPTO', 'ACTUALIDAD', 'GEOPOLITICA', 'CLIMA']
+  const activeCats = new Set(activeMarkets.map(m => m.category).filter(Boolean))
+  const availableCategories = ['ALL', ...ALL_CATS]
 
   const openTrades = userTrades.filter(t => t.status === 'OPEN')
   const realizedTrades = userTrades.filter(t => t.status === 'WON' || t.status === 'LOST' || t.status === 'SOLD')
@@ -408,12 +413,37 @@ export default function Home() {
     return t.status === tradeHistoryFilter
   })
 
+  // Racha actual de victorias/derrotas consecutivas
+  const streakData = (() => {
+    const closed = [...userTrades]
+      .filter(t => t.status === 'WON' || t.status === 'LOST')
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    if (closed.length === 0) return { count: 0, type: null }
+    const first = closed[0].status
+    let count = 0
+    for (const t of closed) {
+      if (t.status === first) count++
+      else break
+    }
+    return { count, type: first }
+  })()
+
+  // Trades este mes vs mes anterior
+  const now = new Date()
+  const thisMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  const prevMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1))
+  const tradesThisMonth = userTrades.filter(t => new Date(t.created_at) >= thisMonthStart).length
+  const tradesPrevMonth = userTrades.filter(t => {
+    const d = new Date(t.created_at)
+    return d >= prevMonthStart && d < thisMonthStart
+  }).length
+
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', fontSize: 14, lineHeight: 1.5 }}>
 
       {/* ── HEADER ── */}
-      <header style={{ borderBottom: `1px solid ${C.cardBorder}`, background: `${C.bg}f0`, position: 'sticky', top: 0, zIndex: 40, backdropFilter: 'blur(20px)' }}>
+      <header style={{ borderBottom: `1px solid ${C.divider}`, background: `${C.bg}e8`, position: 'sticky', top: 0, zIndex: 40, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
           {/* Logo */}
@@ -462,19 +492,20 @@ export default function Home() {
       </header>
 
       {/* ── HERO ── */}
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 24px 28px' }}>
-        <h1 style={{ fontSize: 'clamp(20px, 3.5vw, 32px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 10, color: C.text }}>
-          Mercados de predicción<br />
-          <span style={{ color: C.accentLight, fontWeight: 600 }}>verificables</span>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '52px 24px 20px' }}>
+        <h1 style={{ fontSize: 'clamp(22px, 3vw, 30px)', fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1.2, marginBottom: 8, color: C.text }}>
+          Mercados de predicción — España
         </h1>
-        <p style={{ fontSize: 13, color: C.textMuted, maxWidth: 400, lineHeight: 1.65, marginBottom: 0 }}>
-          Apuesta sobre indicadores económicos y actualidad española. Resolución automática por oráculo público.
-        </p>
-        {!user && (
-          <button onClick={() => setShowAuth(true)} style={{ marginTop: 20, padding: '9px 20px', background: C.accent, borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#fff', border: 'none', cursor: 'pointer' }}>
-            Empezar con 1.000 créditos
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <p style={{ fontSize: 13, color: C.textDim, lineHeight: 1.6, margin: 0 }}>
+            Economía, política y deportes. Resolución automática por oráculo público.
+          </p>
+          {!user && (
+            <button onClick={() => setShowAuth(true)} style={{ padding: '7px 18px', background: C.accent, borderRadius: 6, fontWeight: 600, fontSize: 12, color: '#fff', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'all 0.2s ease' }}>
+              Empezar gratis →
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── FILTER TABS ── */}
@@ -501,23 +532,40 @@ export default function Home() {
         </div>
 
         {/* Category filter pills */}
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', padding: '10px 0 18px' }}>
-          {availableCategories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCatFilter(cat)}
-              style={{
-                padding: '4px 11px', fontSize: 11, fontWeight: catFilter === cat ? 600 : 400,
-                letterSpacing: '0.03em', borderRadius: 20, cursor: 'pointer', transition: 'all 0.12s',
-                border: `1px solid ${catFilter === cat ? C.cardBorderHover : C.cardBorder}`,
-                background: catFilter === cat ? C.card : 'transparent',
-                color: catFilter === cat ? C.text : C.textDim,
-                display: 'flex', alignItems: 'center', gap: 5,
-              }}>
-              {cat !== 'ALL' && <span style={{ width: 5, height: 5, borderRadius: 3, background: getCategoryColor(cat), display: 'inline-block', flexShrink: 0 }} />}
-              {cat === 'ALL' ? 'Todas' : getCategoryLabel(cat)}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '12px 0 20px' }}>
+          {availableCategories.map(cat => {
+            const isActive = catFilter === cat
+            const hasMarkets = cat === 'ALL' || activeCats.has(cat)
+            return (
+              <button
+                key={cat}
+                onClick={() => hasMarkets && setCatFilter(cat)}
+                style={{
+                  padding: '5px 13px', fontSize: 12, fontWeight: isActive ? 600 : 400,
+                  letterSpacing: '0.01em', borderRadius: 20, transition: 'all 0.2s ease',
+                  cursor: hasMarkets ? 'pointer' : 'default',
+                  border: `1px solid ${isActive ? C.accent : hasMarkets ? C.cardBorder : C.divider}`,
+                  background: isActive ? C.accent : 'transparent',
+                  color: isActive ? '#fff' : hasMarkets ? C.textMuted : C.textDim,
+                  opacity: hasMarkets ? 1 : 0.4,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}>
+                {cat !== 'ALL' && (
+                  <span style={{
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: isActive ? 'rgba(255,255,255,0.7)' : getCategoryColor(cat),
+                    display: 'inline-block', flexShrink: 0,
+                  }} />
+                )}
+                {cat === 'ALL' ? 'Todos' : getCategoryLabel(cat)}
+                {cat !== 'ALL' && hasMarkets && (
+                  <span style={{ fontSize: 10, opacity: 0.6, fontWeight: 400 }}>
+                    {activeMarkets.filter(m => m.category === cat).length}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -528,57 +576,101 @@ export default function Home() {
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: C.textDim, fontSize: 13 }}>No hay mercados activos en este filtro.</div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
-            {filtered.map(m => {
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+            {filtered.map((m, index) => {
               const oracle = getOracleDescription(m)
+              const isFeatured = index === 0 && filtered.length > 1
+              const yesP = parseFloat(m.prices.yes)
               return (
                 <div
                   key={m.id}
                   onClick={() => openTradeModal(m)}
-                  style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: 18, cursor: 'pointer', transition: 'border-color 0.12s', display: 'flex', flexDirection: 'column' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = C.cardBorderHover}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = C.cardBorder}>
+                  style={{
+                    background: isFeatured ? C.cardAlt : C.card,
+                    border: `1px solid ${C.cardBorder}`,
+                    borderRadius: 10,
+                    padding: isFeatured ? '28px 28px 24px' : '20px 20px 18px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex', flexDirection: 'column',
+                    boxShadow: C.shadow,
+                    gridColumn: isFeatured ? 'span 2' : undefined,
+                    position: 'relative', overflow: 'hidden',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = C.cardBorderHover
+                    e.currentTarget.style.boxShadow = C.shadowHover
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = C.cardBorder
+                    e.currentTarget.style.boxShadow = C.shadow
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}>
+
+                  {/* Featured accent line */}
+                  {isFeatured && (
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(to right, ${C.accent}, ${C.accentLight})`, opacity: 0.6 }} />
+                  )}
 
                   {/* Top: category badge + type + time */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isFeatured ? 16 : 12 }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       {catBadge(m.category)}
                       <span style={neutralBadge()}>{getTypeLabel(m)}</span>
+                      {isFeatured && <span style={{ ...neutralBadge(), color: C.accentLight, borderColor: `${C.accent}40` }}>Destacado</span>}
                     </div>
                     <span style={{ fontSize: 11, color: C.textDim, fontWeight: 400, flexShrink: 0, marginLeft: 8 }}>{getTimeLeft(m.close_date)}</span>
                   </div>
 
                   {/* Title */}
-                  <p style={{ fontWeight: 500, fontSize: 14, marginBottom: 16, lineHeight: 1.5, color: C.text, flex: 1 }}>{m.title}</p>
+                  <p style={{
+                    fontWeight: 500,
+                    fontSize: isFeatured ? 16 : 14,
+                    marginBottom: isFeatured ? 24 : 18,
+                    lineHeight: 1.5, color: C.text, flex: 1,
+                    letterSpacing: isFeatured ? '-0.01em' : 0,
+                  }}>{m.title}</p>
 
-                  {/* Prices — clean text rows, no colored boxes */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                      <span style={{ fontSize: 10, color: C.textDim, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>SÍ</span>
-                      <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.yes, lineHeight: 1 }}>{m.prices.yes}¢</span>
+                  {/* Prices */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: isFeatured ? 32 : 20, marginBottom: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: C.textDim, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>SÍ</div>
+                      <span style={{ fontSize: isFeatured ? 32 : 26, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.yes, lineHeight: 1 }}>{m.prices.yes}¢</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                      <span style={{ fontSize: 10, color: C.textDim, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>NO</span>
-                      <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.no, lineHeight: 1 }}>{m.prices.no}¢</span>
+                    <div>
+                      <div style={{ fontSize: 10, color: C.textDim, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>NO</div>
+                      <span style={{ fontSize: isFeatured ? 32 : 26, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.no, lineHeight: 1 }}>{m.prices.no}¢</span>
                     </div>
-                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
-                      <div style={{ width: 44, height: 2, borderRadius: 2, overflow: 'hidden', background: `${C.no}30` }}>
-                        <div style={{ width: `${m.prices.yes}%`, height: '100%', background: C.yes, opacity: 0.7 }} />
-                      </div>
+                  </div>
+
+                  {/* Probability bar — gradient green→red */}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ height: 4, borderRadius: 4, background: `linear-gradient(to right, ${C.yes}30, ${C.no}30)`, overflow: 'hidden', position: 'relative' }}>
+                      <div style={{
+                        position: 'absolute', left: 0, top: 0, bottom: 0,
+                        width: `${yesP}%`,
+                        background: `linear-gradient(to right, ${C.yes}, ${C.yes}88)`,
+                        borderRadius: 4, transition: 'width 0.4s ease',
+                      }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: C.textDim }}>
+                      <span>SÍ {yesP.toFixed(0)}%</span>
+                      <span>NO {(100-yesP).toFixed(0)}%</span>
                     </div>
                   </div>
 
                   {/* Meta row */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13 }}>
-                    <span style={{ fontSize: 11, color: C.textDim }}>€{((m.total_volume || 0) / 1000).toFixed(1)}K · {m.active_traders || m.total_traders || 0} traders</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <span style={{ fontSize: 11, color: C.textDim }}>€{((m.total_volume || 0) / 1000).toFixed(1)}K vol · {m.active_traders || m.total_traders || 0} traders</span>
                     <span style={{ fontSize: 10, color: C.textDim }}>{oracle.source}</span>
                   </div>
 
                   <button
-                    style={{ width: '100%', padding: '7px 0', borderRadius: 6, fontWeight: 500, fontSize: 12, border: `1px solid ${C.cardBorder}`, cursor: 'pointer', background: 'transparent', color: C.textMuted, letterSpacing: '0.01em', transition: 'all 0.12s' }}
+                    style={{ width: '100%', padding: '8px 0', borderRadius: 7, fontWeight: 600, fontSize: 12, border: `1px solid ${C.cardBorder}`, cursor: 'pointer', background: 'transparent', color: C.textMuted, letterSpacing: '0.01em', transition: 'all 0.2s ease' }}
                     onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = C.accent }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.textMuted; e.currentTarget.style.borderColor = C.cardBorder }}>
-                    Predecir
+                    Predecir →
                   </button>
                 </div>
               )
@@ -612,7 +704,7 @@ export default function Home() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {(showResolved ? resolvedMarkets : resolvedMarkets.slice(0, 4)).map(m => (
+              {(showResolved ? resolvedMarkets : resolvedMarkets.slice(0, 10)).map(m => (
                 <div key={m.id} style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{m.title}</div>
@@ -660,7 +752,7 @@ export default function Home() {
       {showTradeModal && selectedMarket && (
         <div style={modal}>
           <div style={{ minHeight: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px' }}>
-            <div style={{ ...panel, maxWidth: 660, width: '100%' }}>
+            <div style={{ ...panel, maxWidth: 860, width: '100%' }}>
 
               {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 16 }}>
@@ -693,6 +785,11 @@ export default function Home() {
                   </div>
                 )
               })()}
+
+              {/* 2-column body */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, alignItems: 'start' }}>
+              {/* ─ LEFT COLUMN ─ */}
+              <div>
 
               {/* Price chart */}
               {(() => {
@@ -907,7 +1004,10 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ── ORDER BOOK (always visible) ── */}
+              </div>{/* end left column */}
+
+              {/* ─ RIGHT COLUMN — Order Book ─ */}
+              <div style={{ position: 'sticky', top: 24 }}>
               {(() => {
                 const yp = parseFloat(selectedMarket.yes_pool)
                 const np = parseFloat(selectedMarket.no_pool)
@@ -924,7 +1024,7 @@ export default function Home() {
                   : ammBook.asks
                 const maxAmt = Math.max(1, ...bidLevels.map(l => l.amount), ...askLevels.map(l => l.amount))
                 return (
-                  <div style={{ marginTop: 20, padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
+                  <div style={{ padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
                     {/* Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       {sectionLabel('Libro de órdenes')}
@@ -1008,6 +1108,8 @@ export default function Home() {
                   </div>
                 )
               })()}
+              </div>{/* end right column */}
+              </div>{/* end 2-column grid */}
             </div>
           </div>
         </div>
@@ -1114,33 +1216,64 @@ export default function Home() {
               )}
 
               {/* Category breakdown */}
-              {Object.keys(catBreakdown).length > 0 && (
-                <div style={{ padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}`, marginBottom: 14 }}>
-                  {sectionLabel('Por categoría')}
-                  <div style={{ display: 'flex', height: 3, borderRadius: 3, overflow: 'hidden', gap: 1, marginBottom: 14 }}>
-                    {Object.entries(catBreakdown).map(([cat, data]) => (
-                      <div key={cat} style={{ flex: data.count, background: getCategoryColor(cat), minWidth: 4, opacity: 0.7 }} />
-                    ))}
-                  </div>
-                  {Object.entries(catBreakdown).sort((a, b) => b[1].count - a[1].count).map(([cat, data]) => {
-                    const wr = (data.won + data.lost) > 0 ? (data.won / (data.won + data.lost) * 100) : 0
-                    return (
-                      <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${C.divider}` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: 2, background: getCategoryColor(cat), flexShrink: 0, opacity: 0.8 }} />
-                          <div>
-                            <div style={{ fontSize: 12, fontWeight: 500 }}>{getCategoryLabel(cat)}</div>
-                            <div style={{ fontSize: 10, color: C.textDim }}>{data.count} trades · WR {wr.toFixed(0)}%</div>
+              {Object.keys(catBreakdown).length > 0 && (() => {
+                const sorted = Object.entries(catBreakdown).sort((a, b) => b[1].count - a[1].count)
+                const maxCount = Math.max(1, ...sorted.map(([, d]) => d.count))
+                const bestCat = sorted.reduce((best, cur) => {
+                  const wr = (cur[1].won + cur[1].lost) > 0 ? cur[1].won / (cur[1].won + cur[1].lost) : 0
+                  const bestWr = (best[1].won + best[1].lost) > 0 ? best[1].won / (best[1].won + best[1].lost) : 0
+                  return wr > bestWr ? cur : best
+                }, sorted[0])
+                const worstCat = sorted.reduce((worst, cur) => {
+                  const wr = (cur[1].won + cur[1].lost) > 0 ? cur[1].won / (cur[1].won + cur[1].lost) : 1
+                  const worstWr = (worst[1].won + worst[1].lost) > 0 ? worst[1].won / (worst[1].won + worst[1].lost) : 1
+                  return wr < worstWr ? cur : worst
+                }, sorted[0])
+                return (
+                  <div style={{ padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}`, marginBottom: 14 }}>
+                    {sectionLabel('Por categoría')}
+                    {/* Best / worst */}
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                      <div style={{ flex: 1, padding: '8px 10px', background: `${C.yes}08`, border: `1px solid ${C.yes}20`, borderRadius: 6 }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.yes, marginBottom: 2 }}>MEJOR</div>
+                        <div style={{ fontSize: 12, fontWeight: 500 }}>{getCategoryLabel(bestCat[0])}</div>
+                        <div style={{ fontSize: 10, color: C.textDim }}>{((bestCat[1].won + bestCat[1].lost) > 0 ? bestCat[1].won / (bestCat[1].won + bestCat[1].lost) * 100 : 0).toFixed(0)}% WR</div>
+                      </div>
+                      <div style={{ flex: 1, padding: '8px 10px', background: `${C.no}08`, border: `1px solid ${C.no}20`, borderRadius: 6 }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.no, marginBottom: 2 }}>PEOR</div>
+                        <div style={{ fontSize: 12, fontWeight: 500 }}>{getCategoryLabel(worstCat[0])}</div>
+                        <div style={{ fontSize: 10, color: C.textDim }}>{((worstCat[1].won + worstCat[1].lost) > 0 ? worstCat[1].won / (worstCat[1].won + worstCat[1].lost) * 100 : 0).toFixed(0)}% WR</div>
+                      </div>
+                    </div>
+                    {/* Horizontal bars */}
+                    {sorted.map(([cat, data]) => {
+                      const wr = (data.won + data.lost) > 0 ? (data.won / (data.won + data.lost) * 100) : 0
+                      const color = getCategoryColor(cat)
+                      return (
+                        <div key={cat} style={{ marginBottom: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: 2, background: color, flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, fontWeight: 500 }}>{getCategoryLabel(cat)}</span>
+                              <span style={{ fontSize: 10, color: C.textDim }}>{data.count} trades</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <span style={{ fontSize: 10, color: C.textDim }}>{wr.toFixed(0)}% WR</span>
+                              <span style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: data.pnl >= 0 ? C.yes : C.no }}>
+                                {data.pnl >= 0 ? '+' : ''}€{data.pnl.toFixed(0)}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Bar: trades count */}
+                          <div style={{ height: 3, borderRadius: 2, background: C.divider, overflow: 'hidden' }}>
+                            <div style={{ width: `${(data.count / maxCount) * 100}%`, height: '100%', background: color, opacity: 0.6, transition: 'width 0.4s ease' }} />
                           </div>
                         </div>
-                        <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 700, color: data.pnl >= 0 ? C.yes : C.no }}>
-                          {data.pnl >= 0 ? '+' : ''}€{data.pnl.toFixed(0)}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                      )
+                    })}
+                  </div>
+                )
+              })()}
 
               {/* Stats */}
               <div style={{ padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}`, marginBottom: 14 }}>
@@ -1149,10 +1282,13 @@ export default function Home() {
                   ['Total operaciones', userTrades.length, null],
                   ['Ganadas', wonTrades.length, C.yes],
                   ['Perdidas', lostTrades.length, C.no],
-                  ['Vendidas (anticipado)', soldTrades.length, C.accentLight],
+                  ['Vendidas', soldTrades.length, C.accentLight],
                   ['Mayor ganancia', realizedTrades.length > 0 ? `+€${Math.max(0, ...realizedTrades.map(t => t.pnl || 0)).toFixed(0)}` : '—', C.yes],
                   ['Mayor pérdida', realizedTrades.length > 0 ? `-€${Math.abs(Math.min(0, ...realizedTrades.map(t => t.pnl || 0))).toFixed(0)}` : '—', C.no],
                   ['Avg por trade', realizedTrades.length > 0 ? `${realizedPnL >= 0 ? '+' : ''}€${(realizedPnL / realizedTrades.length).toFixed(1)}` : '—', null],
+                  ['Racha actual', streakData.count > 0 ? `${streakData.count} ${streakData.type === 'WON' ? 'ganadas' : 'perdidas'}` : '—', streakData.type === 'WON' ? C.yes : streakData.type === 'LOST' ? C.no : null],
+                  ['Este mes', `${tradesThisMonth} trades`, null],
+                  ['Mes anterior', `${tradesPrevMonth} trades`, tradesPrevMonth > 0 && tradesThisMonth > tradesPrevMonth ? C.yes : null],
                   ['Capital inicial', '€1.000', null],
                   ['Saldo actual', `€${parseFloat(user.balance).toFixed(0)}`, user.balance >= 1000 ? C.yes : C.no],
                 ].map(([label, val, col], i, arr) => (

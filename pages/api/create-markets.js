@@ -178,6 +178,16 @@ function getObjectiveMarkets(prices = {}) {
 // ─── Deduplicación por título ─────────────────────────────────────────────
 function titlesAreSimilar(a, b) {
   const normalize = s => s.toLowerCase().replace(/[^a-záéíóúüñ0-9]/gi, ' ').replace(/\s+/g, ' ').trim()
+  // If either title contains a significant number (>100) that differs between titles → NOT a duplicate
+  // This allows new weekly markets with updated thresholds (BTC 68.500 vs 73.000, IBEX 17.100 vs 17.250)
+  const parseNums = s => (s.match(/[\d.,]+/g) || [])
+    .map(n => parseFloat(n.replace(/\./g, '').replace(',', '.')))
+    .filter(n => n > 100)
+  const numsA = parseNums(a), numsB = parseNums(b)
+  if (numsA.length > 0 && numsB.length > 0) {
+    const allMatch = numsA.every(na => numsB.some(nb => Math.abs(na - nb) / Math.max(na, nb) < 0.02))
+    if (!allMatch) return false
+  }
   const wordsA = normalize(a).split(' ').filter(w => w.length > 3)
   const wordsB = normalize(b)
   const matchCount = wordsA.filter(w => wordsB.includes(w)).length
