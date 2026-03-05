@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/resolve-markets",
-      "schedule": "0 * * * *"
+      "schedule": "40 17 * * 1-5"
     }
   ]
 }
