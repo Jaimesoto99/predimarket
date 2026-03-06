@@ -33,6 +33,13 @@ export default function Home() {
   const [userOrders, setUserOrders] = useState([])
   const [orderMode, setOrderMode] = useState('MARKET')
   const [limitPrice, setLimitPrice] = useState(0.40)
+  const [modalTab, setModalTab] = useState('BOOK')
+  const [comments, setComments] = useState([])
+  const [newComment, setNewComment] = useState('')
+  const [topHolders, setTopHolders] = useState([])
+  const [toast, setToast] = useState(null)
+  const [showDisclaimer, setShowDisclaimer] = useState(false)
+  const [pendingTradeAction, setPendingTradeAction] = useState(null)
 
   // ─── Design tokens ───────────────────────────────────────────────────────
   const C = {
@@ -224,6 +231,50 @@ export default function Home() {
     }
   }
 
+  function showToast(msg, type = 'success') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  function hasAcceptedDisclaimer() {
+    try { return localStorage.getItem('predi_disclaimer_v1') === 'accepted' } catch { return false }
+  }
+
+  // SQL needed: CREATE TABLE IF NOT EXISTS comments (
+  //   id BIGSERIAL PRIMARY KEY, market_id BIGINT REFERENCES markets(id),
+  //   user_email TEXT NOT NULL, text TEXT NOT NULL, likes INT DEFAULT 0,
+  //   created_at TIMESTAMPTZ DEFAULT NOW()
+  // );
+  async function loadComments(marketId) {
+    const { data } = await supabase.from('comments').select('*').eq('market_id', marketId).order('created_at', { ascending: false }).limit(20)
+    if (data) setComments(data)
+  }
+
+  async function loadTopHolders(marketId) {
+    const { data } = await supabase.from('trades').select('user_email, side, shares').eq('market_id', marketId).eq('status', 'OPEN')
+    if (data) {
+      const agg = {}
+      data.forEach(t => {
+        if (!agg[t.user_email]) agg[t.user_email] = { email: t.user_email, yes: 0, no: 0 }
+        if (t.side === 'YES') agg[t.user_email].yes += parseFloat(t.shares || 0)
+        else agg[t.user_email].no += parseFloat(t.shares || 0)
+      })
+      setTopHolders(Object.values(agg).map(h => ({ ...h, total: h.yes + h.no })).sort((a, b) => b.total - a.total).slice(0, 10))
+    }
+  }
+
+  async function postComment() {
+    if (!user || !newComment.trim() || !selectedMarket) return
+    const { error } = await supabase.from('comments').insert({ market_id: selectedMarket.id, user_email: user.email, text: newComment.trim() })
+    if (!error) { setNewComment(''); loadComments(selectedMarket.id) }
+    else showToast('Error al publicar comentario', 'error')
+  }
+
+  async function likeComment(commentId) {
+    await supabase.rpc('like_comment', { p_comment_id: commentId })
+    loadComments(selectedMarket.id)
+  }
+
   async function loadPriceHistory(marketId) {
     const history = await getPriceHistory(marketId, 168)
     setPriceHistory(history)
@@ -254,13 +305,19 @@ export default function Home() {
     setSelectedMarket(market)
     setShowTradeModal(true)
     setOrderMode('MARKET')
+    setModalTab('BOOK')
+    setComments([])
+    setTopHolders([])
     loadPriceHistory(market.id)
     loadRecentActivity(market.id)
     loadOrderBook(market.id)
+    loadComments(market.id)
+    loadTopHolders(market.id)
   }
 
   async function executeTrade() {
     if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid || processing) return
+    if (!hasAcceptedDisclaimer()) { setPendingTradeAction('MARKET'); setShowDisclaimer(true); return }
     setProcessing(true)
     const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount)
     setProcessing(false)
@@ -268,30 +325,32 @@ export default function Home() {
       const newUser = { ...user, balance: result.new_balance }
       setUser(newUser)
       localStorage.setItem('predi_user', JSON.stringify(newUser))
-      setShowTradeModal(false)
       setTradeAmount(10)
       loadUserTrades(user.email)
       loadMarkets()
+      showToast(`Orden ejecutada: ${tradeSide === 'YES' ? 'SÍ' : 'NO'} €${tradeAmount}`)
     } else {
-      alert(result.error)
+      showToast(result.error || 'Error al ejecutar orden', 'error')
     }
   }
 
   async function placeLimitOrder() {
     if (!user || !selectedMarket || processing) return
+    if (!hasAcceptedDisclaimer()) { setPendingTradeAction('LIMIT'); setShowDisclaimer(true); return }
     setProcessing(true)
     const { data, error } = await supabase.rpc('place_limit_order', {
       p_email: user.email, p_market_id: selectedMarket.id,
       p_side: tradeSide, p_amount: tradeAmount, p_target_price: limitPrice,
     })
     setProcessing(false)
-    if (error) { alert(error.message); return }
-    if (data && !data.success) { alert(data.error); return }
+    if (error) { showToast(error.message, 'error'); return }
+    if (data && !data.success) { showToast(data.error, 'error'); return }
     const newUser = { ...user, balance: data.new_balance }
     setUser(newUser)
     localStorage.setItem('predi_user', JSON.stringify(newUser))
     loadOrderBook(selectedMarket.id)
     loadUserTrades(user.email)
+    showToast(`Orden límite colocada: ${tradeSide} a ${(limitPrice * 100).toFixed(0)}¢`)
   }
 
   async function cancelOrder(orderId) {
@@ -752,10 +811,10 @@ export default function Home() {
       {showTradeModal && selectedMarket && (
         <div style={modal}>
           <div style={{ minHeight: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px' }}>
-            <div style={{ ...panel, maxWidth: 860, width: '100%' }}>
+            <div style={{ ...panel, maxWidth: 920, width: '100%' }}>
 
               {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 16 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
                     {catBadge(selectedMarket.category)}
@@ -769,122 +828,356 @@ export default function Home() {
                 <button onClick={() => setShowTradeModal(false)} style={closeBtn}>✕</button>
               </div>
 
-              {/* Oracle */}
-              {(() => {
-                const oracle = getOracleDescription(selectedMarket)
-                return (
-                  <div style={{ marginBottom: 16, padding: '12px 14px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
-                    {sectionLabel('Oráculo de resolución')}
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.accentLight, marginBottom: 4 }}>{oracle.source}</div>
-                    <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.55 }}>{oracle.method}</div>
-                    {oracle.url && (
-                      <a href={oracle.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display: 'inline-block', marginTop: 7, fontSize: 11, color: C.accent, textDecoration: 'none' }}>
-                        Ver fuente ↗
-                      </a>
-                    )}
-                  </div>
-                )
-              })()}
+              {/* Tabs: Libro de Pedidos | Gráfico | Resolución */}
+              <div style={{ display: 'flex', borderBottom: `1px solid ${C.cardBorder}`, marginBottom: 20 }}>
+                {[['BOOK', 'Libro de Pedidos'], ['CHART', 'Gráfico'], ['RESOLUTION', 'Resolución']].map(([t, label]) => (
+                  <button key={t} onClick={() => setModalTab(t)} style={{
+                    padding: '8px 16px', fontSize: 12, fontWeight: modalTab === t ? 600 : 400,
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    color: modalTab === t ? C.text : C.textDim,
+                    borderBottom: `2px solid ${modalTab === t ? C.accent : 'transparent'}`,
+                    marginBottom: -1, transition: 'all 0.15s ease',
+                  }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
 
               {/* 2-column body */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, alignItems: 'start' }}>
-              {/* ─ LEFT COLUMN ─ */}
+
+              {/* ─ LEFT COLUMN — Tab content ─ */}
               <div>
 
-              {/* Price chart */}
-              {(() => {
+              {/* BOOK TAB — vertical order book + trades + top holders + comments */}
+              {modalTab === 'BOOK' && (() => {
+                const yp = parseFloat(selectedMarket.yes_pool)
+                const np = parseFloat(selectedMarket.no_pool)
+                const ammBook = computeAMMBook(yp, np)
+                const hasBids = orderBook.some(o => o.side === 'YES')
+                const hasAsks = orderBook.some(o => o.side === 'NO')
+                const rawBids = hasBids
+                  ? orderBook.filter(o => o.side === 'YES').map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount) }))
+                  : ammBook.bids
+                const rawAsks = hasAsks
+                  ? orderBook.filter(o => o.side === 'NO').map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount) }))
+                  : ammBook.asks
+                // ASK: buy YES (green), sorted highest first (worst deal at top, best near center)
+                const asksDesc = [...rawAsks].sort((a, b) => b.price - a.price)
+                // BID: buy NO / sell YES (red), sorted highest first (best bid near center)
+                const bidsDesc = [...rawBids].sort((a, b) => b.price - a.price)
+                // Cumulative volume (grows away from center)
+                let askCum = 0
+                const asksWithTot = asksDesc.map(l => { askCum += l.amount; return { ...l, total: askCum } }).reverse()
+                  .map((l, i, arr) => { const cum = arr.slice(0, i + 1).reduce((s, x) => s + x.amount, 0); return { ...l, total: cum } }).reverse()
+                let bidCum = 0
+                const bidsWithTot = bidsDesc.map(l => { bidCum += l.amount; return { ...l, total: bidCum } })
+                const maxVol = Math.max(1, ...asksDesc.map(l => l.amount), ...bidsDesc.map(l => l.amount))
+                const currentYes = parseFloat(selectedMarket.prices.yes)
+                const bestAsk = asksDesc.length > 0 ? asksDesc[asksDesc.length - 1].price : currentYes + 2
+                const bestBid = bidsDesc.length > 0 ? bidsDesc[0].price : currentYes - 2
+                const spread = Math.max(0, bestAsk - bestBid).toFixed(0)
+                return (
+                  <>
+                    {/* Vertical order book */}
+                    <div style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
+                      {/* Column headers */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '7px 12px', background: C.card, borderBottom: `1px solid ${C.divider}` }}>
+                        {['PRECIO', 'CANTIDAD', 'TOTAL'].map((h, i) => (
+                          <span key={h} style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, textAlign: i === 0 ? 'left' : i === 1 ? 'center' : 'right' }}>{h}</span>
+                        ))}
+                      </div>
+                      {/* ASK levels — compra SÍ (verde), mayor a menor */}
+                      {asksWithTot.slice(0, 5).map((level, i) => (
+                        <div key={i} style={{ position: 'relative', overflow: 'hidden' }}>
+                          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(level.amount / maxVol) * 80}%`, background: `${C.yes}18` }} />
+                          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '5px 12px', alignItems: 'center' }}>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: C.yes, fontWeight: 600 }}>{level.price.toFixed(0)}¢</span>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: C.textMuted, textAlign: 'center' }}>€{level.amount.toFixed(0)}</span>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: C.textDim, textAlign: 'right' }}>€{level.total.toFixed(0)}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {asksWithTot.length === 0 && <div style={{ padding: '8px 12px', fontSize: 11, color: C.textDim }}>Sin niveles SÍ</div>}
+                      {/* Center spread line */}
+                      <div style={{ padding: '8px 12px', borderTop: `1px solid ${C.divider}`, borderBottom: `1px solid ${C.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: `${C.card}dd` }}>
+                        <span style={{ fontSize: 11 }}>
+                          <span style={{ color: C.textDim }}>Precio: </span>
+                          <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: C.text }}>{currentYes.toFixed(0)}¢</span>
+                        </span>
+                        <span style={{ fontSize: 10, color: C.textDim }}>
+                          Spread: <span style={{ fontFamily: 'ui-monospace, monospace', color: C.warning }}>{spread}¢</span>
+                        </span>
+                      </div>
+                      {/* BID levels — compra NO (rojo), mayor a menor desde centro */}
+                      {bidsWithTot.slice(0, 5).map((level, i) => (
+                        <div key={i} style={{ position: 'relative', overflow: 'hidden' }}>
+                          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(level.amount / maxVol) * 80}%`, background: `${C.no}18` }} />
+                          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '5px 12px', alignItems: 'center' }}>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: C.no, fontWeight: 600 }}>{level.price.toFixed(0)}¢</span>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: C.textMuted, textAlign: 'center' }}>€{level.amount.toFixed(0)}</span>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: C.textDim, textAlign: 'right' }}>€{level.total.toFixed(0)}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {bidsWithTot.length === 0 && <div style={{ padding: '8px 12px', fontSize: 11, color: C.textDim }}>Sin niveles NO</div>}
+                      <div style={{ padding: '4px 12px', background: C.card, borderTop: `1px solid ${C.divider}` }}>
+                        <span style={{ fontSize: 9, color: C.textDim, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{(hasBids || hasAsks) ? 'Órdenes límite reales' : 'AMM sintético'}</span>
+                      </div>
+                    </div>
+
+                    {/* Recent trades */}
+                    {recentActivity.length > 0 && (
+                      <div style={{ padding: '12px 14px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8, marginBottom: 16 }}>
+                        {sectionLabel('Últimas operaciones')}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {recentActivity.slice(0, 8).map((a, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <span style={badge(a.side === 'YES' ? C.yes : C.no)}>{a.side === 'YES' ? 'SÍ' : 'NO'}</span>
+                                <span style={{ color: C.textMuted, fontFamily: 'ui-monospace, monospace' }}>€{parseFloat(a.amount).toFixed(0)}</span>
+                              </div>
+                              <span style={{ color: C.textDim, fontSize: 10 }}>{new Date(a.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top Holders */}
+                    {topHolders.length > 0 && (
+                      <div style={{ padding: '12px 14px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8, marginBottom: 16 }}>
+                        {sectionLabel('Top holders')}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          {topHolders.map((h, i) => (
+                            <div key={h.email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                                <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'ui-monospace, monospace', minWidth: 16 }}>{i + 1}</span>
+                                <span style={{ color: C.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>
+                                  {h.email.split('@')[0]}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                                {h.yes > 0 && <span style={badge(C.yes)}>{h.yes.toFixed(0)} SÍ</span>}
+                                {h.no > 0 && <span style={badge(C.no)}>{h.no.toFixed(0)} NO</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Comments */}
+                    <div style={{ padding: '12px 14px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
+                      {sectionLabel('Comentarios')}
+                      {user && (
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                          <input
+                            value={newComment}
+                            onChange={e => setNewComment(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && postComment()}
+                            placeholder="Añade un comentario..."
+                            style={{ ...inputStyle, flex: 1, fontSize: 13 }}
+                          />
+                          <button onClick={postComment} style={{ padding: '8px 14px', background: C.accent, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                            Publicar
+                          </button>
+                        </div>
+                      )}
+                      {comments.length === 0 ? (
+                        <div style={{ fontSize: 12, color: C.textDim, textAlign: 'center', padding: '12px 0' }}>Sin comentarios aún</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {comments.map(c => {
+                            const age = (() => {
+                              const diff = Date.now() - new Date(c.created_at)
+                              const h = Math.floor(diff / 3600000)
+                              if (h < 1) return `${Math.floor(diff / 60000)}m`
+                              if (h < 24) return `${h}h`
+                              return `${Math.floor(h / 24)}d`
+                            })()
+                            return (
+                              <div key={c.id} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                                <div style={{ width: 28, height: 28, borderRadius: 6, background: `${C.accent}18`, border: `1px solid ${C.accent}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: C.accent, flexShrink: 0 }}>
+                                  {c.user_email[0].toUpperCase()}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', marginBottom: 3 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{c.user_email.split('@')[0]}</span>
+                                    <span style={{ fontSize: 10, color: C.textDim }}>hace {age}</span>
+                                  </div>
+                                  <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.5, wordBreak: 'break-word' }}>{c.text}</div>
+                                  <button onClick={() => likeComment(c.id)} style={{ marginTop: 4, fontSize: 11, color: C.textDim, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                                    ♡ {c.likes || 0}
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )
+              })()}
+
+              {/* CHART TAB — price chart */}
+              {modalTab === 'CHART' && (() => {
                 const rawPrices = priceHistory.map(p => parseFloat(p.yes_price))
                 const currentPrice = parseFloat(selectedMarket.prices.yes)
                 const prices = rawPrices.length > 0 ? [50, ...rawPrices, currentPrice] : [50, currentPrice]
-                if (prices.length < 2) return null
-                const minP = Math.max(0, Math.min(...prices) - 3)
-                const maxP = Math.min(100, Math.max(...prices) + 3)
+                if (prices.length < 2) return <div style={{ padding: 24, textAlign: 'center', color: C.textDim, fontSize: 13 }}>Sin historial de precios</div>
+                const minP = Math.max(0, Math.min(...prices) - 5)
+                const maxP = Math.min(100, Math.max(...prices) + 5)
                 const range = maxP - minP || 1
                 const first = prices[0], last = prices[prices.length - 1]
                 const trend = last > first ? C.yes : last < first ? C.no : C.accent
                 return (
-                  <div style={{ marginBottom: 16, padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      {sectionLabel('Precio SÍ')}
+                  <div style={{ padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.textDim, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Precio SÍ</div>
                       <div style={{ fontSize: 12, display: 'flex', gap: 8, alignItems: 'baseline' }}>
-                        <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: trend }}>{last.toFixed(1)}%</span>
-                        <span style={{ color: C.textDim, fontSize: 11 }}>{last > first ? '+' : ''}{(last - first).toFixed(1)} pts</span>
+                        <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 700, fontSize: 20, color: trend }}>{last.toFixed(1)}¢</span>
+                        <span style={{ color: last > first ? C.yes : C.no, fontSize: 11, fontFamily: 'ui-monospace, monospace' }}>{last > first ? '+' : ''}{(last - first).toFixed(1)} pts</span>
                       </div>
                     </div>
-                    <div style={{ height: 80, position: 'relative' }}>
+                    <div style={{ height: 160, position: 'relative' }}>
                       <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={trend} stopOpacity="0.15" />
+                            <stop offset="100%" stopColor={trend} stopOpacity="0.01" />
+                          </linearGradient>
+                        </defs>
                         <polygon
                           points={`0,100 ${prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')} 100,100`}
-                          fill={`${trend}08`} stroke="none"
+                          fill="url(#chartGrad)" stroke="none"
                         />
                         <polyline
                           points={prices.map((p, i) => `${(i / Math.max(prices.length - 1, 1)) * 100},${100 - ((p - minP) / range) * 100}`).join(' ')}
-                          fill="none" stroke={trend} strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeOpacity="0.8"
+                          fill="none" stroke={trend} strokeWidth="1.5" vectorEffect="non-scaling-stroke"
                         />
+                        {/* 50% reference line */}
+                        <line x1="0" y1={`${100 - ((50 - minP) / range) * 100}`} x2="100" y2={`${100 - ((50 - minP) / range) * 100}`}
+                          stroke={C.textDim} strokeWidth="0.5" strokeDasharray="2,3" vectorEffect="non-scaling-stroke" opacity="0.4" />
                       </svg>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: C.textDim, marginTop: 5 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: C.textDim, marginTop: 6 }}>
                       <span>Apertura 50%</span>
                       <span>Ahora {currentPrice.toFixed(1)}%</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.divider}` }}>
+                      {[
+                        ['Volumen', `€${((selectedMarket.total_volume || 0) / 1000).toFixed(1)}K`],
+                        ['Traders', `${selectedMarket.active_traders || selectedMarket.total_traders || 0}`],
+                        ['Cierre', getTimeLeft(selectedMarket.close_date)],
+                      ].map(([k, v]) => (
+                        <div key={k}>
+                          <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim, marginBottom: 3 }}>{k}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'ui-monospace, monospace', color: C.text }}>{v}</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )
               })()}
 
-              {/* Trade controls OR expired state */}
+              {/* RESOLUTION TAB — oracle + rules */}
+              {modalTab === 'RESOLUTION' && (() => {
+                const oracle = getOracleDescription(selectedMarket)
+                const rules = selectedMarket.resolution_rules || `Este mercado se resolverá como SÍ si se cumple la condición indicada, según datos de ${oracle.source} publicados en ${oracle.url || 'fuente oficial'}. Se resolverá como NO en caso contrario. La resolución es automática y basada en datos públicos verificables. PrediMarket actúa como intermediario tecnológico; no emite opinión sobre el resultado ni garantiza beneficios. Existe riesgo de pérdida total del capital invertido.`
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
+                      {sectionLabel('Fuente del oráculo')}
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.accentLight, marginBottom: 6 }}>{oracle.source}</div>
+                      <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>{oracle.method}</div>
+                      {oracle.url && (
+                        <a href={oracle.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 11, color: C.accent, textDecoration: 'none' }}>
+                          Ver fuente oficial ↗
+                        </a>
+                      )}
+                    </div>
+                    <div style={{ padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
+                      {sectionLabel('Reglas de resolución')}
+                      <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.7 }}>{rules}</div>
+                    </div>
+                    <div style={{ padding: '12px 14px', background: `${C.warning}06`, border: `1px solid ${C.warning}18`, borderRadius: 8 }}>
+                      <div style={{ fontSize: 11, color: C.warning, fontWeight: 600, marginBottom: 4 }}>Aviso de riesgo</div>
+                      <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.6 }}>
+                        PrediMarket es un mercado de predicción con créditos virtuales. La resolución depende de fuentes externas. No constituye asesoramiento financiero. Riesgo de pérdida total del capital.
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              </div>{/* end left column */}
+
+              {/* ─ RIGHT COLUMN — Trade controls (always visible) ─ */}
+              <div style={{ position: 'sticky', top: 24 }}>
               {!isExpired(selectedMarket.close_date) ? (
                 <>
-                  {/* Order type toggle */}
-                  <div style={{ display: 'flex', background: C.surface, borderRadius: 7, padding: 3, marginBottom: 16 }}>
-                    {['MARKET', 'LIMIT'].map(mode => (
-                      <button key={mode} onClick={() => setOrderMode(mode)} style={{ flex: 1, padding: '7px 0', borderRadius: 5, fontSize: 12, fontWeight: 500, border: 'none', cursor: 'pointer', background: orderMode === mode ? C.card : 'transparent', color: orderMode === mode ? C.text : C.textDim, transition: 'all 0.12s' }}>
-                        {mode === 'MARKET' ? 'Mercado' : 'Límite'}
+                  {/* Order type toggle — 44px height */}
+                  <div style={{ display: 'flex', background: C.surface, borderRadius: 8, padding: 3, marginBottom: 14, border: `1px solid ${C.cardBorder}` }}>
+                    {[['MARKET', '⚡ Mercado'], ['LIMIT', '📋 Límite']].map(([mode, label]) => (
+                      <button key={mode} onClick={() => setOrderMode(mode)} style={{
+                        flex: 1, height: 44, borderRadius: 6, fontSize: 13, fontWeight: orderMode === mode ? 700 : 400,
+                        border: 'none', cursor: 'pointer', transition: 'all 0.2s ease',
+                        background: orderMode === mode ? '#fff' : 'transparent',
+                        color: orderMode === mode ? '#0a0a0a' : C.textDim,
+                        boxShadow: orderMode === mode ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
+                      }}>
+                        {label}
                       </button>
                     ))}
                   </div>
 
-                  {/* YES / NO selector */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-                    {['YES', 'NO'].map(side => (
-                      <button key={side} onClick={() => setTradeSide(side)} style={{
-                        padding: '14px 8px', borderRadius: 7, fontWeight: 600, cursor: 'pointer',
-                        border: `1px solid ${tradeSide === side ? (side === 'YES' ? C.yes : C.no) : C.cardBorder}`,
-                        background: tradeSide === side ? (side === 'YES' ? `${C.yes}08` : `${C.no}08`) : 'transparent',
-                        color: tradeSide === side ? (side === 'YES' ? C.yes : C.no) : C.textMuted,
-                        transition: 'all 0.12s',
-                      }}>
-                        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.09em', marginBottom: 5 }}>{side === 'YES' ? 'SÍ' : 'NO'}</div>
-                        <div style={{ fontSize: 22, fontFamily: 'ui-monospace, monospace', lineHeight: 1 }}>
-                          {side === 'YES' ? selectedMarket.prices.yes : selectedMarket.prices.no}¢
-                        </div>
-                      </button>
-                    ))}
+                  {/* YES / NO selector — 56px height */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                    {['YES', 'NO'].map(side => {
+                      const isSelected = tradeSide === side
+                      const color = side === 'YES' ? C.yes : C.no
+                      return (
+                        <button key={side} onClick={() => setTradeSide(side)} style={{
+                          minHeight: 56, padding: '12px 8px', borderRadius: 8, fontWeight: 700, cursor: 'pointer',
+                          border: `2px solid ${isSelected ? color : C.cardBorder}`,
+                          background: isSelected ? color : `${color}08`,
+                          color: isSelected ? '#fff' : color,
+                          transition: 'all 0.2s ease',
+                          transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                          boxShadow: isSelected ? `0 4px 16px ${color}40` : 'none',
+                        }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>{side === 'YES' ? 'SÍ' : 'NO'}</div>
+                          <div style={{ fontSize: 24, fontFamily: 'ui-monospace, monospace', lineHeight: 1 }}>
+                            {side === 'YES' ? selectedMarket.prices.yes : selectedMarket.prices.no}¢
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
 
                   {/* Limit price */}
                   {orderMode === 'LIMIT' && (
-                    <div style={{ marginBottom: 16, padding: 14, background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
+                    <div style={{ marginBottom: 14, padding: '12px 14px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
                       {sectionLabel('Precio límite')}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <input
-                          type="range"
-                          min="5"
+                        <input type="range" min="5"
                           max={Math.max(6, parseInt(tradeSide === 'YES' ? selectedMarket.prices.yes : selectedMarket.prices.no) - 1)}
-                          value={limitPrice * 100}
-                          onChange={e => setLimitPrice(e.target.value / 100)}
+                          value={limitPrice * 100} onChange={e => setLimitPrice(e.target.value / 100)}
                           style={{ flex: 1, accentColor: C.accent }} />
-                        <span style={{ minWidth: 48, textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontWeight: 700, fontSize: 16, color: C.accentLight }}>
+                        <span style={{ minWidth: 48, textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontWeight: 700, fontSize: 18, color: C.accentLight }}>
                           {(limitPrice * 100).toFixed(0)}¢
                         </span>
                       </div>
-                      <div style={{ marginTop: 8, fontSize: 11, color: C.textDim }}>
-                        Actual: {tradeSide === 'YES' ? selectedMarket.prices.yes : selectedMarket.prices.no}¢ · Retorno estimado: +{((1 / limitPrice - 1) * 100).toFixed(0)}%
+                      <div style={{ marginTop: 6, fontSize: 11, color: C.textDim }}>
+                        Actual: {tradeSide === 'YES' ? selectedMarket.prices.yes : selectedMarket.prices.no}¢ · Retorno si ejecuta: +{((1 / limitPrice - 1) * 100).toFixed(0)}%
                       </div>
                     </div>
                   )}
 
                   {/* Amount */}
-                  <div style={{ marginBottom: 16 }}>
+                  <div style={{ marginBottom: 14 }}>
                     {sectionLabel('Cantidad')}
                     <input
                       type="number" value={tradeAmount}
@@ -893,74 +1186,90 @@ export default function Home() {
                       min="1" max={user?.balance || 1000} />
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
                       {[10, 25, 50, 100].map(v => (
-                        <button key={v} onClick={() => setTradeAmount(v)} style={{ padding: '6px 0', fontSize: 12, fontWeight: 500, background: 'transparent', color: tradeAmount === v ? C.text : C.textDim, borderRadius: 6, border: `1px solid ${tradeAmount === v ? C.accent : C.cardBorder}`, cursor: 'pointer' }}>
+                        <button key={v} onClick={() => setTradeAmount(v)} style={{
+                          padding: '6px 0', fontSize: 12, fontWeight: 500, background: 'transparent',
+                          color: tradeAmount === v ? C.text : C.textDim,
+                          borderRadius: 6, border: `1px solid ${tradeAmount === v ? C.accent : C.cardBorder}`, cursor: 'pointer',
+                        }}>
                           {v}€
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* Summary */}
-                  <div style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 7, padding: '14px 16px', marginBottom: 14 }}>
-                    {sectionLabel('Resumen')}
+                  {/* Summary box — highlighted with left border */}
+                  <div style={{
+                    background: '#111114',
+                    border: `1px solid ${C.cardBorder}`,
+                    borderLeft: `3px solid ${tradeSide === 'YES' ? C.yes : C.no}`,
+                    borderRadius: 7, padding: '14px 16px', marginBottom: 14,
+                  }}>
                     {orderMode === 'MARKET' ? (
                       tradeImpact && tradeImpact.valid ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                          {[
-                            ['Contratos', `${tradeImpact.shares.toFixed(2)}`],
-                            ['Precio medio', `${(tradeImpact.avgPrice * 100).toFixed(1)}¢`],
-                            ['Impacto en precio', `${tradeImpact.priceImpactPercent}¢`],
-                          ].map(([k, v]) => (
-                            <div key={k} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ fontSize: 12, color: C.textMuted }}>{k}</span>
-                              <span style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}>{v}</span>
+                        <>
+                          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
+                            Compras <span style={{ fontWeight: 700, color: C.text }}>{tradeImpact.shares.toFixed(2)} contratos</span> de <span style={{ fontWeight: 700, color: tradeSide === 'YES' ? C.yes : C.no }}>{tradeSide === 'YES' ? 'SÍ' : 'NO'}</span> a <span style={{ fontFamily: 'ui-monospace, monospace' }}>{(tradeImpact.avgPrice * 100).toFixed(1)}¢</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                            <div>
+                              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>Impacto precio</div>
+                              <div style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: C.textMuted }}>{tradeImpact.priceImpactPercent}¢</div>
                             </div>
-                          ))}
-                          <div style={{ borderTop: `1px solid ${C.cardBorder}`, paddingTop: 10, marginTop: 3 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                              <span style={{ fontSize: 12, fontWeight: 500 }}>Si aciertas</span>
-                              <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: 18, fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: C.yes }}>€{tradeImpact.potentialWinnings.toFixed(2)}</div>
-                                <div style={{ fontSize: 11, color: tradeImpact.potentialProfit > 0 ? C.yes : C.no, fontFamily: 'ui-monospace, monospace' }}>
-                                  {tradeImpact.potentialProfit > 0 ? '+' : ''}{tradeImpact.potentialProfit.toFixed(2)}€ ({tradeImpact.roi > 0 ? '+' : ''}{tradeImpact.roi.toFixed(0)}%)
-                                </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>Retorno potencial</div>
+                              <div style={{ fontSize: 22, fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: C.yes, lineHeight: 1 }}>
+                                +{tradeImpact.roi.toFixed(0)}%
                               </div>
+                              <div style={{ fontSize: 11, color: C.yes, fontFamily: 'ui-monospace, monospace' }}>€{tradeImpact.potentialWinnings.toFixed(2)} si acierta</div>
                             </div>
                           </div>
-                        </div>
+                        </>
                       ) : (
                         <div style={{ fontSize: 12, color: C.no }}>{tradeImpact?.error || 'Introduce una cantidad'}</div>
                       )
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                        {[
-                          ['Fondos a reservar', `€${tradeAmount}`],
-                          ['Ejecutar cuando', `${tradeSide} ≤ ${(limitPrice * 100).toFixed(0)}¢`],
-                          ['Contratos estimados', `${(tradeAmount / limitPrice).toFixed(1)}`],
-                          ['Retorno potencial', `+${((1 / limitPrice - 1) * 100).toFixed(0)}%`],
-                        ].map(([k, v]) => (
-                          <div key={k} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: 12, color: C.textMuted }}>{k}</span>
-                            <span style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', fontWeight: 600, color: k === 'Retorno potencial' ? C.yes : C.text }}>{v}</span>
+                      <>
+                        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
+                          Orden límite {tradeSide} — ejecutar a ≤{(limitPrice * 100).toFixed(0)}¢
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                          <div>
+                            <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>Reservado</div>
+                            <div style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: C.textMuted }}>€{tradeAmount}</div>
                           </div>
-                        ))}
-                      </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>Retorno potencial</div>
+                            <div style={{ fontSize: 22, fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: C.yes, lineHeight: 1 }}>
+                              +{((1 / limitPrice - 1) * 100).toFixed(0)}%
+                            </div>
+                          </div>
+                        </div>
+                      </>
                     )}
                   </div>
 
-                  {/* Execute button */}
+                  {/* Execute button — 56px, full width, green/red */}
                   {orderMode === 'MARKET' ? (
                     <button
                       onClick={executeTrade}
                       disabled={!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing}
                       style={{
-                        width: '100%', padding: '12px 0', borderRadius: 7, fontWeight: 600, fontSize: 14,
-                        border: 'none', cursor: 'pointer', letterSpacing: '-0.01em', transition: 'all 0.12s',
+                        width: '100%', height: 56, borderRadius: 8, fontWeight: 700, fontSize: 15,
+                        border: 'none', cursor: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? 'not-allowed' : 'pointer',
+                        letterSpacing: '-0.01em', transition: 'all 0.15s ease',
                         background: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? C.cardBorder : (tradeSide === 'YES' ? C.yes : C.no),
-                        color: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? C.textDim : '#0a0a0a',
-                      }}>
-                      {processing ? 'Procesando...'
-                        : !tradeImpact ? 'Calculando...'
+                        color: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? C.textDim : '#fff',
+                        boxShadow: (!tradeImpact || !tradeImpact.valid || tradeAmount > (user?.balance || 0) || processing) ? 'none' : `0 4px 20px ${tradeSide === 'YES' ? C.yes : C.no}40`,
+                        marginBottom: 14,
+                      }}
+                      onMouseEnter={e => { if (!processing && tradeImpact?.valid) { e.currentTarget.style.filter = 'brightness(1.12)'; e.currentTarget.style.boxShadow = `0 6px 28px ${tradeSide === 'YES' ? C.yes : C.no}60` } }}
+                      onMouseLeave={e => { e.currentTarget.style.filter = ''; e.currentTarget.style.boxShadow = (!tradeImpact || !tradeImpact.valid) ? 'none' : `0 4px 20px ${tradeSide === 'YES' ? C.yes : C.no}40` }}>
+                      {processing ? (
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                          <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                          Procesando...
+                        </span>
+                      ) : !tradeImpact ? 'Calculando...'
                         : !tradeImpact.valid ? tradeImpact.error
                         : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente'
                         : `Comprar ${tradeSide === 'YES' ? 'SÍ' : 'NO'} — €${tradeAmount}`}
@@ -970,23 +1279,53 @@ export default function Home() {
                       onClick={placeLimitOrder}
                       disabled={processing || tradeAmount > (user?.balance || 0)}
                       style={{
-                        width: '100%', padding: '12px 0', borderRadius: 7, fontWeight: 600, fontSize: 14,
-                        border: 'none', cursor: 'pointer', transition: 'all 0.12s',
+                        width: '100%', height: 56, borderRadius: 8, fontWeight: 700, fontSize: 15,
+                        border: 'none', cursor: (processing || tradeAmount > (user?.balance || 0)) ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.15s ease',
                         background: (processing || tradeAmount > (user?.balance || 0)) ? C.cardBorder : C.accent,
                         color: (processing || tradeAmount > (user?.balance || 0)) ? C.textDim : '#fff',
+                        boxShadow: (processing || tradeAmount > (user?.balance || 0)) ? 'none' : `0 4px 20px ${C.accent}40`,
+                        marginBottom: 14,
                       }}>
-                      {processing ? 'Procesando...' : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente' : `Colocar límite ${tradeSide} a ${(limitPrice * 100).toFixed(0)}¢`}
+                      {processing ? 'Procesando...' : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente' : `Colocar límite ${tradeSide === 'YES' ? 'SÍ' : 'NO'} a ${(limitPrice * 100).toFixed(0)}¢`}
                     </button>
                   )}
 
+                  {/* User's open positions in this market */}
+                  {(() => {
+                    const myTrades = userTrades.filter(t => t.market_id == selectedMarket.id && t.status === 'OPEN')
+                    if (myTrades.length === 0) return null
+                    return (
+                      <div style={{ padding: '12px 14px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 7, marginBottom: 14 }}>
+                        {sectionLabel('Mis posiciones en este mercado')}
+                        {myTrades.map(t => (
+                          <div key={t.id} style={{ padding: '8px 0', borderBottom: `1px solid ${C.divider}` }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <span style={badge(t.side === 'YES' ? C.yes : C.no)}>{t.side === 'YES' ? 'SÍ' : 'NO'}</span>
+                                <span style={{ fontSize: 11, color: C.textMuted }}>{t.shares?.toFixed(1)} contratos · €{t.amount?.toFixed(0)} invertido</span>
+                              </div>
+                              <span style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace', fontWeight: 600, color: (t.profit || 0) >= 0 ? C.yes : C.no }}>
+                                {(t.profit || 0) >= 0 ? '+' : ''}€{(t.profit || 0).toFixed(1)}
+                              </span>
+                            </div>
+                            <button onClick={() => { handleSell(t) }} style={{ fontSize: 11, color: C.no, background: 'none', border: `1px solid ${C.no}25`, borderRadius: 4, padding: '3px 10px', cursor: 'pointer', width: '100%' }}>
+                              Vender ~€{t.currentValue?.toFixed(2)}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+
                   {/* My pending orders */}
                   {userOrders.length > 0 && (
-                    <div style={{ marginTop: 16, padding: '12px 14px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
+                    <div style={{ padding: '12px 14px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
                       {sectionLabel('Mis órdenes pendientes')}
                       {userOrders.map(o => (
-                        <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${C.divider}` }}>
+                        <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${C.divider}` }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <span style={badge(o.side === 'YES' ? C.yes : C.no)}>{o.side}</span>
+                            <span style={badge(o.side === 'YES' ? C.yes : C.no)}>{o.side === 'YES' ? 'SÍ' : 'NO'}</span>
                             <span style={{ fontSize: 12, color: C.textMuted }}>€{o.amount} a {(o.target_price * 100).toFixed(0)}¢</span>
                           </div>
                           <button onClick={() => cancelOrder(o.id)} style={{ fontSize: 11, color: C.no, background: 'none', border: `1px solid ${C.no}30`, borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
@@ -1003,111 +1342,6 @@ export default function Home() {
                   <div style={{ fontSize: 12, color: C.textDim }}>Pendiente de resolución automática por el oráculo.</div>
                 </div>
               )}
-
-              </div>{/* end left column */}
-
-              {/* ─ RIGHT COLUMN — Order Book ─ */}
-              <div style={{ position: 'sticky', top: 24 }}>
-              {(() => {
-                const yp = parseFloat(selectedMarket.yes_pool)
-                const np = parseFloat(selectedMarket.no_pool)
-                const ammBook = computeAMMBook(yp, np)
-                const hasBids = orderBook.some(o => o.side === 'YES')
-                const hasAsks = orderBook.some(o => o.side === 'NO')
-                const bidLevels = hasBids
-                  ? orderBook.filter(o => o.side === 'YES').sort((a, b) => b.target_price - a.target_price)
-                      .map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount), count: o.order_count }))
-                  : ammBook.bids
-                const askLevels = hasAsks
-                  ? orderBook.filter(o => o.side === 'NO').sort((a, b) => a.target_price - b.target_price)
-                      .map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount), count: o.order_count }))
-                  : ammBook.asks
-                const maxAmt = Math.max(1, ...bidLevels.map(l => l.amount), ...askLevels.map(l => l.amount))
-                return (
-                  <div style={{ padding: '14px 16px', background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
-                    {/* Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      {sectionLabel('Libro de órdenes')}
-                      <span style={{ fontSize: 9, color: C.textDim, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 500 }}>
-                        {(hasBids || hasAsks) ? 'Órdenes límite' : 'AMM'}
-                      </span>
-                    </div>
-
-                    {/* Spread row */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '8px 0 10px', borderBottom: `1px solid ${C.divider}`, marginBottom: 10 }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.yes, marginBottom: 2 }}>SÍ</div>
-                        <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.yes, lineHeight: 1 }}>{selectedMarket.prices.yes}¢</div>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                        <div style={{ width: 40, height: 2, borderRadius: 1, background: `linear-gradient(to right, ${C.yes}, ${C.no})`, opacity: 0.4 }} />
-                        <div style={{ fontSize: 9, color: C.textDim }}>spread {Math.abs(selectedMarket.prices.yes - selectedMarket.prices.no)}¢</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', color: C.no, marginBottom: 2 }}>NO</div>
-                        <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: C.no, lineHeight: 1 }}>{selectedMarket.prices.no}¢</div>
-                      </div>
-                    </div>
-
-                    {/* Two-column BID / ASK */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {/* BID column */}
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.yes, marginBottom: 5 }}>
-                          <span>Precio</span><span>Vol</span>
-                        </div>
-                        {bidLevels.slice(0, 5).map((level, i) => (
-                          <div key={i} style={{ position: 'relative', marginBottom: 2, borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${(level.amount / maxAmt) * 100}%`, background: `${C.yes}14` }} />
-                            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', padding: '3px 5px', fontSize: 11 }}>
-                              <span style={{ fontFamily: 'ui-monospace, monospace', color: C.yes }}>{level.price.toFixed(0)}¢</span>
-                              <span style={{ fontFamily: 'ui-monospace, monospace', color: C.textDim }}>€{level.amount.toFixed(0)}</span>
-                            </div>
-                          </div>
-                        ))}
-                        {bidLevels.length === 0 && <div style={{ fontSize: 11, color: C.textDim, paddingTop: 2 }}>—</div>}
-                      </div>
-
-                      {/* ASK column */}
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.no, marginBottom: 5 }}>
-                          <span>Vol</span><span>Precio</span>
-                        </div>
-                        {askLevels.slice(0, 5).map((level, i) => (
-                          <div key={i} style={{ position: 'relative', marginBottom: 2, borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(level.amount / maxAmt) * 100}%`, background: `${C.no}14` }} />
-                            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', padding: '3px 5px', fontSize: 11 }}>
-                              <span style={{ fontFamily: 'ui-monospace, monospace', color: C.textDim }}>€{level.amount.toFixed(0)}</span>
-                              <span style={{ fontFamily: 'ui-monospace, monospace', color: C.no }}>{level.price.toFixed(0)}¢</span>
-                            </div>
-                          </div>
-                        ))}
-                        {askLevels.length === 0 && <div style={{ fontSize: 11, color: C.textDim, paddingTop: 2, textAlign: 'right' }}>—</div>}
-                      </div>
-                    </div>
-
-                    {/* Recent trades */}
-                    {recentActivity.length > 0 && (
-                      <div style={{ marginTop: 14, borderTop: `1px solid ${C.divider}`, paddingTop: 12 }}>
-                        {sectionLabel('Últimas operaciones')}
-                        <div style={{ maxHeight: 80, overflowY: 'auto' }}>
-                          {recentActivity.slice(0, 5).map((a, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', fontSize: 11 }}>
-                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                <span style={badge(a.side === 'YES' ? C.yes : C.no)}>{a.side}</span>
-                                <span style={{ color: C.textDim, fontFamily: 'ui-monospace, monospace' }}>€{parseFloat(a.amount).toFixed(0)}</span>
-                              </div>
-                              <span style={{ color: C.textDim, fontSize: 10 }}>
-                                {new Date(a.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
               </div>{/* end right column */}
               </div>{/* end 2-column grid */}
             </div>
@@ -1431,6 +1665,80 @@ export default function Home() {
         </div>
       )}
 
+      {/* ── DISCLAIMER MODAL ── */}
+      {showDisclaimer && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(20px)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ ...panel, maxWidth: 440, width: '100%' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.025em', marginBottom: 16 }}>Antes de tu primera operación</h2>
+            <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.7, marginBottom: 20, padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
+              PrediMarket es una plataforma de mercados de predicción con <strong style={{ color: C.text }}>créditos virtuales</strong>. Al operar, aceptas que:
+              <ul style={{ marginTop: 10, marginBottom: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <li>Puedes perder el 100% del crédito invertido en cada operación</li>
+                <li>PrediMarket actúa como intermediario tecnológico, no como asesor financiero</li>
+                <li>La resolución depende de oráculos externos y datos públicos verificables</li>
+                <li>Los créditos son virtuales y no tienen valor monetario real</li>
+              </ul>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginBottom: 16 }}>
+              <input
+                type="checkbox"
+                id="disclaimer-check"
+                style={{ marginTop: 2, width: 16, height: 16, accentColor: C.accent, flexShrink: 0 }}
+                onChange={e => {
+                  document.getElementById('disclaimer-accept-btn').disabled = !e.target.checked
+                  document.getElementById('disclaimer-accept-btn').style.opacity = e.target.checked ? '1' : '0.4'
+                }}
+              />
+              <span style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+                Entiendo que puedo perder el 100% de mis créditos y que PrediMarket es un intermediario tecnológico, no un servicio financiero regulado.
+              </span>
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => { setShowDisclaimer(false); setPendingTradeAction(null) }}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 7, border: `1px solid ${C.cardBorder}`, background: 'transparent', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button
+                id="disclaimer-accept-btn"
+                disabled
+                style={{ flex: 2, padding: '11px 0', borderRadius: 7, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.15s' }}
+                onClick={() => {
+                  localStorage.setItem('predi_disclaimer_v1', 'accepted')
+                  setShowDisclaimer(false)
+                  if (pendingTradeAction === 'MARKET') executeTrade()
+                  else if (pendingTradeAction === 'LIMIT') placeLimitOrder()
+                  setPendingTradeAction(null)
+                }}>
+                Acepto — Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TOAST ── */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 100, padding: '12px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+          background: toast.type === 'error' ? '#1a0a0a' : '#0a1a0f',
+          border: `1px solid ${toast.type === 'error' ? C.no + '60' : C.yes + '60'}`,
+          color: toast.type === 'error' ? C.no : C.yes,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+          display: 'flex', alignItems: 'center', gap: 8,
+          animation: 'fadeInUp 0.2s ease',
+          whiteSpace: 'nowrap',
+        }}>
+          <span>{toast.type === 'error' ? '✕' : '✓'}</span>
+          {toast.msg}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+      `}</style>
     </div>
   )
 }
