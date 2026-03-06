@@ -274,6 +274,7 @@ async function createManualMarket(params) {
 // ─── Handler principal ────────────────────────────────────────────────────
 export default async function handler(req, res) {
   // Auth
+  console.log("ENV KEY:", process.env.ADMIN_API_KEY, "QUERY KEY:", req.query.key, "HEADER:", req.headers["x-admin-key"])
   const authKey = (req.headers['x-admin-key'] || req.query.key || '').trim()
   const expectedKey = (process.env.ADMIN_API_KEY || '').trim()
   console.log('[auth] query.key:', req.query.key)
