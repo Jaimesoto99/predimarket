@@ -274,19 +274,9 @@ async function createManualMarket(params) {
 // ─── Handler principal ────────────────────────────────────────────────────
 export default async function handler(req, res) {
   // Auth
-  console.log("ENV KEY:", process.env.ADMIN_API_KEY, "QUERY KEY:", req.query.key, "HEADER:", req.headers["x-admin-key"])
-  const authKey = (req.headers['x-admin-key'] || req.query.key || '').trim()
-  const expectedKey = (process.env.ADMIN_API_KEY || '').trim()
-  console.log('[auth] query.key:', req.query.key)
-  console.log('[auth] ADMIN_API_KEY:', JSON.stringify(expectedKey))
-  console.log('[auth] authKey:', JSON.stringify(authKey))
-  console.log('[auth] match:', authKey === expectedKey)
-  if (!expectedKey) {
-    return res.status(500).json({ error: 'ADMIN_API_KEY no configurada en el servidor' })
-  }
-  if (authKey !== expectedKey && authKey !== process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 20)) {
-    return res.status(401).json({ error: 'No autorizado. Añade ?key=TU_KEY o header x-admin-key', debug: { received: authKey, expected_length: expectedKey.length } })
-  }
+  const key = (req.query.key || req.headers["x-admin-key"] || "").trim()
+  const expected = (process.env.ADMIN_API_KEY || "").trim()
+  if (!expected || key !== expected) return res.status(401).json({ error: "No autorizado" })
 
   const mode = req.query.mode || 'objective'
 

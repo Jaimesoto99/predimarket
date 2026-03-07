@@ -314,6 +314,10 @@ async function createRecurringMarkets() {
 
 // ─── Main handler ─────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  const key = (req.query.key || req.headers["x-admin-key"] || "").trim()
+  const expected = (process.env.ADMIN_API_KEY || "").trim()
+  if (!expected || key !== expected) return res.status(401).json({ error: "No autorizado" })
+
   try {
     // Prices injected externally (e.g., from GitHub Actions)
     const injectedLuz = req.query.luz ? parseFloat(req.query.luz) : null

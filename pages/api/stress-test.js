@@ -8,7 +8,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-const ADMIN_KEY = 'predi-admin-2026'
 const NUM_USERS = 50
 const INITIAL_BALANCE = 1000
 const USER_PREFIX = 'stress_user_'
@@ -89,9 +88,9 @@ async function cleanupTestUser(email) {
 // PARTE 2: Stress test
 // ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  if (req.query.key !== ADMIN_KEY) {
-    return res.status(403).json({ error: 'Acceso denegado. Usa ?key=predi-admin-2026' })
-  }
+  const key = (req.query.key || req.headers["x-admin-key"] || "").trim()
+  const expected = (process.env.ADMIN_API_KEY || "").trim()
+  if (!expected || key !== expected) return res.status(401).json({ error: "No autorizado" })
 
   const startTime = Date.now()
   const details = []
