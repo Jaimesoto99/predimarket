@@ -10,6 +10,8 @@ import MarketHero from '../components/Markethero'
 import MarketFilters from '../components/Marketfilters'
 import MarketGrid from '../components/MarketGrid'
 import TrendingRow from '../components/TrendingRow'
+import Footer from '../components/Footer'
+import KYCModal from '../components/KYCModal'
 
 const TradingModal = dynamic(() => import('../components/TradingModal'), { ssr: false })
 const ProfileModal = dynamic(() => import('../components/ProfileModal'), { ssr: false })
@@ -49,6 +51,7 @@ export default function Home() {
   const [toast, setToast] = useState(null)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const [pendingTradeAction, setPendingTradeAction] = useState(null)
+  const [showKYC, setShowKYC] = useState(false)
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -431,6 +434,7 @@ export default function Home() {
           user={user}
           userTrades={userTrades}
           onClose={() => setShowProfile(false)}
+          onShowKYC={() => { setShowProfile(false); setShowKYC(true) }}
         />
       )}
 
@@ -564,6 +568,11 @@ export default function Home() {
           {toast.msg}
         </div>
       )}
+
+      {/* ── KYC MODAL ── */}
+      {showKYC && <KYCModal onClose={() => setShowKYC(false)} />}
+
+      <Footer />
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }

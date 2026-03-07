@@ -9,7 +9,7 @@ function sectionLabel(text) {
   )
 }
 
-export default function ProfileModal({ user, userTrades, onClose }) {
+export default function ProfileModal({ user, userTrades, onClose, onShowKYC }) {
   const [tradeHistoryFilter, setTradeHistoryFilter] = useState('ALL')
 
   const openTrades = userTrades.filter(t => t.status === 'OPEN')
@@ -94,6 +94,28 @@ export default function ProfileModal({ user, userTrades, onClose }) {
               <div style={{ fontSize: 9, color: C.textDim, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Saldo</div>
             </div>
           </div>
+
+          {/* KYC banner */}
+          {onShowKYC && (() => {
+            let kycDone = false
+            try { kycDone = localStorage.getItem('kycCompleted') === 'true' } catch {}
+            return !kycDone ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: `${C.accent}08`, border: `1px solid ${C.accent}25`, borderRadius: 8, marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 2 }}>Verificación de identidad pendiente</div>
+                  <div style={{ fontSize: 11, color: C.textDim }}>Requerida para operar con fondos reales</div>
+                </div>
+                <button onClick={onShowKYC} style={{ padding: '7px 14px', background: C.accent, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                  Verificar
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: `${C.yes}08`, border: `1px solid ${C.yes}25`, borderRadius: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 13, color: C.yes }}>✓</span>
+                <span style={{ fontSize: 12, color: C.yes, fontWeight: 600 }}>Identidad verificada (KYC completado)</span>
+              </div>
+            )
+          })()}
 
           {/* KPI cards */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
