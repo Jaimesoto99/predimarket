@@ -49,7 +49,6 @@ export default function Home() {
   const [toast, setToast] = useState(null)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const [pendingTradeAction, setPendingTradeAction] = useState(null)
-  const [trendingMarkets, setTrendingMarkets] = useState([])
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -82,12 +81,6 @@ export default function Home() {
       isExpired: new Date(m.close_date) < new Date(),
     }))
     setMarkets(enriched)
-    // Compute trending: top 4 by volume among active, non-expired
-    const active = enriched.filter(m => !m.isExpired)
-    const trending = [...active]
-      .sort((a, b) => (b.total_volume || 0) - (a.total_volume || 0))
-      .slice(0, 4)
-    setTrendingMarkets(trending)
     setLoading(false)
   }
 
@@ -284,6 +277,11 @@ export default function Home() {
     if (catFilter !== 'ALL' && m.category !== catFilter) return false
     return true
   })
+
+  // Trending: top 4 by volume from currently filtered markets (respects all active filters)
+  const trendingMarkets = [...filtered]
+    .sort((a, b) => (b.total_volume || 0) - (a.total_volume || 0))
+    .slice(0, 4)
 
   // Leaderboard helpers
   const rankColor = (rank) => rank === 1 ? '#f59e0b' : rank === 2 ? '#9ca3af' : rank === 3 ? '#cd7f32' : C.textDim
