@@ -148,7 +148,7 @@ export default function Demo() {
       </Head>
 
       <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, sans-serif', fontSize: 14, display: 'flex', flexDirection: 'column' }}>
-        <header style={{ borderBottom: `1px solid ${C.divider}`, background: `${C.bg}e8`, position: 'sticky', top: 0, zIndex: 40, backdropFilter: 'blur(24px)' }}>
+        <header style={{ borderBottom: `1px solid ${C.divider}`, background: C.bgBackdrop, position: 'sticky', top: 0, zIndex: 40, backdropFilter: 'blur(24px)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
               <div style={{ width: 26, height: 26, background: C.accent, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>P</div>

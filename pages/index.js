@@ -294,7 +294,7 @@ export default function Home() {
     <div style={{
       minHeight: '100vh', background: C.bg, color: C.text,
       fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: 14, lineHeight: 1.5,
+      fontSize: 14, lineHeight: 1.5, maxWidth: '100vw', overflowX: 'hidden',
     }}>
 
       <MarketNav
@@ -329,8 +329,8 @@ export default function Home() {
 
       {/* ── AUTH MODAL ── */}
       {showAuth && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ ...panelStyle, maxWidth: 360, width: '100%' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0', '@media(minWidth:600px)': { alignItems: 'center', padding: 16 } }}>
+          <div style={{ ...panelStyle, maxWidth: 400, width: '100%', borderRadius: '16px 16px 0 0' }} className="anim-fade-up">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.025em' }}>Empezar</h2>
               <button onClick={() => setShowAuth(false)} style={closeBtnStyle}>✕</button>
@@ -575,8 +575,10 @@ export default function Home() {
       <Footer />
 
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+        @keyframes fadeInToast { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+        @media (max-width: 600px) {
+          .modal-panel { padding: 16px !important; border-radius: 16px 16px 0 0 !important; }
+        }
       `}</style>
     </div>
   )
