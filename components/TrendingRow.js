@@ -4,7 +4,7 @@ export default function TrendingRow({ markets, onOpen }) {
   if (!markets || markets.length === 0) return null
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 24px' }}>
+    <div style={{ padding: '0 0 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim }}>
           Tendencia

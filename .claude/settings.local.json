@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "WebFetch(domain:api.esios.ree.es)",
+      "WebFetch(domain:apidatos.ree.es)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(winget install:*)",
+      "Bash(scoop:*)",
+      "Bash(vercel:*)",
+      "WebFetch(domain:attio.com)",
+      "Bash(node:*)",
+      "Bash(npx next:*)",
+      "Bash(npx vercel:*)",
+      "Bash(cd \"C:/Users/jaime.desoto/Downloads/predimarket-new\" && sed -i 's/background: `\\\\${C\\\\.bg}e8`/background: C.bgBackdrop/g' pages/about.js pages/legal.js pages/stats.js pages/demo.js)"
+    ]
+  },
+  "prefersReducedMotion": true
+}

@@ -1,45 +1,109 @@
 import { useEffect, useRef, useState } from 'react'
-import { C, badge, getOracleDescription } from '../lib/theme'
+import { C, badge, getCategoryColor, getCategoryLabel, getTypeLabel, getTimeLeft, getOracleDescription } from '../lib/theme'
 import MarketCard from './marketcard'
 
-const INITIAL_VISIBLE = 9
-const LOAD_MORE_STEP = 6
+const INITIAL_VISIBLE = 12
+const LOAD_MORE_STEP  = 8
 
-function SkeletonCard({ wide }) {
+function PlaceholderCard({ market }) {
+  const catColor = getCategoryColor(market.category)
+  const yesP = parseFloat(market.prices?.yes || 50)
+
   return (
     <div style={{
+      display: 'flex', alignItems: 'stretch',
       background: C.card, border: `1px solid ${C.cardBorder}`,
-      borderRadius: 12, padding: '18px 18px 16px',
-      gridColumn: wide ? 'span 2' : undefined,
+      borderRadius: 12, overflow: 'hidden', opacity: 0.55,
+      cursor: 'default',
     }}>
-      <div className="skeleton" style={{ height: 14, width: '35%', marginBottom: 14 }} />
-      <div className="skeleton" style={{ height: 14, width: '90%', marginBottom: 6 }} />
-      <div className="skeleton" style={{ height: 14, width: '70%', marginBottom: 20 }} />
-      <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
-        <div className="skeleton" style={{ height: 30, width: 60 }} />
-        <div className="skeleton" style={{ height: 30, width: 60 }} />
+      {/* Category strip */}
+      <div style={{ width: 3, flexShrink: 0, background: catColor, opacity: 0.5 }} />
+
+      <div style={{ flex: 1, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'nowrap' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: catColor }}>
+              {getCategoryLabel(market.category)}
+            </span>
+            <span style={{ fontSize: 10, color: C.textDim }}>·</span>
+            <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: C.textDim }}>
+              {getTypeLabel(market)}
+            </span>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', padding: '1px 5px', borderRadius: 3, marginLeft: 2, color: C.textDim, background: C.surface, border: `1px solid ${C.cardBorder}` }}>
+              Próximamente
+            </span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: C.textDim, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+              {getTimeLeft(market.close_date)}
+            </span>
+          </div>
+          <p style={{ fontSize: 13, fontWeight: 500, color: C.textMuted, lineHeight: 1.45, margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            {market.title}
+          </p>
+        </div>
+
+        {/* Probability display */}
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, minWidth: 56, opacity: 0.6 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: C.textMuted, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+            {yesP.toFixed(0)}%
+          </div>
+          <div style={{ height: 3, width: 56, borderRadius: 3, background: C.cardBorder, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${yesP}%`, background: C.textDim, borderRadius: 3 }} />
+          </div>
+        </div>
       </div>
-      <div className="skeleton" style={{ height: 5, width: '100%', borderRadius: 5, marginBottom: 10 }} />
-      <div className="skeleton" style={{ height: 12, width: '50%' }} />
     </div>
   )
 }
 
-function SectionHeader({ title, count, accent }) {
+function SkeletonRow() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: accent || C.textDim }}>
-        {title}
-      </span>
-      {count > 0 && (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 16,
+      background: C.card, border: `1px solid ${C.cardBorder}`,
+      borderRadius: 12, padding: '14px 16px', overflow: 'hidden',
+    }}>
+      <div style={{ width: 3, alignSelf: 'stretch', flexShrink: 0 }}>
+        <div className="skeleton" style={{ width: '100%', height: '100%', borderRadius: 0 }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="skeleton" style={{ height: 10, width: '20%', marginBottom: 8, borderRadius: 4 }} />
+        <div className="skeleton" style={{ height: 13, width: '85%', marginBottom: 5, borderRadius: 4 }} />
+        <div className="skeleton" style={{ height: 13, width: '60%', marginBottom: 10, borderRadius: 4 }} />
+        <div className="skeleton" style={{ height: 10, width: '30%', borderRadius: 4 }} />
+      </div>
+      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        <div className="skeleton" style={{ height: 24, width: 48, borderRadius: 4 }} />
+        <div className="skeleton" style={{ height: 3, width: 72, borderRadius: 3 }} />
+      </div>
+    </div>
+  )
+}
+
+function SectionLabel({ children, count, action }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      marginBottom: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{
-          fontSize: 10, fontWeight: 600, color: accent || C.textDim,
-          background: `${accent || C.textDim}12`,
-          border: `1px solid ${accent || C.textDim}25`,
-          padding: '1px 6px', borderRadius: 10,
-        }}>{count}</span>
-      )}
-      <div style={{ flex: 1, height: 1, background: C.divider }} />
+          fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase',
+          color: C.textDim,
+        }}>
+          {children}
+        </span>
+        {count != null && (
+          <span style={{
+            fontSize: 10, color: C.textDim, fontWeight: 500,
+            background: `${C.cardBorder}`,
+            padding: '1px 6px', borderRadius: 10,
+          }}>
+            {count}
+          </span>
+        )}
+      </div>
+      {action}
     </div>
   )
 }
@@ -56,136 +120,123 @@ export default function MarketGrid({
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
   const sentinelRef = useRef(null)
 
-  // Reset visible count when filter changes
   useEffect(() => { setVisibleCount(INITIAL_VISIBLE) }, [filtered.length])
 
-  // Infinite scroll observer
   useEffect(() => {
     if (!sentinelRef.current) return
     const observer = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
-        setVisibleCount(v => v + LOAD_MORE_STEP)
-      }
+      if (entries[0].isIntersecting) setVisibleCount(v => v + LOAD_MORE_STEP)
     }, { threshold: 0.1 })
     observer.observe(sentinelRef.current)
     return () => observer.disconnect()
   }, [])
 
-  // Compute labels for markets
-  const sortedByVolume = [...filtered].sort((a, b) => (b.total_volume || 0) - (a.total_volume || 0))
-  const sortedByTraders = [...filtered].sort((a, b) => (b.active_traders || b.total_traders || 0) - (a.active_traders || a.total_traders || 0))
+  const realFiltered     = filtered.filter(m => !m.placeholder)
+  const sortedByVolume   = [...realFiltered].sort((a, b) => (b.total_volume || 0) - (a.total_volume || 0))
+  const sortedByTraders  = [...realFiltered].sort((a, b) => (b.active_traders || 0) - (a.active_traders || 0))
   const now = Date.now()
-  const newMarkets = filtered.filter(m => m.created_at && now - new Date(m.created_at).getTime() < 48 * 3600000)
+  const newMarkets = realFiltered.filter(m => m.created_at && now - new Date(m.created_at).getTime() < 48 * 3600000)
 
   const labelMap = {}
-  sortedByVolume.slice(0, 4).forEach(m => { labelMap[m.id] = 'TRENDING' })
-  sortedByTraders.slice(0, 4).forEach(m => { if (!labelMap[m.id]) labelMap[m.id] = 'HOT' })
+  sortedByVolume.slice(0, 3).forEach(m => { labelMap[m.id] = 'TRENDING' })
+  sortedByTraders.slice(0, 3).forEach(m => { if (!labelMap[m.id]) labelMap[m.id] = 'HOT' })
   newMarkets.forEach(m => { if (!labelMap[m.id]) labelMap[m.id] = 'NEW' })
 
   const visible = filtered.slice(0, visibleCount)
   const hasMore = visibleCount < filtered.length
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 56px' }}>
+    <div style={{ padding: '0 0 48px' }}>
 
-      {/* Loading skeletons */}
+      {/* Loading */}
       {loading ? (
-        <div>
-          <SectionHeader title="Cargando mercados..." count={0} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-            {[0,1,2,3,4,5].map(i => <SkeletonCard key={i} wide={i === 0} />)}
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <SectionLabel>Cargando mercados...</SectionLabel>
+          {[0,1,2,3,4,5].map(i => <SkeletonRow key={i} />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '64px 0', color: C.textDim, fontSize: 13,
-        }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>&#128202;</div>
-          No hay mercados activos en este filtro.
+        <div style={{ textAlign: 'center', padding: '80px 0', color: C.textDim }}>
+          <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.4 }}>○</div>
+          <div style={{ fontSize: 14 }}>Sin mercados en este filtro.</div>
         </div>
       ) : (
         <>
-          {/* Section header */}
-          <SectionHeader title="Mercados activos" count={filtered.length} accent={C.accent} />
+          <SectionLabel count={realFiltered.length}>Mercados activos</SectionLabel>
 
-          {/* Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-            {visible.map((m, index) => (
-              <MarketCard
-                key={m.id}
-                market={m}
-                index={index}
-                total={visible.length}
-                onOpen={onOpen}
-                label={labelMap[m.id]}
-              />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {visible.map(m => (
+              m.placeholder
+                ? <PlaceholderCard key={m.id} market={m} />
+                : <MarketCard key={m.id} market={m} onOpen={onOpen} label={labelMap[m.id]} />
             ))}
           </div>
 
-          {/* Infinite scroll sentinel + loader */}
           {hasMore && (
-            <div ref={sentinelRef} style={{ textAlign: 'center', padding: '24px 0', color: C.textDim, fontSize: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-                {[0,1,2].map(i => <SkeletonCard key={i} />)}
-              </div>
+            <div ref={sentinelRef} style={{ paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[0,1,2].map(i => <SkeletonRow key={i} />)}
             </div>
           )}
         </>
       )}
 
-      {/* Pending resolution notice */}
+      {/* Pending resolution */}
       {pendingMarkets.length > 0 && (
         <div style={{
-          marginTop: 24, padding: '12px 16px',
+          marginTop: 20, padding: '10px 16px',
           background: `${C.warning}08`, border: `1px solid ${C.warning}20`,
-          borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10,
+          borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10,
         }}>
           <div style={{ width: 6, height: 6, borderRadius: 3, background: C.warning, flexShrink: 0 }} />
           <span style={{ fontSize: 12, color: C.warning, fontWeight: 500 }}>
-            {pendingMarkets.length} mercado{pendingMarkets.length > 1 ? 's' : ''} pendiente{pendingMarkets.length > 1 ? 's' : ''} de resolucion por oraculo
+            {pendingMarkets.length} mercado{pendingMarkets.length > 1 ? 's' : ''} pendiente{pendingMarkets.length > 1 ? 's' : ''} de resolución por oráculo
           </span>
         </div>
       )}
 
-      {/* Resolved markets section */}
+      {/* Resolved markets */}
       {resolvedMarkets.length > 0 && (
         <div style={{ marginTop: 48 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <SectionHeader title="Ultimos resultados" count={resolvedMarkets.length} />
-            <button
-              onClick={() => setShowResolved(!showResolved)}
-              style={{
-                fontSize: 12, color: C.textDim, background: 'none',
-                border: `1px solid ${C.cardBorder}`, borderRadius: 6,
-                padding: '4px 12px', cursor: 'pointer', flexShrink: 0, marginLeft: 12,
-              }}>
-              {showResolved ? 'Ver menos' : 'Ver todos'}
-            </button>
-          </div>
+          <SectionLabel
+            count={resolvedMarkets.length}
+            action={
+              <button
+                onClick={() => setShowResolved(!showResolved)}
+                style={{
+                  fontSize: 12, color: C.textMuted, background: 'none',
+                  border: `1px solid ${C.cardBorder}`, borderRadius: 6,
+                  padding: '3px 10px', cursor: 'pointer',
+                }}>
+                {showResolved ? 'Menos' : 'Ver todos'}
+              </button>
+            }
+          >
+            Últimos resultados
+          </SectionLabel>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {(showResolved ? resolvedMarkets : resolvedMarkets.slice(0, 8)).map(m => (
               <div key={m.id} style={{
-                background: C.card, border: `1px solid ${C.cardBorder}`,
-                borderRadius: 8, padding: '11px 14px',
-                display: 'flex', alignItems: 'center', gap: 12,
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '12px 0',
+                borderBottom: `1px solid ${C.divider}`,
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
                     fontSize: 13, fontWeight: 500, color: C.text,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    marginBottom: 2,
                   }}>{m.title}</div>
                   <div style={{ fontSize: 11, color: C.textDim }}>
                     {m.resolution_source || getOracleDescription(m).source}
                     {m.close_date && ` · ${new Date(m.close_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}`}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'ui-monospace, monospace' }}>
-                    €{(Math.max(0, (m.total_volume || 0) - 5000) / 1000).toFixed(1)}K
+                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 11, color: C.textDim, fontVariantNumeric: 'tabular-nums' }}>
+                    €{((m.total_volume || 0) / 1000).toFixed(1)}K
                   </span>
                   <span style={badge(m.resolved_outcome ? C.yes : C.no)}>
-                    {m.resolved_outcome ? 'SI' : 'NO'}
+                    {m.resolved_outcome ? 'SÍ' : 'NO'}
                   </span>
                 </div>
               </div>

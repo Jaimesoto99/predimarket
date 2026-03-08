@@ -4,9 +4,14 @@ export default function Document() {
   return (
     <Html lang="es">
       <Head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`
+          }}
+        />
         <meta name="description" content="Mercados de predicción sobre economía y actualidad española. Opera con créditos virtuales en IBEX, Bitcoin, política y deportes." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#08080a" />
+        <meta name="theme-color" content="#FAFAFA" />
         <meta property="og:title" content="PrediMarket — Mercados de predicción" />
         <meta property="og:description" content="Economía, política y deportes. Resolución automática por oráculo público." />
         <meta property="og:type" content="website" />

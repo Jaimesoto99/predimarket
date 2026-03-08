@@ -87,7 +87,7 @@ export default function OrderBook({ market, orderBook }) {
         padding: '8px 12px',
         borderTop: `1px solid ${C.divider}`, borderBottom: `1px solid ${C.divider}`,
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        background: `${C.card}dd`,
+        background: C.card,
       }}>
         <span style={{ fontSize: 11 }}>
           <span style={{ color: C.textDim }}>Precio: </span>
