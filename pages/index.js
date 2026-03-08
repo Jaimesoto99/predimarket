@@ -10,11 +10,13 @@ import useTrades from '@/hooks/useTrades'
 import useLeaderboard from '@/hooks/useLeaderboard'
 
 import AppLayout from '@/components/layout/AppLayout'
-import MarketGrid from '@/components/MarketGrid'
 import TrendingRow from '@/components/TrendingRow'
 import Footer from '@/components/Footer'
 import KYCModal from '@/components/KYCModal'
 import HomeHero from '@/components/home/HomeHero'
+import HowItWorks from '@/components/home/HowItWorks'
+import MarketFeed from '@/components/home/MarketFeed'
+import TransparencySection from '@/components/home/TransparencySection'
 
 import AuthModal from '@/components/modals/AuthModal'
 import PortfolioModal from '@/components/modals/PortfolioModal'
@@ -279,9 +281,11 @@ export default function Home() {
         totalTraders={totalTraders}
       />
 
+      <HowItWorks />
+
       <TrendingRow markets={trendingMarkets} onOpen={openTradeModal} />
 
-      <MarketGrid
+      <MarketFeed
         filtered={filtered}
         loading={loading}
         pendingMarkets={pendingMarkets}
@@ -289,7 +293,14 @@ export default function Home() {
         showResolved={showResolved}
         setShowResolved={setShowResolved}
         onOpen={openTradeModal}
+        filter={filter}
+        setFilter={setFilter}
+        catFilter={catFilter}
+        setCatFilter={setCatFilter}
+        activeMarkets={realActiveMarkets}
       />
+
+      <TransparencySection />
 
       <AuthModal
         showAuth={showAuth}

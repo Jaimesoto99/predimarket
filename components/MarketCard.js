@@ -14,11 +14,15 @@ function ProbBar({ pct }) {
 }
 
 export default function MarketCard({ market, onOpen, label }) {
-  const yesP    = parseFloat(market.prices?.yes || 50)
-  const catColor = getCategoryColor(market.category)
-  const timeLeft = getTimeLeft(market.close_date)
-  const oracle   = getOracleDescription(market)
-  const volume   = market.total_volume || 0
+  const yesP      = parseFloat(market.prices?.yes || 50)
+  const catColor  = getCategoryColor(market.category)
+  const timeLeft  = getTimeLeft(market.close_date)
+  const oracle    = getOracleDescription(market)
+  const volume    = market.total_volume || 0
+  const liquidity = Math.min(
+    parseFloat(market.yes_pool) || 5000,
+    parseFloat(market.no_pool)  || 5000,
+  )
 
   const isUrgent = (() => {
     const diff = new Date(market.close_date) - new Date()
@@ -106,17 +110,21 @@ export default function MarketCard({ market, onOpen, label }) {
             {market.title}
           </p>
 
-          {/* Resolution source + volume */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 7 }}>
+          {/* Metrics row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 7, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 10, color: C.textDim, fontVariantNumeric: 'tabular-nums' }}>
-              €{volume > 1000 ? `${(volume / 1000).toFixed(1)}K` : volume.toFixed(0)}
+              Vol {volume > 1000 ? `€${(volume / 1000).toFixed(1)}K` : `€${volume.toFixed(0)}`}
+            </span>
+            <span style={{ width: 2, height: 2, borderRadius: 1, background: C.divider, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, color: C.textDim, fontVariantNumeric: 'tabular-nums' }}>
+              Liq {liquidity > 1000 ? `€${(liquidity / 1000).toFixed(1)}K` : `€${liquidity.toFixed(0)}`}
             </span>
             <span style={{ width: 2, height: 2, borderRadius: 1, background: C.divider, flexShrink: 0 }} />
             <span style={{
               fontSize: 10, color: C.textDim,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
-              <span style={{ color: C.textDim, fontWeight: 500 }}>Res.: </span>
+              <span style={{ fontWeight: 500 }}>Res.: </span>
               {oracle.source}
             </span>
           </div>
