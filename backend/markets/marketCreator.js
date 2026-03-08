@@ -38,7 +38,18 @@ async function saveCandidateRecord(supabase, candidate) {
   return data?.id
 }
 
-// ─── Map oracle_type to market_type ──────────────────────────────────────
+// ─── Duration constants (shared with spainMarketCreator) ─────────────────
+
+export const MARKET_DURATIONS = {
+  ULTRA_FAST: 6,
+  FAST:       12,
+  DAILY:      24,
+  SHORT:      48,
+  MEDIUM:     120,
+  MONTHLY:    720,
+}
+
+// ─── Map duration hours to market_type label ──────────────────────────────
 
 function resolveMarketType(durationHours) {
   if (durationHours <= 24)  return 'DIARIO'

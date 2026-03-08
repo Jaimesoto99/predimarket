@@ -156,6 +156,10 @@ export async function buildCandidate(detection) {
     entity_importance: scored.entity_importance,
     novelty_score:     scored.novelty_score,
     initial_prob:      filledWithLive.initial_prob,
+    // Mandatory resolution fields (R10)
+    resolution_source: filledWithLive.resolution_source || null,
+    resolution_method: filledWithLive.resolution_method || null,
+    resolution_time:   new Date(Date.now() + filledWithLive.duration_hours * 3600000).toISOString(),
     status:            'PENDING',
     expires_at:        expiresAt,
     // Internal — not persisted to DB but used during pipeline

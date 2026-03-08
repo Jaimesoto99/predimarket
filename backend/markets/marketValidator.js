@@ -157,6 +157,34 @@ function validateCategory(candidate) {
   return { rule: 'R9_CATEGORY', passed: true }
 }
 
+// R10 — Mandatory resolution fields
+// Markets must have resolution_source, resolution_method and resolution_time
+// so users and regulators can verify how each market resolves.
+
+function validateResolutionFields(candidate) {
+  const missing = []
+
+  if (!candidate.resolution_source || candidate.resolution_source.trim().length < 4) {
+    missing.push('resolution_source')
+  }
+  if (!candidate.resolution_method || candidate.resolution_method.trim().length < 10) {
+    missing.push('resolution_method')
+  }
+  if (!candidate.resolution_time && !candidate.duration_hours) {
+    missing.push('resolution_time (or duration_hours)')
+  }
+
+  if (missing.length > 0) {
+    return {
+      rule:    'R10_RESOLUTION_FIELDS',
+      passed:  false,
+      message: `Missing mandatory resolution fields: ${missing.join(', ')}`,
+      details: { missing },
+    }
+  }
+  return { rule: 'R10_RESOLUTION_FIELDS', passed: true }
+}
+
 // ─── Main validator ───────────────────────────────────────────────────────
 
 export async function validateCandidate(candidate) {
@@ -181,6 +209,7 @@ export async function validateCandidate(candidate) {
     validateOracle(candidate),
     validateQuestion(candidate),
     validateCategory(candidate),
+    validateResolutionFields(candidate),
   ]
 
   // Check for failures in fast rules first (no async cost)
