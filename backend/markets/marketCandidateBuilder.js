@@ -13,7 +13,7 @@ import { selectBestTemplate, fillTemplate, validateFilledTemplate }
   from './templateEngine'
 import { ENTITY_ROLE_MAP } from './marketTemplates'
 import { scoreCandidate, fetchCoveringArticles } from './marketScorer'
-import { MIN_LIQUIDITY_POOL, DEFAULT_INITIAL_PROBABILITY, clampProbability } from '../../lib/liquidity'
+import { MIN_LIQUIDITY_POOL, DEFAULT_INITIAL_PROBABILITY, clampProbability } from '../../lib/amm'
 
 // ─── Live price fetchers ──────────────────────────────────────────────────
 

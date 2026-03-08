@@ -37,7 +37,13 @@
 /* ─── Base ───────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box }
 /* Explicit light background prevents flash-of-dark on initial load */
-html { background: #FAFAFA; scroll-behavior: smooth; -webkit-text-size-adjust: 100% }
+html {
+  background: #FAFAFA;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -202,4 +208,44 @@ html * { transition: background-color 0.15s ease, border-color 0.15s ease, color
 :focus-visible {
   outline: 2px solid var(--card-border-hover);
   outline-offset: 2px;
+}
+
+/* ─── Mobile responsive fixes ───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Trading modal fullscreen on mobile */
+  .trading-modal-panel {
+    position: fixed !important;
+    inset: 0 !important;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    border-radius: 0 !important;
+    max-height: 100dvh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Market cards: 1 column, full width */
+  .market-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .market-card-title {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  /* Filters: single scrollable row */
+  .filter-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 6px !important;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .filter-row::-webkit-scrollbar { display: none }
+  .filter-row > * { flex-shrink: 0 !important }
+
+  /* Prevent any container from overflowing */
+  .app-content > * { max-width: 100% !important; overflow-x: hidden }
 }

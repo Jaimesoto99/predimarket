@@ -37,7 +37,7 @@ export default function TradingModal({
         minHeight: '100%', display: 'flex', alignItems: 'flex-start',
         justifyContent: 'center', padding: '32px 16px',
       }}>
-        <div className="anim-slide-up" style={{
+        <div className="anim-slide-up trading-modal-panel" style={{
           background: C.card, border: `1px solid ${C.cardBorder}`,
           borderRadius: 16, width: '100%', maxWidth: 960,
           overflow: 'hidden', boxShadow: '0 24px 80px rgba(15,23,42,0.18)',

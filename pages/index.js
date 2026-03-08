@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { getOrCreateUser, createTrade, getPriceHistory } from '../lib/supabase'
+import { getOrCreateUser, createTrade, getPriceHistory, onAuthStateChange } from '../lib/supabase'
 import { supabase } from '../lib/supabase'
 import { previewTrade } from '../lib/amm'
 import { C } from '../lib/theme'
@@ -30,7 +30,6 @@ const ProfileModal = dynamic(() => import('../components/ProfileModal'), { ssr: 
 export default function Home() {
   // ─── Auth ─────────────────────────────────────────────────────────────────
   const [user, setUser] = useState(null)
-  const [email, setEmail] = useState('')
   const [showAuth, setShowAuth] = useState(false)
 
   // ─── Modal visibility ─────────────────────────────────────────────────────
@@ -74,7 +73,7 @@ export default function Home() {
   const { leaderboard, loadLeaderboard } = useLeaderboard()
   const { isWatching, toggleWatch, alertCount } = useWatchlist(user)
 
-  // ─── Init ─────────────────────────────────────────────────────────────────
+  // ─── Init — restaurar sesión desde localStorage + listener Supabase Auth ─
   useEffect(() => {
     const savedUser = localStorage.getItem('predi_user')
     if (savedUser) {
@@ -84,6 +83,24 @@ export default function Home() {
         loadUserTrades(u.email)
       } catch (e) { localStorage.removeItem('predi_user') }
     }
+
+    // Auth state change listener
+    const subscription = onAuthStateChange(async (authUser) => {
+      if (authUser) {
+        const result = await getOrCreateUser(authUser.email)
+        if (result.success) {
+          setUser(result.user)
+          localStorage.setItem('predi_user', JSON.stringify(result.user))
+          loadUserTrades(result.user.email)
+        }
+      } else {
+        // signed out via Supabase
+        setUser(null)
+        localStorage.removeItem('predi_user')
+      }
+    })
+
+    return () => { subscription?.unsubscribe?.() }
   }, [])
 
   // ─── Trade preview ────────────────────────────────────────────────────────
@@ -95,19 +112,17 @@ export default function Home() {
   }, [tradeAmount, tradeSide, selectedMarket])
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
-  async function handleLogin(e) {
-    e.preventDefault()
-    if (!email) return
-    const result = await getOrCreateUser(email)
-    if (!result.success) { alert(result.error || 'Error al crear usuario'); return }
-    setUser(result.user)
-    localStorage.setItem('predi_user', JSON.stringify(result.user))
+  function handleLogin(prediUser) {
+    // Called by AuthModal after successful auth + getOrCreateUser
+    setUser(prediUser)
+    localStorage.setItem('predi_user', JSON.stringify(prediUser))
     setShowAuth(false)
-    setEmail('')
-    loadUserTrades(result.user.email)
+    loadUserTrades(prediUser.email)
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    const { signOut } = await import('../lib/supabase')
+    await signOut()
     setUser(null)
     localStorage.removeItem('predi_user')
   }
@@ -154,7 +169,7 @@ export default function Home() {
     if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid || processing) return
     if (!hasAcceptedDisclaimer()) { setPendingTradeAction('MARKET'); setShowDisclaimer(true); return }
     setProcessing(true)
-    const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount)
+    const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount, selectedMarket)
     setProcessing(false)
     if (result.success) {
       const newUser = { ...user, balance: result.new_balance }
@@ -321,8 +336,6 @@ export default function Home() {
       <AuthModal
         showAuth={showAuth}
         setShowAuth={setShowAuth}
-        email={email}
-        setEmail={setEmail}
         handleLogin={handleLogin}
       />
 
