@@ -8,6 +8,7 @@ import { C } from '../lib/theme'
 import useMarkets from '@/hooks/useMarkets'
 import useTrades from '@/hooks/useTrades'
 import useLeaderboard from '@/hooks/useLeaderboard'
+import useWatchlist from '@/hooks/useWatchlist'
 
 import AppLayout from '@/components/layout/AppLayout'
 import TrendingRow from '@/components/TrendingRow'
@@ -71,6 +72,7 @@ export default function Home() {
   const { markets, resolvedMarkets, loading, loadMarkets } = useMarkets()
   const { userTrades, openTrades, loadUserTrades, handleSell } = useTrades({ user, setUser, onRefreshMarkets: loadMarkets })
   const { leaderboard, loadLeaderboard } = useLeaderboard()
+  const { isWatching, toggleWatch, alertCount } = useWatchlist(user)
 
   // ─── Init ─────────────────────────────────────────────────────────────────
   useEffect(() => {
