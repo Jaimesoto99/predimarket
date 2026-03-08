@@ -67,7 +67,7 @@ function MarketHeader({ market, onClose }) {
       {/* Credibility line */}
       <p style={{ fontSize: 11, color: C.textDim, marginBottom: 16, lineHeight: 1.5 }}>
         Este mercado se resolverá automáticamente según la fuente indicada.{' '}
-        <a href="/about" style={{ color: C.textDim, textDecoration: 'underline', textUnderlineOffset: 2 }}>
+        <a href="/metodologia" style={{ color: C.textDim, textDecoration: 'underline', textUnderlineOffset: 2 }}>
           Ver metodología
         </a>
       </p>

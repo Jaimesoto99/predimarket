@@ -6,7 +6,7 @@ export default function Document() {
       <Head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`
+            __html: `(function(){try{var s=localStorage.getItem('theme');if(s==='dark'){document.documentElement.setAttribute('data-theme','dark');}else{document.documentElement.setAttribute('data-theme','light');}}catch(e){}})();`
           }}
         />
         <meta name="description" content="Mercados de predicción sobre economía y actualidad española. Opera con créditos virtuales en IBEX, Bitcoin, política y deportes." />

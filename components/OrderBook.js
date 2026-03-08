@@ -129,7 +129,7 @@ export default function OrderBook({ market, orderBook }) {
 
       <div style={{ padding: '4px 12px', background: C.card, borderTop: `1px solid ${C.divider}` }}>
         <span style={{ fontSize: 9, color: C.textDim, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-          {(hasBids || hasAsks) ? 'Órdenes límite reales' : 'AMM sintético'}
+          Liquidez del mercado
         </span>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { C, getCategoryColor, getCategoryLabel } from '../lib/theme'
 
-const ALL_CATS = ['ECONOMIA', 'POLITICA', 'DEPORTES', 'ENERGIA', 'CRIPTO', 'ACTUALIDAD', 'GEOPOLITICA', 'CLIMA', 'TECNOLOGIA']
+const ALL_CATS = ['ECONOMIA', 'POLITICA', 'DEPORTES', 'ENERGIA', 'TECNOLOGIA', 'CRIPTO', 'ACTUALIDAD', 'GEOPOLITICA', 'INTERNACIONAL', 'SOCIEDAD', 'CIENCIA', 'CULTURA', 'CLIMA']
 
 export default function MarketFilters({ filter, setFilter, catFilter, setCatFilter, activeMarkets }) {
   const activeCats = new Set(activeMarkets.map(m => m.category).filter(Boolean))

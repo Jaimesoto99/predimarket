@@ -272,6 +272,18 @@ export default function Home() {
       activeMarkets={realActiveMarkets}
     >
 
+      {/* Homepage explanation banner */}
+      <div style={{
+        marginBottom: 24, padding: '14px 18px',
+        background: `${C.accent}06`, border: `1px solid ${C.cardBorder}`,
+        borderRadius: 10,
+      }}>
+        <p style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.6, margin: 0 }}>
+          <strong style={{ color: C.text, fontWeight: 600 }}>Predimarket</strong> es un mercado de predicciones donde los precios reflejan la probabilidad colectiva de que ocurra un evento futuro.
+          {' '}<a href="/metodologia" style={{ color: C.accentLight, textDecoration: 'underline', textUnderlineOffset: 2 }}>Ver metodología</a>
+        </p>
+      </div>
+
       {/* Page heading + market stats */}
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em', color: C.text, marginBottom: 6, lineHeight: 1.2 }}>

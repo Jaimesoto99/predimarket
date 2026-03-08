@@ -40,6 +40,14 @@ export default function Footer() {
               </div>
             </div>
             <div>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10 }}>Transparencia</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Link href="/metodologia" style={linkStyle}>Metodología</Link>
+                <Link href="/reglas" style={linkStyle}>Reglas de resolución</Link>
+                <Link href="/disclaimer" style={linkStyle}>Aviso legal</Link>
+              </div>
+            </div>
+            <div>
               <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10 }}>Legal</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <Link href="/legal" style={linkStyle}>Términos y Condiciones</Link>
