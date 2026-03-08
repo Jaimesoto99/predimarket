@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { C, badge, getCategoryColor, getCategoryLabel, getTypeLabel, getTimeLeft, getOracleDescription } from '../lib/theme'
-import MarketCard from './marketcard'
+import MarketCard from './MarketCard'
 
 const INITIAL_VISIBLE = 12
 const LOAD_MORE_STEP  = 8
