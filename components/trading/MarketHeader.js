@@ -1,4 +1,6 @@
-import { C, getCategoryColor, getCategoryLabel, getTimeLeft, getTypeLabel, isExpiredDate } from '../../lib/theme'
+import { C, getCategoryColor, getCategoryLabel, getTypeLabel, isExpiredDate } from '../../lib/theme'
+import ResolutionCountdown from './ResolutionCountdown'
+import MarketDurationBadge from './MarketDurationBadge'
 
 export default function MarketHeader({ market, onClose }) {
   const expired  = isExpiredDate(market.close_date)
@@ -6,8 +8,8 @@ export default function MarketHeader({ market, onClose }) {
 
   return (
     <div style={{ padding: '24px 28px 0', borderBottom: `1px solid ${C.cardBorder}` }}>
-      {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      {/* Top bar: category + close button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
@@ -17,14 +19,7 @@ export default function MarketHeader({ market, onClose }) {
           </span>
           <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.textDim, flexShrink: 0 }} />
           <span style={{ fontSize: 11, color: C.textDim }}>{getTypeLabel(market)}</span>
-          <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.textDim, flexShrink: 0 }} />
-          <span style={{
-            fontSize: 11,
-            color: expired ? C.no : C.textDim,
-            fontWeight: expired ? 600 : 400,
-          }}>
-            {expired ? 'Cerrado' : `Cierra en ${getTimeLeft(market.close_date)}`}
-          </span>
+          <MarketDurationBadge market={market} />
         </div>
         <button onClick={onClose} style={{
           width: 32, height: 32, borderRadius: 8,
@@ -38,18 +33,24 @@ export default function MarketHeader({ market, onClose }) {
       {/* Title */}
       <h2 style={{
         fontSize: 17, fontWeight: 700, lineHeight: 1.35, letterSpacing: '-0.025em',
-        color: C.text, marginBottom: 6,
+        color: C.text, marginBottom: 10,
       }}>
         {market.title}
       </h2>
 
-      {/* Credibility line */}
-      <p style={{ fontSize: 11, color: C.textDim, marginBottom: 16, lineHeight: 1.5 }}>
-        Este mercado se resolverá automáticamente según la fuente indicada.{' '}
-        <a href="/metodologia" style={{ color: C.textDim, textDecoration: 'underline', textUnderlineOffset: 2 }}>
-          Ver metodología
-        </a>
-      </p>
+      {/* Resolution countdown — prominent, always visible */}
+      <div style={{ marginBottom: 14 }}>
+        {expired ? (
+          <span style={{
+            fontSize: 12, fontWeight: 600, color: C.no,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+          }}>
+            ⏹ Mercado cerrado — pendiente de resolución
+          </span>
+        ) : (
+          <ResolutionCountdown market={market} size="lg" />
+        )}
+      </div>
 
       {/* Probability stats strip */}
       <div style={{
