@@ -247,6 +247,12 @@ export default function Stats() {
                 )}
               </div>
 
+              {/* Nota regulatoria */}
+              <div style={{ marginTop: 32, padding: '14px 20px', background: `${C.accent}06`, border: `1px solid ${C.accent}15`, borderRadius: 8 }}>
+                <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.6 }}>
+                  Este dashboard muestra métricas de la fase de pruebas de PrediMarket. Todos los saldos son virtuales. No se ha procesado dinero real. La plataforma está pendiente de evaluación regulatoria.
+                </div>
+              </div>
             </>
           )}
         </main>
