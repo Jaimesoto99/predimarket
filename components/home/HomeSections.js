@@ -28,43 +28,63 @@ export default function HomeSections({ markets, onOpen }) {
     !m.isExpired && !m.placeholder && m.status !== 'RESOLVED' && m.status !== 'CLOSED'
   )
 
-  // 1. Resolving Today
-  const resolvingToday = active
-    .filter(m => resolveTs(m) > now && resolveTs(m) < in24h)
-    .sort((a, b) => resolveTs(a) - resolveTs(b))
-    .slice(0, 8)
+  // Deduplication — markets appear in at most one section (priority order)
+  const used = new Set()
+  function unique(list) {
+    return list.filter(m => {
+      if (used.has(m.id)) return false
+      used.add(m.id)
+      return true
+    })
+  }
+
+  // 1. Resolving Today (highest priority)
+  const resolvingToday = unique(
+    active
+      .filter(m => resolveTs(m) > now && resolveTs(m) < in24h)
+      .sort((a, b) => resolveTs(a) - resolveTs(b))
+      .slice(0, 8)
+  )
 
   // 2. Fast Markets (≤24h duration)
-  const fastMarkets = active
-    .filter(m => durationHours(m) <= 24)
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(0, 8)
+  const fastMarkets = unique(
+    active
+      .filter(m => durationHours(m) <= 24)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 8)
+  )
 
   // 3. Trending
-  const trending = active
-    .filter(m => m.trending)
-    .sort((a, b) => (parseFloat(b.prob_change_6h) || 0) - (parseFloat(a.prob_change_6h) || 0))
-    .slice(0, 8)
+  const trending = unique(
+    active
+      .filter(m => m.trending)
+      .sort((a, b) => (parseFloat(b.prob_change_6h) || 0) - (parseFloat(a.prob_change_6h) || 0))
+      .slice(0, 8)
+  )
 
   // 4. Popular
-  const popular = active
-    .filter(m => m.popularity_score != null)
-    .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0))
-    .slice(0, 8)
+  const popular = unique(
+    active
+      .filter(m => m.popularity_score != null)
+      .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0))
+      .slice(0, 8)
+  )
 
   // 5. España
-  const espana = active
-    .filter(m =>
-      m.super_category === 'SPAIN' ||
-      (m.cluster_id && (
-        m.cluster_id.startsWith('SPANISH') ||
-        m.cluster_id.startsWith('ES_') ||
-        m.cluster_id === 'LA_LIGA' ||
-        m.cluster_id === 'CHAMPIONS_LEAGUE'
-      ))
-    )
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(0, 8)
+  const espana = unique(
+    active
+      .filter(m =>
+        m.super_category === 'SPAIN' ||
+        (m.cluster_id && (
+          m.cluster_id.startsWith('SPANISH') ||
+          m.cluster_id.startsWith('ES_') ||
+          m.cluster_id === 'LA_LIGA' ||
+          m.cluster_id === 'CHAMPIONS_LEAGUE'
+        ))
+      )
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 8)
+  )
 
   const hasAnySections =
     resolvingToday.length > 0 || fastMarkets.length > 0 ||

@@ -13,6 +13,7 @@ import { selectBestTemplate, fillTemplate, validateFilledTemplate }
   from './templateEngine'
 import { ENTITY_ROLE_MAP } from './marketTemplates'
 import { scoreCandidate, fetchCoveringArticles } from './marketScorer'
+import { MIN_LIQUIDITY_POOL, DEFAULT_INITIAL_PROBABILITY, clampProbability } from '../../lib/liquidity'
 
 // ─── Live price fetchers ──────────────────────────────────────────────────
 
@@ -157,10 +158,14 @@ export async function buildCandidate(detection) {
     novelty_score:     scored.novelty_score,
     initial_prob:      filledWithLive.initial_prob,
     // Mandatory resolution fields (R10)
-    resolution_source: filledWithLive.resolution_source || null,
-    resolution_method: filledWithLive.resolution_method || null,
-    resolution_time:   new Date(Date.now() + filledWithLive.duration_hours * 3600000).toISOString(),
-    status:            'PENDING',
+    resolution_source:   filledWithLive.resolution_source || null,
+    resolution_method:   filledWithLive.resolution_method || null,
+    resolution_time:     new Date(Date.now() + filledWithLive.duration_hours * 3600000).toISOString(),
+    // Phase 5 — liquidity fields
+    initial_probability: clampProbability((filledWithLive.initial_prob || 50) / 100),
+    current_probability: clampProbability((filledWithLive.initial_prob || 50) / 100),
+    liquidity_pool:      MIN_LIQUIDITY_POOL,
+    status:              'PENDING',
     expires_at:        expiresAt,
     // Internal — not persisted to DB but used during pipeline
     _detection:        detection,

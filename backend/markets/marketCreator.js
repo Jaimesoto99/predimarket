@@ -86,10 +86,16 @@ async function enrichMarketMetadata(supabase, marketId, candidate, candidateId) 
     .from('markets')
     .update({
       oracle_type:         candidate.oracle_type,
-      resolution_method:   candidate.oracle_type,
+      resolution_method:   candidate.resolution_method || candidate.oracle_type,
+      resolution_source:   candidate.resolution_source || null,
+      resolution_time:     candidate.resolution_time   || null,
       source_candidate_id: candidateId,
       auto_created:        true,
       relevance_score:     candidate.relevance_score,
+      // Phase 5 — liquidity fields
+      initial_probability: candidate.initial_probability ?? null,
+      current_probability: candidate.current_probability ?? null,
+      liquidity_pool:      candidate.liquidity_pool      ?? null,
     })
     .eq('id', marketId)
 
