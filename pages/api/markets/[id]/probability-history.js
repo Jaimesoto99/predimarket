@@ -6,7 +6,7 @@
 //   maxPoints      = 120 (downsampled output points for chart)
 //   includeSignals = false
 
-import { getProbabilityHistory, downsampleHistory, computeHistoryStats }
+import { getProbabilityHistory, downsampleHistory, computeHistoryStats, computeHistoryVolatility }
   from '../../../../lib/engine/probability/probabilityHistory'
 
 const CORS = {
@@ -32,9 +32,10 @@ export default async function handler(req, res) {
       includeSignals: includeSignals === 'true',
     })
 
-    const max        = parseInt(maxPoints, 10) || 120
+    const max         = parseInt(maxPoints, 10) || 120
     const downsampled = downsampleHistory(snapshots, max)
     const stats       = computeHistoryStats(snapshots)
+    const volatility  = computeHistoryVolatility(snapshots)
 
     // Format for chart consumption: { t, p } tuples
     const series = downsampled.map(s => ({
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
       market_id:   id,
       series,
       stats,
+      volatility,
       raw_count:   snapshots.length,
       chart_count: series.length,
     })
