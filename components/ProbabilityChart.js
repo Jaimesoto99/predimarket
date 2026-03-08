@@ -69,25 +69,34 @@ export default function ProbabilityChart({ priceHistory, market }) {
         <span>Ahora {currentPrice.toFixed(1)}%</span>
       </div>
 
-      <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.divider}` }}>
+      <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.divider}`, flexWrap: 'wrap' }}>
         {[
-          ['Volumen', `€${((market.total_volume || 0) / 1000).toFixed(1)}K`],
-          ['Traders', `${market.active_traders || market.total_traders || 0}`],
-          ['Cierre', (() => {
+          { k: 'Volumen',  v: `€${((market.total_volume || 0) / 1000).toFixed(1)}K` },
+          { k: 'Traders',  v: `${market.active_traders || market.total_traders || 0}` },
+          market.vol_24h != null
+            ? { k: 'Vol. 24h', v: `${parseFloat(market.vol_24h).toFixed(2)}pp` }
+            : null,
+          market.prob_change_24h != null
+            ? { k: 'Δ 24h', v: `${parseFloat(market.prob_change_24h) > 0 ? '+' : ''}${parseFloat(market.prob_change_24h).toFixed(1)}pp`, change: parseFloat(market.prob_change_24h) }
+            : null,
+          { k: 'Cierre', v: (() => {
             const diff = new Date(market.close_date) - new Date()
             if (diff < 0) return 'Expirado'
             const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000)
             if (h > 24) return `${Math.floor(h / 24)}d ${h % 24}h`
             if (h > 0) return `${h}h ${m}m`
             return `${m}m`
-          })()],
-        ].map(([k, v]) => (
+          })() },
+        ].filter(Boolean).map(({ k, v, change }) => (
           <div key={k}>
             <div style={{
               fontSize: 9, fontWeight: 600, letterSpacing: '0.07em',
               textTransform: 'uppercase', color: C.textDim, marginBottom: 3,
             }}>{k}</div>
-            <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'ui-monospace, monospace', color: C.text }}>{v}</div>
+            <div style={{
+              fontSize: 13, fontWeight: 600, fontFamily: 'ui-monospace, monospace',
+              color: change != null ? (change > 0 ? C.yes : change < 0 ? C.no : C.textDim) : C.text,
+            }}>{v}</div>
           </div>
         ))}
       </div>

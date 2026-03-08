@@ -8,6 +8,7 @@ import MarketMetrics from './trading/MarketMetrics'
 import CommentsSection from './trading/CommentsSection'
 import RecentTrades from './trading/RecentTrades'
 import ResolutionInfo from './trading/ResolutionInfo'
+import MarketInsights from './analytics/MarketInsights'
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
 
@@ -21,7 +22,8 @@ export default function TradingModal({
   tradeImpact, processing,
   priceHistory, recentActivity, orderBook, userOrders,
   comments, newComment, setNewComment, topHolders,
-  onClose, onExecuteTrade, onLimitOrder, onCancelOrder, onSell, onPostComment, onLikeComment,
+  relatedMarkets = [],
+  onClose, onExecuteTrade, onLimitOrder, onCancelOrder, onSell, onPostComment, onLikeComment, onOpenMarket,
 }) {
   return (
     <div style={{
@@ -73,7 +75,7 @@ export default function TradingModal({
 
                 {/* Tabs */}
                 <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${C.cardBorder}` }}>
-                  {[['BOOK', 'Liquidez'], ['RESOLUTION', 'Resolución']].map(([t, label]) => (
+                  {[['BOOK', 'Liquidez'], ['INSIGHTS', 'Análisis'], ['RESOLUTION', 'Resolución']].map(([t, label]) => (
                     <button key={t} onClick={() => setModalTab(t)} style={{
                       padding: '8px 14px', fontSize: 12, fontWeight: modalTab === t ? 600 : 400,
                       background: 'transparent', border: 'none', cursor: 'pointer',
@@ -97,6 +99,14 @@ export default function TradingModal({
                       onPostComment={onPostComment} onLikeComment={onLikeComment}
                     />
                   </>
+                )}
+
+                {modalTab === 'INSIGHTS' && (
+                  <MarketInsights
+                    market={market}
+                    relatedMarkets={relatedMarkets}
+                    onOpenMarket={onOpenMarket}
+                  />
                 )}
 
                 {modalTab === 'RESOLUTION' && (

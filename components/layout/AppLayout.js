@@ -11,10 +11,11 @@ const ALL_CATS = [
 ]
 
 const NAV_ITEMS = [
-  { href: '/',             label: 'Mercados' },
-  { href: '/stats',        label: 'Estadísticas' },
-  { href: '/metodologia',  label: 'Metodología' },
-  { href: '/demo',         label: 'Cómo funciona' },
+  { href: '/',          label: 'Mercados' },
+  { href: '/trending',  label: 'Trending' },
+  { href: '/topics',    label: 'Temas' },
+  { href: '/clusters',  label: 'Clusters' },
+  { href: '/stats',     label: 'Estadísticas' },
 ]
 
 function SidebarInner({

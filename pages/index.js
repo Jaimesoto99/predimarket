@@ -60,6 +60,7 @@ export default function Home() {
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
   const [topHolders, setTopHolders] = useState([])
+  const [relatedMarkets, setRelatedMarkets] = useState([])
 
   // ─── Filters & UI ────────────────────────────────────────────────────────
   const [filter, setFilter] = useState('ALL')
@@ -129,11 +130,22 @@ export default function Home() {
     setModalTab('BOOK')
     setComments([])
     setTopHolders([])
+    setRelatedMarkets([])
     loadPriceHistory(market.id)
     loadRecentActivity(market.id)
     loadOrderBook(market.id)
     loadComments(market.id)
     loadTopHolders(market.id)
+    loadRelatedMarkets(market)
+  }
+
+  async function loadRelatedMarkets(market) {
+    if (!market?.cluster_id) return
+    const related = markets
+      .filter(m => m.id !== market.id && m.cluster_id === market.cluster_id && !m.isExpired)
+      .sort((a, b) => (b.market_score || 0) - (a.market_score || 0))
+      .slice(0, 4)
+    setRelatedMarkets(related)
   }
 
   async function executeTrade() {
@@ -329,6 +341,7 @@ export default function Home() {
           comments={comments}
           newComment={newComment}   setNewComment={setNewComment}
           topHolders={topHolders}
+          relatedMarkets={relatedMarkets}
           onClose={() => setShowTradeModal(false)}
           onExecuteTrade={executeTrade}
           onLimitOrder={placeLimitOrder}
@@ -336,6 +349,7 @@ export default function Home() {
           onSell={handleSell}
           onPostComment={postComment}
           onLikeComment={likeComment}
+          onOpenMarket={openTradeModal}
         />
       )}
 
