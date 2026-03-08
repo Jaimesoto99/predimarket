@@ -261,6 +261,7 @@ export default function Home() {
       if (filter === 'SEMANAL' && t !== 'SHORT'  && t !== 'SEMANAL') return false
       if (filter === 'MENSUAL' && t !== 'LONG'   && t !== 'MENSUAL') return false
     }
+    if (catFilter === 'SPAIN') return m.super_category === 'SPAIN'
     if (catFilter !== 'ALL' && m.category !== catFilter) return false
     return true
   })

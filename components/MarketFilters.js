@@ -3,8 +3,9 @@ import { C, getCategoryColor, getCategoryLabel } from '../lib/theme'
 const ALL_CATS = ['ECONOMIA', 'POLITICA', 'DEPORTES', 'ENERGIA', 'TECNOLOGIA', 'CRIPTO', 'ACTUALIDAD', 'GEOPOLITICA', 'INTERNACIONAL', 'SOCIEDAD', 'CIENCIA', 'CULTURA', 'CLIMA']
 
 export default function MarketFilters({ filter, setFilter, catFilter, setCatFilter, activeMarkets }) {
-  const activeCats = new Set(activeMarkets.map(m => m.category).filter(Boolean))
-  const allCount   = activeMarkets.length
+  const activeCats    = new Set(activeMarkets.map(m => m.category).filter(Boolean))
+  const spainCount    = activeMarkets.filter(m => m.super_category === 'SPAIN').length
+  const allCount      = activeMarkets.length
 
   const timeFilters = [
     { f: 'ALL',     label: 'Todos',   count: allCount },
@@ -63,6 +64,23 @@ export default function MarketFilters({ filter, setFilter, catFilter, setCatFilt
         }}>
           Todos
         </button>
+
+        {/* España 🇪🇸 filter */}
+        {spainCount > 0 && (
+          <button onClick={() => setCatFilter('SPAIN')} style={{
+            flexShrink: 0, padding: '4px 12px', fontSize: 12,
+            fontWeight: catFilter === 'SPAIN' ? 600 : 400,
+            borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
+            border: `1px solid ${catFilter === 'SPAIN' ? '#c60b1e' : C.cardBorder}`,
+            background: catFilter === 'SPAIN' ? '#c60b1e10' : 'transparent',
+            color: catFilter === 'SPAIN' ? '#c60b1e' : C.textMuted,
+            display: 'flex', alignItems: 'center', gap: 5,
+            transition: 'all 0.12s',
+          }}>
+            <span>🇪🇸</span> España
+            <span style={{ fontSize: 10, color: catFilter === 'SPAIN' ? '#c60b1e' : C.textDim }}>{spainCount}</span>
+          </button>
+        )}
 
         {ALL_CATS.filter(cat => activeCats.has(cat)).map(cat => {
           const isActive = catFilter === cat
