@@ -109,32 +109,11 @@ const CRIPTO_TEMPLATES = [
 ]
 
 // ─── SPORTS ───────────────────────────────────────────────────────────────
+// NOTE: Individual match results (TEAM_NEXT_MATCH, TEAM_VS_TEAM) are blocked
+// by R0_REGULATORY (CNMV compliance). Only tournament/season/national-team
+// outcomes are permitted.
 
 const DEPORTES_TEMPLATES = [
-  {
-    id:           'TEAM_NEXT_MATCH',
-    category:     'DEPORTES',
-    oracle_type:  'SPORTS_RESULT',
-    required:     ['TEAM'],
-    optional:     ['COMPETITION'],
-    question:     '¿{TEAM_NAME} gana su próximo partido oficial?',
-    description:  'Se resuelve SÍ si {TEAM_NAME} obtiene victoria (3 puntos) en su próximo partido oficial{COMPETITION_SUFFIX}. Empate = NO. Fuente: {ORACLE_SOURCE}.',
-    duration_type: 'EVENT',
-    initial_prob: [40, 65],
-    min_score:    0.5,
-  },
-  {
-    id:           'TEAM_VS_TEAM',
-    category:     'DEPORTES',
-    oracle_type:  'SPORTS_RESULT',
-    required:     ['TEAM', 'OPPONENT'],
-    optional:     ['COMPETITION'],
-    question:     '¿{TEAM_NAME} vence a {OPPONENT_NAME}?',
-    description:  'Se resuelve SÍ si {TEAM_NAME} gana el partido frente a {OPPONENT_NAME}{COMPETITION_SUFFIX}. Empate = NO. Fuente: {ORACLE_SOURCE}.',
-    duration_type: 'EVENT',
-    initial_prob: [35, 65],
-    min_score:    0.65,
-  },
   {
     id:           'TEAM_SEASON',
     category:     'DEPORTES',
@@ -145,6 +124,18 @@ const DEPORTES_TEMPLATES = [
     description:  'Se resuelve SÍ si {TEAM_NAME} se proclama campeón de {COMPETITION_NAME} al final de la temporada. Fuente: {ORACLE_SOURCE}.',
     duration_type: 'MONTHLY',
     initial_prob: [10, 50],
+    min_score:    0.60,
+  },
+  {
+    id:           'NATIONAL_TEAM_TOURNAMENT',
+    category:     'DEPORTES',
+    oracle_type:  'SPORTS_SEASON',
+    required:     ['COMPETITION'],
+    optional:     [],
+    question:     '¿Llegará la Selección Española a semifinales de {COMPETITION_NAME}?',
+    description:  'Se resuelve SÍ si la Selección Española de fútbol alcanza las semifinales de {COMPETITION_NAME}. Fuente: UEFA / FIFA.',
+    duration_type: 'MONTHLY',
+    initial_prob: [25, 60],
     min_score:    0.60,
   },
 ]

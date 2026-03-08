@@ -13,9 +13,10 @@
 //   R9  Category must be valid
 // ============================================================
 
-import { isDuplicate }         from './marketDeduplicator'
-import { isDeterministic }     from './marketCategories'
-import { CATEGORY_KEYS }       from './marketCategories'
+import { isDuplicate }             from './marketDeduplicator'
+import { isDeterministic }         from './marketCategories'
+import { CATEGORY_KEYS }           from './marketCategories'
+import { regulatoryValidationRule } from '../../lib/engine/regulatoryFilter'
 
 // ─── Rule configs ─────────────────────────────────────────────────────────
 
@@ -159,7 +160,19 @@ function validateCategory(candidate) {
 // ─── Main validator ───────────────────────────────────────────────────────
 
 export async function validateCandidate(candidate) {
+  // R0 — Regulatory compliance (CNMV). Runs first, short-circuits all other checks.
+  const r0 = regulatoryValidationRule(candidate)
+  if (!r0.passed) {
+    return {
+      valid:    false,
+      failures: [r0],
+      passed:   0,
+      total:    1,
+    }
+  }
+
   const ruleResults = [
+    r0,
     validateSources(candidate),
     validateCoverage(candidate),
     validateEntityImportance(candidate),
