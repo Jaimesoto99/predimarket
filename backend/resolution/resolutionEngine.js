@@ -15,8 +15,14 @@ import {
   resolveFootball,
   resolveINEData,
   resolveBOEPublication,
+  getOracleCredibility,
 } from './resolutionSources'
-import { transitionMarket } from '../markets/marketLifecycle'
+import { transitionMarket }         from '../markets/marketLifecycle'
+import { extractEvidence }          from './evidenceExtractor'
+import { logResolution }            from './resolutionLogger'
+
+// Minimum oracle credibility required to resolve a market
+const MIN_ORACLE_CREDIBILITY = 0.85
 
 function getSupabase() {
   return createClient(
@@ -122,17 +128,44 @@ async function routeToOracle(market) {
 export async function resolveMarket(market) {
   const supabase = getSupabase()
 
+  // 1. Query oracle
   const oracleResult = await routeToOracle(market)
 
   if (!oracleResult) {
+    await logResolution({
+      marketId:  market.id,
+      question:  market.title,
+      outcome:   null,
+      status:    'ORACLE_UNAVAILABLE',
+    })
+    return { marketId: market.id, title: market.title, status: 'ORACLE_UNAVAILABLE' }
+  }
+
+  // 2. Trust threshold — only resolve if oracle credibility ≥ MIN_ORACLE_CREDIBILITY
+  const credibility = getOracleCredibility(oracleResult.source)
+  if (credibility < MIN_ORACLE_CREDIBILITY) {
+    await logResolution({
+      marketId:          market.id,
+      question:          market.title,
+      outcome:           oracleResult.outcome,
+      oracleSource:      oracleResult.source,
+      oracleValue:       oracleResult.value,
+      oracleCredibility: credibility,
+      status:            'TRUST_FAILED',
+    })
     return {
-      marketId: market.id,
-      title:    market.title,
-      status:   'ORACLE_UNAVAILABLE',
+      marketId:    market.id,
+      title:       market.title,
+      status:      'TRUST_FAILED',
+      credibility,
+      minRequired: MIN_ORACLE_CREDIBILITY,
     }
   }
 
-  // Call existing resolve_market_manual RPC
+  // 3. Extract supporting evidence from recent articles
+  const evidence = await extractEvidence(market, { sinceHours: 72, maxItems: 5 })
+
+  // 4. Resolve in DB via RPC
   const { error: rErr } = await supabase.rpc('resolve_market_manual', {
     p_market_id: market.id,
     p_outcome:   oracleResult.outcome,
@@ -140,30 +173,67 @@ export async function resolveMarket(market) {
   })
 
   if (rErr) {
+    await logResolution({
+      marketId:          market.id,
+      question:          market.title,
+      outcome:           oracleResult.outcome,
+      oracleSource:      oracleResult.source,
+      oracleValue:       oracleResult.value,
+      oracleCredibility: credibility,
+      evidence,
+      status:            'ERROR',
+    })
     return { marketId: market.id, status: 'ERROR', error: rErr.message }
   }
 
-  // Distribute winnings
+  // 5. Distribute winnings
   try {
     await supabase.rpc('distribute_winnings', { p_market_id: market.id })
   } catch (e) {
     console.error('[resolutionEngine] distribute_winnings error:', e.message)
   }
 
-  // Lifecycle: CLOSING → RESOLVED
+  // 6. Store resolution evidence on the market record
+  try {
+    await supabase
+      .from('markets')
+      .update({
+        resolution_source:   oracleResult.source,
+        resolution_evidence: evidence,
+        resolution_value:    oracleResult.value,
+      })
+      .eq('id', market.id)
+  } catch (e) { /* non-critical — columns may not exist yet */ }
+
+  // 7. Lifecycle: CLOSING → RESOLVED
   await transitionMarket(market.id, 'RESOLVED', {
     triggeredBy: 'oracle',
     reason:      `Oracle: ${oracleResult.source.slice(0, 100)}`,
-    metadata:    { outcome: oracleResult.outcome, value: oracleResult.value },
+    metadata:    { outcome: oracleResult.outcome, value: oracleResult.value, credibility },
+  })
+
+  // 8. Log resolution
+  await logResolution({
+    marketId:          market.id,
+    question:          market.title,
+    outcome:           oracleResult.outcome,
+    oracleSource:      oracleResult.source,
+    oracleValue:       oracleResult.value,
+    oracleCredibility: credibility,
+    evidence,
+    status:            'RESOLVED',
+    resolvedAt:        new Date().toISOString(),
   })
 
   return {
-    marketId:  market.id,
-    title:     market.title,
-    status:    'RESOLVED',
-    outcome:   oracleResult.outcome,
-    source:    oracleResult.source,
-    value:     oracleResult.value,
+    marketId:    market.id,
+    title:       market.title,
+    status:      'RESOLVED',
+    outcome:     oracleResult.outcome,
+    source:      oracleResult.source,
+    value:       oracleResult.value,
+    credibility,
+    evidence:    evidence.length,
   }
 }
 
@@ -207,6 +277,12 @@ export async function resolveClosingMarkets() {
           await transitionMarket(market.id, 'ARCHIVED', {
             triggeredBy: 'scheduler',
             reason:      'Oracle unavailable after 24h — refunded',
+          })
+          await logResolution({
+            marketId: market.id,
+            question: market.title,
+            outcome:  null,
+            status:   'EXPIRED',
           })
           refunded.push(market.id)
         } catch (e) {

@@ -184,7 +184,7 @@ export async function resolveBOEPublication(keywords) {
     if (!res.ok) return null
     const xml    = await res.text()
     const today  = new Date().toISOString().split('T')[0]
-    const titles = [...xml.matchAll(/<title>(?:<!\\[CDATA\\[)?([^<]+)(?:\\]\\]>)?<\/title>/gi)]
+    const titles = [...xml.matchAll(/<title>(?:<!\[CDATA\[)?([^<\]]+)(?:\]\]>)?<\/title>/gi)]
       .map(m => m[1].trim().toLowerCase())
 
     // Check if any BOE item today mentions the keywords
@@ -202,6 +202,33 @@ export async function resolveBOEPublication(keywords) {
     console.error('[resolutionSources] BOE:', err.message)
     return null
   }
+}
+
+// ─── Oracle credibility scores (0–1) ─────────────────────────────────────
+// Used by the trust threshold check before a market is resolved.
+// A market only resolves if its oracle credibility ≥ MIN_ORACLE_CREDIBILITY.
+
+export const ORACLE_CREDIBILITY = {
+  'Yahoo Finance':        0.95,
+  'CoinGecko':            0.90,
+  'REE apidatos':         1.00,
+  'preciodelaluz.org':    0.85,
+  'football-data.org':    0.90,
+  'INE':                  1.00,
+  'BOE':                  1.00,
+  'ECB':                  1.00,
+  'Banco de España':      1.00,
+  'AEMET':                0.95,
+  'default':              0.70,
+}
+
+export function getOracleCredibility(source) {
+  if (!source) return ORACLE_CREDIBILITY.default
+  for (const [key, score] of Object.entries(ORACLE_CREDIBILITY)) {
+    if (key === 'default') continue
+    if (source.toLowerCase().includes(key.toLowerCase())) return score
+  }
+  return ORACLE_CREDIBILITY.default
 }
 
 // ─── Source registry by oracle_type ──────────────────────────────────────
