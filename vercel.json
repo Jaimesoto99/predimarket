@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/engine/run?job=all",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/resolve-markets",
       "schedule": "40 17 * * 1-5"
     }
