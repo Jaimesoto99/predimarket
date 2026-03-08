@@ -308,6 +308,7 @@ export default function Home() {
         showResolved={showResolved}
         setShowResolved={setShowResolved}
         onOpen={openTradeModal}
+        onTrade={(market, side) => { openTradeModal(market); setTradeSide(side) }}
         filter={filter}
         setFilter={setFilter}
         catFilter={catFilter}

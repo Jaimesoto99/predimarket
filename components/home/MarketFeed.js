@@ -10,6 +10,7 @@ export default function MarketFeed({
   showResolved,
   setShowResolved,
   onOpen,
+  onTrade,
   filter,
   setFilter,
   catFilter,
@@ -32,7 +33,7 @@ export default function MarketFeed({
       <div style={{ marginTop: 20 }}>
         {isUnfiltered && !loading ? (
           <>
-            <HomeSections markets={activeMarkets} onOpen={onOpen} />
+            <HomeSections markets={activeMarkets} onOpen={onOpen} onTrade={onTrade} />
             {/* Full list below sections with a divider */}
             <div style={{
               fontSize: 11, fontWeight: 600, letterSpacing: '0.07em',

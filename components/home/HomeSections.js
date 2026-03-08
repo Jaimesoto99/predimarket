@@ -19,7 +19,7 @@ function durationHours(market) {
 // ─── HomeSections ─────────────────────────────────────────────────────────
 // Pure client-side filtering — uses the markets array already loaded by useMarkets().
 
-export default function HomeSections({ markets, onOpen }) {
+export default function HomeSections({ markets, onOpen, onTrade }) {
   const now   = Date.now()
   const in24h = now + 24 * 3600000
 
@@ -86,19 +86,28 @@ export default function HomeSections({ markets, onOpen }) {
       .slice(0, 8)
   )
 
+  // 0. Featured (highest priority, before all others)
+  const featured = unique(
+    active
+      .filter(m => m.featured === true)
+      .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0))
+      .slice(0, 5)
+  )
+
   const hasAnySections =
-    resolvingToday.length > 0 || fastMarkets.length > 0 ||
+    featured.length > 0 || resolvingToday.length > 0 || fastMarkets.length > 0 ||
     trending.length > 0 || popular.length > 0 || espana.length > 0
 
   if (!hasAnySections) return null
 
   return (
     <div>
-      <MarketSection icon="🔥" title="Resuelven hoy"    markets={resolvingToday} onOpen={onOpen} />
-      <MarketSection icon="⚡" title="Mercados rápidos" markets={fastMarkets}    onOpen={onOpen} />
-      <MarketSection icon="📈" title="Trending"          markets={trending}       onOpen={onOpen} />
-      <MarketSection icon="⭐" title="Más populares"     markets={popular}        onOpen={onOpen} />
-      <MarketSection icon="🇪🇸" title="España"           markets={espana}         onOpen={onOpen} />
+      <MarketSection icon="⭐" title="Destacados"        markets={featured}       onOpen={onOpen} onTrade={onTrade} />
+      <MarketSection icon="🔥" title="Resuelven hoy"    markets={resolvingToday} onOpen={onOpen} onTrade={onTrade} />
+      <MarketSection icon="⚡" title="Mercados rápidos" markets={fastMarkets}    onOpen={onOpen} onTrade={onTrade} />
+      <MarketSection icon="📈" title="Trending"          markets={trending}       onOpen={onOpen} onTrade={onTrade} />
+      <MarketSection icon="🏆" title="Más populares"     markets={popular}        onOpen={onOpen} onTrade={onTrade} />
+      <MarketSection icon="🇪🇸" title="España"           markets={espana}         onOpen={onOpen} onTrade={onTrade} />
     </div>
   )
 }

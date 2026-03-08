@@ -178,6 +178,41 @@ export async function rejectExpiredCandidates() {
   return { rejected: expired.length }
 }
 
+// Archive ACTIVE markets with 0 trades that are older than 48 hours
+// These are "dead" markets that never attracted any liquidity.
+export async function archiveDeadMarkets() {
+  const supabase = getSupabase()
+  const cutoff   = new Date(Date.now() - 48 * 3600000).toISOString()
+
+  // Find ACTIVE markets older than 48h
+  const { data: candidates, error } = await supabase
+    .from('markets')
+    .select('id, title, created_at, total_volume')
+    .eq('status', 'ACTIVE')
+    .lt('created_at', cutoff)
+    .gt('close_date', new Date().toISOString())  // not yet expired — that's handled by closeExpiredMarkets
+
+  if (error || !candidates?.length) return { archived: 0 }
+
+  // Filter to markets with no trades (total_volume = 0 or null)
+  const dead = candidates.filter(m => !m.total_volume || parseFloat(m.total_volume) === 0)
+  if (!dead.length) return { archived: 0 }
+
+  let archived = 0
+  for (const market of dead) {
+    const result = await transitionMarket(market.id, 'ARCHIVED', {
+      triggeredBy: 'scheduler',
+      reason:      'No trades after 48h — dead market protection',
+    })
+    if (result.success) {
+      archived++
+      console.log('[lifecycle] archived dead market:', market.title?.slice(0, 60))
+    }
+  }
+
+  return { archived, checked: candidates.length }
+}
+
 // ─── Get lifecycle history for a market ──────────────────────────────────
 
 export async function getLifecycleHistory(marketId) {
