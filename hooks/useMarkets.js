@@ -175,19 +175,25 @@ const EXAMPLE_PLACEHOLDERS = [
   },
 ]
 
-export default function useMarkets() {
+export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
   const [markets, setMarkets] = useState([])
   const [resolvedMarkets, setResolvedMarkets] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadMarkets()
+  }, [catFilter, typeFilter])
+
+  useEffect(() => {
     loadResolvedMarkets()
   }, [])
 
   async function loadMarkets() {
     setLoading(true)
-    const data = await getActiveMarkets()
+    const options = {}
+    if (catFilter !== 'ALL')  options.catFilter  = catFilter
+    if (typeFilter !== 'ALL') options.typeFilter = typeFilter
+    const data = await getActiveMarkets(options)
     const enriched = data.map(m => ({
       ...m,
       prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),

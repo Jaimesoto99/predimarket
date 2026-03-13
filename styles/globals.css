@@ -210,6 +210,23 @@ html * { transition: background-color 0.15s ease, border-color 0.15s ease, color
   outline-offset: 2px;
 }
 
+/* ─── Trending row & filter pills — scrollable on all sizes ─────────────────── */
+.trending-row {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap !important;
+}
+.trending-row::-webkit-scrollbar { display: none }
+.trending-row { -ms-overflow-style: none; scrollbar-width: none }
+
+.filter-pills {
+  overflow-x: auto;
+  flex-wrap: nowrap !important;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-pills::-webkit-scrollbar { display: none }
+.filter-pills { -ms-overflow-style: none; scrollbar-width: none }
+
 /* ─── Mobile responsive fixes ───────────────────────────────────────────────── */
 @media (max-width: 768px) {
   /* Trading modal fullscreen on mobile */

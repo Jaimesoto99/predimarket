@@ -189,7 +189,7 @@ export default function TradePanel({
           ) : !tradeImpact         ? 'Calculando...'
             : !tradeImpact.valid   ? tradeImpact.error
             : tradeAmount > (user?.balance || 0) ? 'Saldo insuficiente'
-            : `Comprar ${tradeSide === 'YES' ? 'SÍ' : 'NO'} · €${tradeAmount}`
+            : `Comprar ${tradeSide === 'YES' ? 'SÍ' : 'NO'} a ${tradeSide === 'YES' ? market.prices?.yes : market.prices?.no}¢ · €${tradeAmount}`
           }
         </button>
       ) : (

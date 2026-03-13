@@ -68,7 +68,7 @@ export default function Home() {
   const [toast, setToast] = useState(null)
 
   // ─── Hooks ────────────────────────────────────────────────────────────────
-  const { markets, resolvedMarkets, loading, loadMarkets } = useMarkets()
+  const { markets, resolvedMarkets, loading, loadMarkets } = useMarkets(catFilter, filter)
   const { userTrades, openTrades, loadUserTrades, handleSell } = useTrades({ user, setUser, onRefreshMarkets: loadMarkets })
   const { leaderboard, loadLeaderboard } = useLeaderboard()
   const { isWatching, toggleWatch, alertCount } = useWatchlist(user)
@@ -178,7 +178,11 @@ export default function Home() {
       setTradeAmount(10)
       loadUserTrades(user.email)
       loadMarkets()
-      showToast(`Orden ejecutada: ${tradeSide === 'YES' ? 'SÍ' : 'NO'} €${tradeAmount}`)
+      if (result.matched) {
+        showToast(`Orden ejecutada: ${tradeSide === 'YES' ? 'SÍ' : 'NO'} €${tradeAmount} ✓`)
+      } else {
+        showToast(`Orden colocada. Esperando contraparte.`)
+      }
     } else {
       showToast(result.error || 'Error al ejecutar orden', 'error')
     }
