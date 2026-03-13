@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://predimarket-new.vercel.app/sitemap.xml

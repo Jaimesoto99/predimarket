@@ -32,13 +32,18 @@ export default async function handler(req, res) {
 
   const startedAt = Date.now()
 
+  const TIMEOUT = 50000
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Engine timeout')), TIMEOUT)
+  )
+
   try {
     let result
 
     if (jobName === 'all') {
-      result = await runAllDueJobs()
+      result = await Promise.race([runAllDueJobs(), timeoutPromise])
     } else {
-      const single = await runJob(jobName, force)
+      const single = await Promise.race([runJob(jobName, force), timeoutPromise])
       result = [single]
     }
 
