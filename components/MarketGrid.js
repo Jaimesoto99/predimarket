@@ -150,10 +150,11 @@ export default function MarketGrid({
   sortedByTraders.slice(0, 3).forEach(m => { if (!labelMap[m.id]) labelMap[m.id] = 'HOT' })
   newMarkets.forEach(m => { if (!labelMap[m.id]) labelMap[m.id] = 'NEW' })
 
-  // Sort: markets with activity first, 0-volume at end
+  // Sort: markets with activity first, 0-volume at end. Never render placeholders.
+  const realMarkets = filtered.filter(m => !m.placeholder)
   const sortedFiltered = [
-    ...filtered.filter(m => m.placeholder || (m.total_volume || 0) > 0 || (m.active_traders || 0) > 0),
-    ...filtered.filter(m => !m.placeholder && (m.total_volume || 0) === 0 && (m.active_traders || 0) === 0),
+    ...realMarkets.filter(m => (m.total_volume || 0) > 0 || (m.active_traders || 0) > 0),
+    ...realMarkets.filter(m => (m.total_volume || 0) === 0 && (m.active_traders || 0) === 0),
   ]
 
   const visible = sortedFiltered.slice(0, visibleCount)
@@ -193,13 +194,11 @@ export default function MarketGrid({
         </div>
       ) : (
         <>
-          <SectionLabel count={realFiltered.length}>Mercados activos</SectionLabel>
+          <SectionLabel count={sortedFiltered.length}>Mercados activos</SectionLabel>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {visible.map(m => (
-              m.placeholder
-                ? <PlaceholderCard key={m.id} market={m} />
-                : <MarketCard key={m.id} market={m} onOpen={onOpen} label={labelMap[m.id]} />
+              <MarketCard key={m.id} market={m} onOpen={onOpen} label={labelMap[m.id]} />
             ))}
           </div>
 

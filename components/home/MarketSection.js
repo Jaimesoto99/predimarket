@@ -57,7 +57,7 @@ function MiniCard({ market, onOpen, onTrade }) {
             fontVariantNumeric: 'tabular-nums',
             color: closeInfo.isExpired ? C.warning : closeInfo.isUrgent ? C.no : C.textDim,
           }}>
-            {closeInfo.isExpired ? 'Resolviendo...' : closeInfo.isUrgent && closeInfo.countdown === '¡Última hora!' ? '¡Última hora!' : closeInfo.countdown}
+            {closeInfo.isExpired ? 'Resolviendo...' : closeInfo.countdown}
           </div>
         </div>
 

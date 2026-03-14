@@ -57,7 +57,7 @@ export default function ResolutionCountdown({ market, size = 'md' }) {
           whiteSpace: 'nowrap',
           letterSpacing: '-0.01em',
         }}>
-          {isExpired ? 'Resolviendo...' : isUrgent && countdown === '¡Última hora!' ? '¡Última hora!' : `Quedan ${countdown}`}
+          {isExpired ? 'Resolviendo...' : isUrgent ? countdown : `Quedan ${countdown}`}
         </span>
       </div>
     </div>
