@@ -1,4 +1,5 @@
 import { C, getCategoryColor, getCategoryLabel, getTimeLeft, getTypeLabel, getOracleDescription } from '../lib/theme'
+import useTick from '../hooks/useTick'
 
 function ProbBar({ pct }) {
   const color = pct > 60 ? C.yes : pct < 40 ? C.no : C.warning
@@ -14,9 +15,10 @@ function ProbBar({ pct }) {
 }
 
 export default function MarketCard({ market, onOpen, label }) {
+  useTick()  // re-render every minute so countdown stays live
   const yesP      = parseFloat(market.prices?.yes || 50)
   const catColor  = getCategoryColor(market.category)
-  const timeLeft  = getTimeLeft(market.close_date)
+  const timeLeft  = getTimeLeft(market.resolution_time || market.close_date)
   const oracle    = getOracleDescription(market)
   const volume    = market.total_volume || 0
   const liquidity = Math.min(
@@ -46,6 +48,17 @@ export default function MarketCard({ market, onOpen, label }) {
         cursor: 'pointer', overflow: 'hidden',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
+        transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.12s',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = C.cardBorderHover
+        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'
+        e.currentTarget.style.transform = 'translateY(-1px)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = C.cardBorder
+        e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.transform = 'translateY(0)'
       }}>
 
       {/* Category strip */}
@@ -92,8 +105,8 @@ export default function MarketCard({ market, onOpen, label }) {
             )}
             <span style={{
               marginLeft: 'auto', fontSize: 10,
-              color: isUrgent ? C.warning : C.textDim,
-              fontWeight: isUrgent ? 600 : 400,
+              color: timeLeft === 'Resolviendo...' ? C.warning : isUrgent ? C.warning : C.textDim,
+              fontWeight: (timeLeft === 'Resolviendo...' || isUrgent) ? 600 : 400,
               fontVariantNumeric: 'tabular-nums',
               flexShrink: 0,
             }}>

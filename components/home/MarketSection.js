@@ -1,8 +1,10 @@
 import { C, getCategoryColor, getTimeLeft } from '../../lib/theme'
+import useTick from '../../hooks/useTick'
 
 // ─── Mini card for horizontal scroll sections ─────────────────────────────
 
 function MiniCard({ market, onOpen, onTrade }) {
+  useTick()
   const yesP      = parseFloat(market.prices?.yes || 50)
   const catColor  = getCategoryColor(market.category)
   const timeLeft  = getTimeLeft(market.resolution_time || market.close_date)

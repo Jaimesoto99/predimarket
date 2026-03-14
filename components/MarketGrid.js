@@ -142,8 +142,14 @@ export default function MarketGrid({
   sortedByTraders.slice(0, 3).forEach(m => { if (!labelMap[m.id]) labelMap[m.id] = 'HOT' })
   newMarkets.forEach(m => { if (!labelMap[m.id]) labelMap[m.id] = 'NEW' })
 
-  const visible = filtered.slice(0, visibleCount)
-  const hasMore = visibleCount < filtered.length
+  // Sort: markets with activity first, 0-volume at end
+  const sortedFiltered = [
+    ...filtered.filter(m => m.placeholder || (m.total_volume || 0) > 0 || (m.active_traders || 0) > 0),
+    ...filtered.filter(m => !m.placeholder && (m.total_volume || 0) === 0 && (m.active_traders || 0) === 0),
+  ]
+
+  const visible = sortedFiltered.slice(0, visibleCount)
+  const hasMore = visibleCount < sortedFiltered.length
 
   return (
     <div style={{ padding: '0 0 48px' }}>

@@ -190,22 +190,28 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
 
   async function loadMarkets() {
     setLoading(true)
-    const options = {}
-    if (catFilter !== 'ALL')  options.catFilter  = catFilter
-    if (typeFilter !== 'ALL') options.typeFilter = typeFilter
-    const data = await getActiveMarkets(options)
-    const enriched = data.map(m => ({
-      ...m,
-      prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
-      isExpired: new Date(m.close_date) < new Date(),
-    }))
+    try {
+      const options = {}
+      if (catFilter !== 'ALL')  options.catFilter  = catFilter
+      if (typeFilter !== 'ALL') options.typeFilter = typeFilter
+      const data = await getActiveMarkets(options)
+      const enriched = data.map(m => ({
+        ...m,
+        prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
+        isExpired: new Date(m.close_date) < new Date(),
+      }))
 
-    const nonExpiredCount = enriched.filter(m => !m.isExpired).length
-    const fillerCount = Math.max(0, 15 - nonExpiredCount)
-    const fillers = EXAMPLE_PLACEHOLDERS.slice(0, fillerCount)
+      const nonExpiredCount = enriched.filter(m => !m.isExpired).length
+      const fillerCount = Math.max(0, 15 - nonExpiredCount)
+      const fillers = EXAMPLE_PLACEHOLDERS.slice(0, fillerCount)
 
-    setMarkets([...enriched, ...fillers])
-    setLoading(false)
+      setMarkets([...enriched, ...fillers])
+    } catch (err) {
+      console.error('[useMarkets] loadMarkets error:', err)
+      setMarkets(EXAMPLE_PLACEHOLDERS.slice(0, 15))
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function loadResolvedMarkets() {

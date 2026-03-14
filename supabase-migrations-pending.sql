@@ -3,6 +3,31 @@
 -- Ejecutar en Supabase SQL Editor en el orden indicado.
 -- ============================================================
 
+-- ─── 0. Limpiar caracteres UTF-8 corruptos (◆ y similares) ─────────────────
+-- Ejecutar PRIMERO. Limpia títulos, descripciones y resolution_source de mercados.
+
+UPDATE markets SET
+  title = REGEXP_REPLACE(
+    REPLACE(REPLACE(REPLACE(title, '◆', ''), chr(65533), ''), '', ''),
+    '\s{2,}', ' ', 'g'
+  ),
+  description = REGEXP_REPLACE(
+    REPLACE(REPLACE(REPLACE(COALESCE(description,''), '◆', ''), chr(65533), ''), '', ''),
+    '\s{2,}', ' ', 'g'
+  ),
+  resolution_source = REGEXP_REPLACE(
+    REPLACE(REPLACE(REPLACE(COALESCE(resolution_source,''), '◆', ''), chr(65533), ''), '', ''),
+    '\s{2,}', ' ', 'g'
+  )
+WHERE
+  title            LIKE '%◆%' OR title            LIKE '%' || chr(65533) || '%'
+  OR description   LIKE '%◆%' OR description   LIKE '%' || chr(65533) || '%'
+  OR resolution_source LIKE '%◆%' OR resolution_source LIKE '%' || chr(65533) || '%';
+
+-- Verificar cuántos registros quedan sucios tras la limpieza:
+-- SELECT COUNT(*) FROM markets WHERE title LIKE '%◆%' OR description LIKE '%◆%';
+
+
 -- ─── 1. match_orders RPC ─────────────────────────────────────────────────────
 -- Busca pares YES/NO que se cruzan (bid_yes + bid_no >= 1.00) y los ejecuta.
 -- PrediMarket cobra 2% de comisión del total del contrato (1€).

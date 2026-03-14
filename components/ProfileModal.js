@@ -141,7 +141,7 @@ export default function ProfileModal({ user, userTrades, onClose, onShowKYC }) {
             }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 500, color: C.warning }}>Exposición abierta</div>
-                <div style={{ fontSize: 11, color: C.textDim }}>{openTrades.length} posiciones · €{totalInvested.toFixed(0)} en juego</div>
+                <div style={{ fontSize: 11, color: C.textDim }}>{openTrades.length} posiciones · €{totalInvested.toFixed(0)} en exposición</div>
               </div>
               <span style={badge(C.warning)}>ABIERTO</span>
             </div>

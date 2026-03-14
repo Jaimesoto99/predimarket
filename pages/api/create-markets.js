@@ -156,6 +156,39 @@ function getObjectiveMarkets(prices = {}) {
     category: 'POLITICA', type: 'SEMANAL', hours: hoursToEndOfWeek,
   })
 
+  // ── SOCIEDAD ──────────────────────────────────────────────────────────
+  markets.push(
+    {
+      title: '¿La gasolina 95 supera los 1,60 €/L esta semana?',
+      description: 'Se resuelve SÍ si el precio medio nacional de la gasolina 95 sin plomo supera 1,60 €/litro en algún día de esta semana. Fuente: Geoportal Gasolineras del Ministerio para la Transición Ecológica (geoportalgasolineras.es). Dato oficial diario.',
+      category: 'SOCIEDAD', type: 'SEMANAL', hours: hoursToEndOfWeek,
+    },
+    {
+      title: '¿El paro registrado baja en el último dato mensual del SEPE?',
+      description: 'Se resuelve SÍ si el informe mensual de paro registrado del SEPE muestra una variación negativa respecto al mes anterior. Fuente: SEPE (sepe.es) — datos mensuales de empleo. Resolución al publicarse el informe del mes en curso.',
+      category: 'SOCIEDAD', type: 'MENSUAL', hours: hoursToEndOfMonth,
+    },
+    {
+      title: '¿Se registra temperatura superior a 38°C en alguna capital española esta semana?',
+      description: 'Se resuelve SÍ si AEMET registra una temperatura máxima superior a 38°C en alguna capital de provincia española durante esta semana. Fuente: AEMET Open Data (opendata.aemet.es). Dato oficial verificable.',
+      category: 'SOCIEDAD', type: 'SEMANAL', hours: hoursToEndOfWeek,
+    }
+  )
+
+  // ── TRANSPORTE ────────────────────────────────────────────────────────
+  markets.push(
+    {
+      title: '¿Renfe reporta más de 50 trenes con retraso superior a 15 minutos esta semana?',
+      description: 'Se resuelve SÍ si el informe semanal de puntualidad de Renfe indica más de 50 servicios con retraso superior a 15 minutos durante esta semana. Fuente: Renfe — estadísticas de puntualidad (renfe.com/es/es/cercanias/informacion/puntualidad.html).',
+      category: 'SOCIEDAD', type: 'SEMANAL', hours: hoursToEndOfWeek,
+    },
+    {
+      title: '¿AENA registra más de 200 vuelos cancelados esta semana?',
+      description: 'Se resuelve SÍ si el sistema de seguimiento de vuelos de AENA registra más de 200 vuelos cancelados en aeropuertos españoles durante esta semana. Fuente: AENA estadísticas de operaciones (estadisticas.aena.es). Dato público.',
+      category: 'SOCIEDAD', type: 'SEMANAL', hours: hoursToEndOfWeek,
+    }
+  )
+
   // ── ENERGÍA (Brent) ───────────────────────────────────────────────────
   if (brentThreshold) {
     const brentCurrent = prices.brent.toFixed(2)
