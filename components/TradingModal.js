@@ -46,7 +46,7 @@ export default function TradingModal({
           {/* ── MarketHeader ─────────────────────────────────────────────── */}
           <MarketHeader market={market} onClose={onClose} />
 
-          <div style={{ padding: '24px 28px' }}>
+          <div className="trading-modal-scroll" style={{ padding: '24px 28px' }}>
 
             {/* ── PriceChart ───────────────────────────────────────────────── */}
             {priceHistory.length > 1 && (

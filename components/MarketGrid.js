@@ -118,7 +118,15 @@ export default function MarketGrid({
   onOpen,
 }) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
+  const [loadingTooLong, setLoadingTooLong] = useState(false)
   const sentinelRef = useRef(null)
+
+  // 10s fallback: show error if still loading after 10 seconds
+  useEffect(() => {
+    if (!loading) { setLoadingTooLong(false); return }
+    const t = setTimeout(() => setLoadingTooLong(true), 10000)
+    return () => clearTimeout(t)
+  }, [loading])
 
   useEffect(() => { setVisibleCount(INITIAL_VISIBLE) }, [filtered.length])
 
@@ -156,10 +164,28 @@ export default function MarketGrid({
 
       {/* Loading */}
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <SectionLabel>Cargando mercados...</SectionLabel>
-          {[0,1,2,3,4,5].map(i => <SkeletonRow key={i} />)}
-        </div>
+        loadingTooLong ? (
+          <div style={{ textAlign: 'center', padding: '80px 0' }}>
+            <div style={{ fontSize: 14, color: C.textDim, marginBottom: 16 }}>
+              No se pudieron cargar los mercados.
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                fontSize: 13, fontWeight: 600,
+                background: C.text, color: C.card,
+                border: 'none', borderRadius: 8,
+                padding: '10px 20px', cursor: 'pointer',
+              }}>
+              Recarga la página
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <SectionLabel>Cargando mercados...</SectionLabel>
+            {[0,1,2,3,4,5].map(i => <SkeletonRow key={i} />)}
+          </div>
+        )
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '80px 0', color: C.textDim }}>
           <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.4 }}>○</div>
