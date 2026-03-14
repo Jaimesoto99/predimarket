@@ -1,4 +1,4 @@
-import { C, getCategoryColor, getTimeLeft } from '../../lib/theme'
+import { C, getCategoryColor, getCloseInfo } from '../../lib/theme'
 import useTick from '../../hooks/useTick'
 
 // ─── Mini card for horizontal scroll sections ─────────────────────────────
@@ -7,7 +7,7 @@ function MiniCard({ market, onOpen, onTrade }) {
   useTick()
   const yesP      = parseFloat(market.prices?.yes || 50)
   const catColor  = getCategoryColor(market.category)
-  const timeLeft  = getTimeLeft(market.resolution_time || market.close_date)
+  const closeInfo = getCloseInfo(market.resolution_time || market.close_date)
   const probColor = yesP > 60 ? C.yes : yesP < 40 ? C.no : C.warning
   const traders   = market.trader_count ?? market.active_traders ?? market.total_traders ?? 0
 
@@ -46,12 +46,19 @@ function MiniCard({ market, onOpen, onTrade }) {
       <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
 
         {/* Time left */}
-        <div style={{
-          fontSize: 9, fontWeight: 600, color: C.textDim,
-          textTransform: 'uppercase', letterSpacing: '0.06em',
-          marginBottom: 7, fontVariantNumeric: 'tabular-nums',
-        }}>
-          {timeLeft}
+        <div style={{ marginBottom: 7 }}>
+          {closeInfo.dateStr && (
+            <div style={{ fontSize: 8, color: C.textDim, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', marginBottom: 1 }}>
+              Cierra: {closeInfo.dateStr}
+            </div>
+          )}
+          <div style={{
+            fontSize: 9, fontWeight: 600, letterSpacing: '0.06em',
+            fontVariantNumeric: 'tabular-nums',
+            color: closeInfo.isExpired ? C.warning : closeInfo.isUrgent ? C.no : C.textDim,
+          }}>
+            {closeInfo.isExpired ? 'Resolviendo...' : closeInfo.isUrgent && closeInfo.countdown === '¡Última hora!' ? '¡Última hora!' : closeInfo.countdown}
+          </div>
         </div>
 
         {/* Question */}

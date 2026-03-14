@@ -1,4 +1,4 @@
-import { C, getCategoryColor, getCategoryLabel, getTimeLeft, getTypeLabel, getOracleDescription } from '../lib/theme'
+import { C, getCategoryColor, getCategoryLabel, getCloseInfo, getTypeLabel, getOracleDescription } from '../lib/theme'
 import useTick from '../hooks/useTick'
 
 function ProbBar({ pct }) {
@@ -18,7 +18,7 @@ export default function MarketCard({ market, onOpen, label }) {
   useTick()  // re-render every minute so countdown stays live
   const yesP      = parseFloat(market.prices?.yes || 50)
   const catColor  = getCategoryColor(market.category)
-  const timeLeft  = getTimeLeft(market.resolution_time || market.close_date)
+  const closeInfo = getCloseInfo(market.resolution_time || market.close_date)
   const oracle    = getOracleDescription(market)
   const volume    = market.total_volume || 0
   const liquidity = Math.min(
@@ -26,10 +26,7 @@ export default function MarketCard({ market, onOpen, label }) {
     parseFloat(market.no_pool)  || 5000,
   )
 
-  const isUrgent = (() => {
-    const diff = new Date(market.close_date) - new Date()
-    return diff > 0 && diff < 3600000 * 6
-  })()
+  const { dateStr, countdown, isUrgent, isExpired } = closeInfo
 
   const probColor = yesP > 60 ? C.yes : yesP < 40 ? C.no : C.warning
 
@@ -103,15 +100,20 @@ export default function MarketCard({ market, onOpen, label }) {
                 {label === 'TRENDING' ? 'Trending' : label === 'HOT' ? 'Hot' : 'Nuevo'}
               </span>
             )}
-            <span style={{
-              marginLeft: 'auto', fontSize: 10,
-              color: timeLeft === 'Resolviendo...' ? C.warning : isUrgent ? C.warning : C.textDim,
-              fontWeight: (timeLeft === 'Resolviendo...' || isUrgent) ? 600 : 400,
-              fontVariantNumeric: 'tabular-nums',
-              flexShrink: 0,
-            }}>
-              {timeLeft}
-            </span>
+            <div style={{ marginLeft: 'auto', flexShrink: 0, textAlign: 'right' }}>
+              {dateStr && (
+                <div style={{ fontSize: 9, color: C.textDim, fontVariantNumeric: 'tabular-nums', marginBottom: 1 }}>
+                  Cierra: {dateStr}
+                </div>
+              )}
+              <div style={{
+                fontSize: 10, fontVariantNumeric: 'tabular-nums',
+                color: isExpired ? C.warning : isUrgent ? C.no : C.textDim,
+                fontWeight: (isExpired || isUrgent) ? 700 : 400,
+              }}>
+                {countdown}
+              </div>
+            </div>
           </div>
 
           <p style={{
