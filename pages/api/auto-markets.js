@@ -308,7 +308,6 @@ async function upsertMarkets(markets) {
           yes_price:         market.yes_price,
           no_price:          market.no_price,
           status:            'open',
-          created_by:        'auto-markets-bot',
         })
         .select('id')
         .single();
