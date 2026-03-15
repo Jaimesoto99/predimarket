@@ -109,9 +109,13 @@ export default async function handler(req, res) {
   details.push({ phase: 'CREATE_USERS', created: createdUsers.length, total: NUM_USERS })
 
   // Obtener mercados activos y cerrados para tests
-  const { data: allMarkets } = await supabase.from('markets').select('id, status, yes_pool, no_pool, close_date').order('id', { ascending: true }).limit(20)
-  const activeMarkets = (allMarkets || []).filter(m => m.status === 'ACTIVE' && new Date(m.close_date) > new Date())
-  const closedMarkets = (allMarkets || []).filter(m => m.status === 'CLOSED' || new Date(m.close_date) < new Date())
+  const now = new Date().toISOString()
+  const { data: activeMarkets = [] } = await supabase
+    .from('markets').select('id, status, yes_pool, no_pool, close_date')
+    .eq('status', 'ACTIVE').gt('close_date', now).limit(20)
+  const { data: closedMarkets = [] } = await supabase
+    .from('markets').select('id, status, yes_pool, no_pool, close_date')
+    .neq('status', 'ACTIVE').limit(20)
 
   if (activeMarkets.length === 0) {
     return res.status(200).json({ error: 'No hay mercados ACTIVE para el stress test', details })
