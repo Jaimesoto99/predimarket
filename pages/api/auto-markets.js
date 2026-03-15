@@ -139,14 +139,13 @@ function buildMarketsFromData({ ibex, eurusd, btc, eth, meteo, luz }) {
     const threshold = niceThreshold(ibex.price);
     markets.push({
       external_id: `ibex35-above-${threshold}-${today}`,
-      question: `¿Cerrará el IBEX 35 por encima de ${threshold.toLocaleString('es-ES')} puntos hoy?`,
+      title:`¿Cerrará el IBEX 35 por encima de ${threshold.toLocaleString('es-ES')} puntos hoy?`,
       description:
         `El IBEX 35 cotiza actualmente en torno a ${ibex.price.toLocaleString('es-ES')} puntos. ` +
         `Este mercado se resolverá SÍ si el precio de cierre oficial supera los ${threshold.toLocaleString('es-ES')} puntos al finalizar la sesión bursátil de hoy.`,
-      category: 'economia',
-      subcategory: 'bolsa',
+      category: 'ECONOMIA',
       resolution_source: 'Yahoo Finance (^IBEX)',
-      resolution_date: resolutionDate,
+      close_date: resolutionDate,
       threshold,
       direction: 'above',
       ...initialPrices(),
@@ -158,14 +157,13 @@ function buildMarketsFromData({ ibex, eurusd, btc, eth, meteo, luz }) {
     const threshold = niceThreshold(eurusd.price);
     markets.push({
       external_id: `eurusd-above-${threshold}-${today}`,
-      question: `¿Cerrará el EUR/USD por encima de ${threshold} hoy?`,
+      title:`¿Cerrará el EUR/USD por encima de ${threshold} hoy?`,
       description:
         `El par EUR/USD cotiza actualmente en ${eurusd.price.toFixed(4)}. ` +
         `Este mercado se resolverá SÍ si el tipo de cambio de cierre supera ${threshold}.`,
-      category: 'economia',
-      subcategory: 'divisas',
+      category: 'ECONOMIA',
       resolution_source: 'Yahoo Finance (EURUSD=X)',
-      resolution_date: resolutionDate,
+      close_date: resolutionDate,
       threshold,
       direction: 'above',
       ...initialPrices(),
@@ -178,14 +176,13 @@ function buildMarketsFromData({ ibex, eurusd, btc, eth, meteo, luz }) {
     const threshold = niceThreshold(price);
     markets.push({
       external_id: `btc-above-${threshold}-${today}`,
-      question: `¿Cerrará Bitcoin por encima de $${threshold.toLocaleString('en-US')} hoy?`,
+      title:`¿Cerrará Bitcoin por encima de $${threshold.toLocaleString('en-US')} hoy?`,
       description:
         `Bitcoin cotiza actualmente en torno a $${price.toLocaleString('en-US')}. ` +
         `Este mercado se resolverá SÍ si el precio de cierre (00:00 UTC) supera los $${threshold.toLocaleString('en-US')}.`,
-      category: 'cripto',
-      subcategory: 'bitcoin',
+      category: 'CRIPTO',
       resolution_source: 'CoinGecko (bitcoin)',
-      resolution_date: resolutionDate,
+      close_date: resolutionDate,
       threshold,
       direction: 'above',
       ...initialPrices(),
@@ -198,14 +195,13 @@ function buildMarketsFromData({ ibex, eurusd, btc, eth, meteo, luz }) {
     const threshold = niceThreshold(price);
     markets.push({
       external_id: `eth-above-${threshold}-${today}`,
-      question: `¿Cerrará Ethereum por encima de $${threshold.toLocaleString('en-US')} hoy?`,
+      title:`¿Cerrará Ethereum por encima de $${threshold.toLocaleString('en-US')} hoy?`,
       description:
         `Ethereum cotiza actualmente en torno a $${price.toLocaleString('en-US')}. ` +
         `Este mercado se resolverá SÍ si el precio de cierre (00:00 UTC) supera los $${threshold.toLocaleString('en-US')}.`,
-      category: 'cripto',
-      subcategory: 'ethereum',
+      category: 'CRIPTO',
       resolution_source: 'CoinGecko (ethereum)',
-      resolution_date: resolutionDate,
+      close_date: resolutionDate,
       threshold,
       direction: 'above',
       ...initialPrices(),
@@ -217,14 +213,13 @@ function buildMarketsFromData({ ibex, eurusd, btc, eth, meteo, luz }) {
     const threshold = niceThreshold(meteo.tempMax);
     markets.push({
       external_id: `madrid-tempmax-above-${threshold}-${today}`,
-      question: `¿Superará la temperatura máxima en Madrid los ${threshold}°C hoy?`,
+      title:`¿Superará la temperatura máxima en Madrid los ${threshold}°C hoy?`,
       description:
         `La previsión de temperatura máxima para Madrid hoy es de ${meteo.tempMax}°C. ` +
         `Este mercado se resolverá SÍ si la temperatura máxima registrada supera los ${threshold}°C según Open-Meteo.`,
-      category: 'tiempo',
-      subcategory: 'temperatura',
+      category: 'CLIMA',
       resolution_source: 'Open-Meteo (Madrid)',
-      resolution_date: resolutionDate,
+      close_date: resolutionDate,
       threshold,
       direction: 'above',
       ...initialPrices(),
@@ -236,14 +231,13 @@ function buildMarketsFromData({ ibex, eurusd, btc, eth, meteo, luz }) {
     const willRain = meteo.precipitation > 0;
     markets.push({
       external_id: `madrid-rain-${today}`,
-      question: `¿Lloverá en Madrid hoy?`,
+      title:`¿Lloverá en Madrid hoy?`,
       description:
         `La previsión de precipitación para Madrid hoy es de ${meteo.precipitation} mm. ` +
         `Este mercado se resolverá SÍ si la precipitación acumulada supera 0 mm según Open-Meteo.`,
-      category: 'tiempo',
-      subcategory: 'precipitacion',
+      category: 'CLIMA',
       resolution_source: 'Open-Meteo (Madrid)',
-      resolution_date: resolutionDate,
+      close_date: resolutionDate,
       threshold: 0,
       direction: 'above',
       // Precio inicial sesgado por la previsión
@@ -257,14 +251,13 @@ function buildMarketsFromData({ ibex, eurusd, btc, eth, meteo, luz }) {
     const threshold = niceThreshold(luz);
     markets.push({
       external_id: `luz-above-${threshold}-${today}`,
-      question: `¿Superará el precio medio de la luz los ${threshold} €/MWh hoy?`,
+      title:`¿Superará el precio medio de la luz los ${threshold} €/MWh hoy?`,
       description:
         `El precio actual de la electricidad en España es de ${luz.toFixed(2)} €/MWh. ` +
         `Este mercado se resolverá SÍ si el precio medio diario del mercado mayorista (PVPC) supera los ${threshold} €/MWh.`,
-      category: 'energia',
-      subcategory: 'electricidad',
+      category: 'ENERGIA',
       resolution_source: 'preciodelaluz.org / REE',
-      resolution_date: resolutionDate,
+      close_date: resolutionDate,
       threshold,
       direction: 'above',
       ...initialPrices(),
@@ -276,49 +269,59 @@ function buildMarketsFromData({ ibex, eurusd, btc, eth, meteo, luz }) {
 
 // ─── Inserción en Supabase ────────────────────────────────────────────────────
 
+/** Convierte precio AMM (0-1) a pools iniciales con total = 10000 */
+function priceToPool(yesPrice) {
+  const total = 10000;
+  return {
+    yes_pool: (1 - yesPrice) * total,
+    no_pool:  yesPrice        * total,
+  };
+}
+
 async function upsertMarkets(markets) {
   const results = { created: [], skipped: [], errors: [] };
+  const today   = todayUTC();
 
   for (const market of markets) {
     try {
-      // Comprobar si ya existe un mercado con este external_id hoy (idempotencia)
+      // Idempotencia: comprobar si ya existe un mercado con el mismo título hoy
       const { data: existing } = await supabase
         .from('markets')
         .select('id')
-        .eq('external_id', market.external_id)
-        .single();
+        .eq('title', market.title)
+        .gte('close_date', today)
+        .maybeSingle();
 
       if (existing) {
-        results.skipped.push(market.external_id);
+        results.skipped.push(market.title);
         continue;
       }
+
+      const { yes_pool, no_pool } = priceToPool(market.yes_price);
 
       const { data, error } = await supabase
         .from('markets')
         .insert({
-          external_id:       market.external_id,
-          question:          market.question,
+          title:             market.title,
           description:       market.description,
           category:          market.category,
-          subcategory:       market.subcategory,
+          market_type:       'DIARIO',
           resolution_source: market.resolution_source,
-          resolution_date:   market.resolution_date,
-          threshold:         market.threshold,
-          direction:         market.direction,
-          yes_price:         market.yes_price,
-          no_price:          market.no_price,
-          status:            'open',
+          close_date:        market.close_date,
+          yes_pool,
+          no_pool,
+          status:            'ACTIVE',
         })
         .select('id')
         .single();
 
       if (error) {
-        results.errors.push({ id: market.external_id, error: error.message });
+        results.errors.push({ id: market.title, error: error.message });
       } else {
-        results.created.push({ id: data.id, external_id: market.external_id });
+        results.created.push({ id: data.id, title: market.title });
       }
     } catch (err) {
-      results.errors.push({ id: market.external_id, error: err.message });
+      results.errors.push({ id: market.title, error: err.message });
     }
   }
 
