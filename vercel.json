@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/engine/run?job=all",
-      "schedule": "0 * * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/resolve-markets",
