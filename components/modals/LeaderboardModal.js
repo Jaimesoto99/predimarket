@@ -7,7 +7,7 @@ function rankColor(rank) {
   return C.textDim
 }
 
-export default function LeaderboardModal({ showLeaderboard, setShowLeaderboard, leaderboard, user }) {
+export default function LeaderboardModal({ showLeaderboard, setShowLeaderboard, leaderboard, loading, user }) {
   if (!showLeaderboard) return null
 
   return (
@@ -22,9 +22,13 @@ export default function LeaderboardModal({ showLeaderboard, setShowLeaderboard, 
             <button onClick={() => setShowLeaderboard(false)} style={closeBtnStyle}>✕</button>
           </div>
 
-          {leaderboard.length === 0 ? (
+          {loading ? (
             <div style={{ textAlign: 'center', padding: '48px 0', color: C.textDim, fontSize: 13 }}>
               Cargando ranking...
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: C.textDim, fontSize: 13 }}>
+              Sin datos de ranking todavía.
             </div>
           ) : (
             <div>

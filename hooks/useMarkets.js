@@ -25,10 +25,10 @@ const EXAMPLE_PLACEHOLDERS = [
   { id: 'placeholder_14', title: '¿Ganará el Atlético de Madrid la Liga 2025-26?',              category: 'DEPORTES',   market_type: 'MENSUAL',     close_date: daysFromNow(75),  total_volume: 0, active_traders: 0, prices: { yes: 22, no: 78 }, placeholder: true },
 ]
 
-// Wrap getActiveMarkets with a hard 8s timeout so loading never hangs forever
+// Wrap getActiveMarkets with a hard 4s timeout so loading never hangs forever
 async function fetchWithTimeout(options) {
   const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('timeout')), 8000)
+    setTimeout(() => reject(new Error('timeout')), 4000)
   )
   return Promise.race([getActiveMarkets(options), timeoutPromise])
 }
@@ -87,6 +87,10 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
 
   useEffect(() => {
     loadMarkets()
+    // Safety: if loading gets stuck (e.g. React Compiler memoization edge case),
+    // force it off after 6s so the UI never shows skeleton indefinitely
+    const fallback = setTimeout(() => setLoading(false), 6000)
+    return () => clearTimeout(fallback)
   }, [loadMarkets])
 
   useEffect(() => {

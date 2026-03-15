@@ -70,7 +70,7 @@ export default function Home() {
   // ─── Hooks ────────────────────────────────────────────────────────────────
   const { markets, resolvedMarkets, loading, loadMarkets } = useMarkets(catFilter, filter)
   const { userTrades, openTrades, loadUserTrades, handleSell } = useTrades({ user, setUser, onRefreshMarkets: loadMarkets })
-  const { leaderboard, loadLeaderboard } = useLeaderboard()
+  const { leaderboard, loading: leaderboardLoading, loadLeaderboard } = useLeaderboard()
   const { isWatching, toggleWatch, alertCount } = useWatchlist(user)
 
   // ─── Init — restaurar sesión desde localStorage + listener Supabase Auth ─
@@ -394,6 +394,7 @@ export default function Home() {
         showLeaderboard={showLeaderboard}
         setShowLeaderboard={setShowLeaderboard}
         leaderboard={leaderboard}
+        loading={leaderboardLoading}
         user={user}
       />
 
