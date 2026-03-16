@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { C } from '../lib/theme'
 import { getAlertMarkets } from '../lib/watchlist'
+import { supabase } from '../lib/supabase'
+import { calculatePrices } from '../lib/amm'
 import AppLayout from '@/components/layout/AppLayout'
 import MarketCard from '@/components/MarketCard'
 import WatchButton from '@/components/WatchButton'
@@ -17,8 +19,29 @@ export default function WatchlistPage() {
   }, [])
 
   const { watchlistMarkets, alertCount, loading, isWatching, toggleWatch, loadMarkets } = useWatchlist(user)
+  const [suggestions, setSuggestions] = useState([])
 
   useEffect(() => { loadMarkets() }, [loadMarkets])
+
+  // Load soonest-closing suggestions when watchlist is empty
+  useEffect(() => {
+    if (loading || watchlistMarkets.length > 0) return
+    supabase
+      .from('markets')
+      .select('id, title, category, yes_pool, no_pool, total_volume, close_date, active_traders, created_at')
+      .eq('status', 'ACTIVE')
+      .in('category', ['ECONOMIA', 'TIPOS', 'ENERGIA'])
+      .gt('close_date', new Date().toISOString())
+      .order('close_date', { ascending: true })
+      .limit(4)
+      .then(({ data }) => {
+        if (data) setSuggestions(data.map(m => ({
+          ...m,
+          prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
+          isExpired: false,
+        })))
+      })
+  }, [loading, watchlistMarkets.length])
 
   const alertMarkets  = getAlertMarkets(watchlistMarkets)
   const normalMarkets = watchlistMarkets.filter(m => !alertMarkets.includes(m))
@@ -57,12 +80,29 @@ export default function WatchlistPage() {
           Cargando watchlist...
         </div>
       ) : watchlistMarkets.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: C.textDim }}>
-          <div style={{ fontSize: 32, marginBottom: 16, opacity: 0.3 }}>♡</div>
-          <div style={{ fontSize: 14 }}>Tu watchlist está vacía.</div>
-          <div style={{ marginTop: 8, fontSize: 12 }}>
-            Pulsa ♡ en cualquier mercado para añadirlo.
+        <div>
+          <div style={{ textAlign: 'center', padding: '40px 0 24px', color: C.textDim }}>
+            <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>♡</div>
+            <div style={{ fontSize: 14 }}>Tu watchlist está vacía.</div>
+            <div style={{ marginTop: 6, fontSize: 12 }}>
+              Pulsa ♡ en cualquier mercado para añadirlo.
+            </div>
           </div>
+          {suggestions.length > 0 && (
+            <div>
+              <div style={{
+                fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
+                textTransform: 'uppercase', color: C.textDim, marginBottom: 12,
+              }}>
+                Cierran pronto
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {suggestions.map(market => (
+                  <MarketCard key={market.id} market={market} onOpen={() => {}} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

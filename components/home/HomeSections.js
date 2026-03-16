@@ -54,19 +54,21 @@ export default function HomeSections({ markets, onOpen, onTrade }) {
       .slice(0, 8)
   )
 
-  // 3. Trending
+  const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
+
+  // 3. Trending — top by total_volume in CNMV categories
   const trending = unique(
     active
-      .filter(m => m.trending)
-      .sort((a, b) => (parseFloat(b.prob_change_6h) || 0) - (parseFloat(a.prob_change_6h) || 0))
+      .filter(m => CNMV_CATS.has(m.category))
+      .sort((a, b) => (parseFloat(b.total_volume) || 0) - (parseFloat(a.total_volume) || 0))
       .slice(0, 8)
   )
 
-  // 4. Popular
+  // 4. Popular — top by active_traders in CNMV categories
   const popular = unique(
     active
-      .filter(m => m.popularity_score != null)
-      .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0))
+      .filter(m => CNMV_CATS.has(m.category))
+      .sort((a, b) => (parseFloat(b.active_traders) || 0) - (parseFloat(a.active_traders) || 0))
       .slice(0, 8)
   )
 

@@ -9,18 +9,19 @@ import { calculatePrices } from '../lib/amm'
 export default function TrendingPage() {
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [sort, setSort] = useState('change24h') // 'change24h' | 'score'
+  const [sort, setSort] = useState('volume') // 'volume' | 'traders'
 
   useEffect(() => {
     async function load() {
       setLoading(true)
+      const col = sort === 'traders' ? 'active_traders' : 'total_volume'
       const { data, error } = await supabase
         .from('markets')
         .select('id, title, category, yes_pool, no_pool, total_volume, close_date, market_score, cluster_id, trending, prob_change_6h, prob_change_24h, vol_24h, created_at, active_traders')
         .eq('status', 'ACTIVE')
-        .eq('trending', true)
+        .in('category', ['ECONOMIA', 'TIPOS', 'ENERGIA'])
         .gt('close_date', new Date().toISOString())
-        .order(sort === 'change24h' ? 'prob_change_24h' : 'market_score', { ascending: false })
+        .order(col, { ascending: false })
         .limit(50)
 
       if (!error && data) {
@@ -53,7 +54,7 @@ export default function TrendingPage() {
             display: 'flex', background: C.surface, borderRadius: 8, padding: 3,
             border: `1px solid ${C.cardBorder}`,
           }}>
-            {[['change24h', 'Cambio 24h'], ['score', 'Relevancia']].map(([k, label]) => (
+            {[['volume', 'Volumen'], ['traders', 'Traders']].map(([k, label]) => (
               <button key={k} onClick={() => setSort(k)} style={{
                 padding: '5px 12px', fontSize: 12, borderRadius: 6, border: 'none',
                 cursor: 'pointer', fontFamily: 'inherit', fontWeight: sort === k ? 600 : 400,
@@ -75,8 +76,8 @@ export default function TrendingPage() {
       ) : markets.length === 0 ? (
         <div style={{ color: C.textDim, fontSize: 13, padding: '60px 0', textAlign: 'center' }}>
           <div style={{ fontSize: 24, marginBottom: 12, opacity: 0.4 }}>📊</div>
-          <div>No hay mercados trending ahora mismo.</div>
-          <div style={{ marginTop: 6, fontSize: 12 }}>El motor de inteligencia actualiza los trending cada 30 minutos.</div>
+          <div>No hay mercados activos ahora mismo.</div>
+          <div style={{ marginTop: 6, fontSize: 12 }}>Pronto habrá nuevos mercados disponibles.</div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

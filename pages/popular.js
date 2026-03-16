@@ -6,26 +6,24 @@ import AppLayout from '@/components/layout/AppLayout'
 import MarketCard from '@/components/MarketCard'
 
 const SORTS = [
-  { key: 'popularity_score', label: 'Popularidad' },
-  { key: 'total_volume',     label: 'Volumen' },
-  { key: 'watchlist_count',  label: 'Seguidos' },
-  { key: 'active_traders',   label: 'Traders' },
+  { key: 'active_traders', label: 'Traders' },
+  { key: 'total_volume',   label: 'Volumen' },
 ]
 
 export default function PopularPage() {
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [sort, setSort]       = useState('popularity_score')
+  const [sort, setSort]       = useState('active_traders')
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       const { data, error } = await supabase
         .from('markets')
-        .select('id, title, category, yes_pool, no_pool, total_volume, close_date, active_traders, market_score, cluster_id, trending, prob_change_6h, prob_change_24h, vol_24h, popularity_score, watchlist_count, created_at')
+        .select('id, title, category, yes_pool, no_pool, total_volume, close_date, active_traders, market_score, cluster_id, trending, prob_change_6h, prob_change_24h, vol_24h, created_at')
         .eq('status', 'ACTIVE')
+        .in('category', ['ECONOMIA', 'TIPOS', 'ENERGIA'])
         .gt('close_date', new Date().toISOString())
-        .not(sort, 'is', null)
         .order(sort, { ascending: false })
         .limit(50)
 
@@ -82,8 +80,8 @@ export default function PopularPage() {
       ) : markets.length === 0 ? (
         <div style={{ color: C.textDim, fontSize: 13, padding: '60px 0', textAlign: 'center' }}>
           <div style={{ fontSize: 24, marginBottom: 12, opacity: 0.4 }}>📊</div>
-          <div>Puntuaciones de popularidad aún no calculadas.</div>
-          <div style={{ marginTop: 6, fontSize: 12 }}>El motor las actualiza cada 30 minutos.</div>
+          <div>No hay mercados activos ahora mismo.</div>
+          <div style={{ marginTop: 6, fontSize: 12 }}>Pronto habrá nuevos mercados disponibles.</div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

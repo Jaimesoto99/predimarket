@@ -316,16 +316,16 @@ export default function Home() {
         totalTraders={totalTraders}
       />
 
-      <HowItWorks />
-
-      <TrendingRow markets={trendingMarkets} onOpen={openTradeModal} />
-
       <LiveFeed
         markets={realActiveMarkets}
         loading={loading}
         onTrade={(market, side) => { openTradeModal(market); setTradeSide(side) }}
         onOpen={openTradeModal}
       />
+
+      <HowItWorks />
+
+      <TrendingRow markets={trendingMarkets} onOpen={openTradeModal} />
 
       <MarketFeed
         filtered={filtered}
