@@ -34,19 +34,22 @@ function DiscoverCard({ market, onOpen }) {
   const probColor = yesP > 60 ? C.yes : yesP < 40 ? C.no : C.warning
 
   return (
-    <div style={{
-      height: 'calc(100dvh - 48px)',
-      scrollSnapAlign: 'start',
-      scrollSnapStop: 'always',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '32px 24px',
-      gap: 20,
-      borderBottom: `1px solid ${C.cardBorder}`,
-      background: C.bg,
-    }}>
+    <div
+      onClick={() => onOpen(market)}
+      style={{
+        height: 'calc(100dvh - 48px)',
+        scrollSnapAlign: 'start',
+        scrollSnapStop: 'always',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 24px',
+        gap: 20,
+        borderBottom: `1px solid ${C.cardBorder}`,
+        background: C.bg,
+        cursor: 'pointer',
+      }}>
 
       {/* Category */}
       <span style={{
@@ -103,7 +106,7 @@ function DiscoverCard({ market, onOpen }) {
       {/* CTA buttons */}
       <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 280 }}>
         <button
-          onClick={() => onOpen(market)}
+          onClick={(e) => { e.stopPropagation(); onOpen(market) }}
           style={{
             flex: 1, padding: '14px 0', background: C.yes, border: 'none', borderRadius: 12,
             color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
@@ -112,7 +115,7 @@ function DiscoverCard({ market, onOpen }) {
           Comprar SÍ
         </button>
         <button
-          onClick={() => onOpen(market)}
+          onClick={(e) => { e.stopPropagation(); onOpen(market) }}
           style={{
             flex: 1, padding: '14px 0', background: C.no, border: 'none', borderRadius: 12,
             color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',

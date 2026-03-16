@@ -24,6 +24,7 @@ export default function TradingModal({
   priceHistory, recentActivity, orderBook, userOrders,
   comments, newComment, setNewComment, topHolders,
   relatedMarkets = [],
+  isWatching, onToggleWatch,
   onClose, onExecuteTrade, onLimitOrder, onCancelOrder, onSell, onPostComment, onLikeComment, onOpenMarket,
 }) {
   const scrollRef = useRef(null)
@@ -50,7 +51,13 @@ export default function TradingModal({
         }}>
 
           {/* ── MarketHeader ─────────────────────────────────────────────── */}
-          <MarketHeader market={market} onClose={onClose} />
+          <MarketHeader
+            market={market}
+            onClose={onClose}
+            user={user}
+            isWatching={isWatching}
+            onToggleWatch={onToggleWatch}
+          />
 
           <div ref={scrollRef} className="trading-modal-scroll" style={{ padding: '24px 28px' }}>
 

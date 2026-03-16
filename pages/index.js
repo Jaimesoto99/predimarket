@@ -369,6 +369,8 @@ export default function Home() {
           newComment={newComment}   setNewComment={setNewComment}
           topHolders={topHolders}
           relatedMarkets={relatedMarkets}
+          isWatching={selectedMarket ? isWatching(selectedMarket.id) : false}
+          onToggleWatch={() => selectedMarket && toggleWatch(selectedMarket.id)}
           onClose={() => setShowTradeModal(false)}
           onExecuteTrade={executeTrade}
           onLimitOrder={placeLimitOrder}

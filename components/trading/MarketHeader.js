@@ -1,10 +1,46 @@
+import { useState, useEffect } from 'react'
 import { C, getCategoryColor, getCategoryLabel, getTypeLabel, isExpiredDate } from '../../lib/theme'
+import { followMarket, unfollowMarket } from '../../lib/watchlist'
 import ResolutionCountdown from './ResolutionCountdown'
 import MarketDurationBadge from './MarketDurationBadge'
 
-export default function MarketHeader({ market, onClose }) {
+export default function MarketHeader({ market, onClose, user, isWatching, onToggleWatch }) {
   const expired  = isExpiredDate(market.close_date)
   const catColor = getCategoryColor(market.category)
+
+  const [localUser, setLocalUser] = useState(null)
+  const [localWatching, setLocalWatching] = useState(false)
+  const [heartBusy, setHeartBusy] = useState(false)
+
+  useEffect(() => {
+    if (user) return
+    try {
+      const saved = localStorage.getItem('predi_user')
+      if (saved) setLocalUser(JSON.parse(saved))
+    } catch {}
+  }, [user])
+
+  const effectiveUser     = user || localUser
+  const effectiveWatching = isWatching !== undefined ? isWatching : localWatching
+
+  async function handleHeart(e) {
+    e.stopPropagation()
+    if (heartBusy) return
+    if (!effectiveUser) return
+    if (onToggleWatch) {
+      onToggleWatch(market.id)
+    } else {
+      setHeartBusy(true)
+      if (effectiveWatching) {
+        await unfollowMarket(effectiveUser.email, market.id)
+        setLocalWatching(false)
+      } else {
+        await followMarket(effectiveUser.email, market.id)
+        setLocalWatching(true)
+      }
+      setHeartBusy(false)
+    }
+  }
 
   return (
     <div style={{ padding: '24px 28px 0', borderBottom: `1px solid ${C.cardBorder}` }}>
@@ -21,13 +57,29 @@ export default function MarketHeader({ market, onClose }) {
           <span style={{ fontSize: 11, color: C.textDim }}>{getTypeLabel(market)}</span>
           <MarketDurationBadge market={market} />
         </div>
-        <button onClick={onClose} style={{
-          width: 32, height: 32, borderRadius: 8,
-          background: 'transparent', border: `1px solid ${C.cardBorder}`,
-          color: C.textDim, cursor: 'pointer', fontSize: 16,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-        }}>✕</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <button
+            onClick={handleHeart}
+            title={!effectiveUser ? 'Inicia sesión para guardar' : effectiveWatching ? 'Quitar de watchlist' : 'Guardar en watchlist'}
+            style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: effectiveWatching ? `${C.no}12` : 'transparent',
+              border: `1px solid ${effectiveWatching ? `${C.no}40` : C.cardBorder}`,
+              color: effectiveWatching ? C.no : C.textDim,
+              cursor: effectiveUser ? 'pointer' : 'default',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 15, opacity: heartBusy ? 0.5 : 1,
+            }}
+          >
+            {effectiveWatching ? '♥' : '♡'}
+          </button>
+          <button onClick={onClose} style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: 'transparent', border: `1px solid ${C.cardBorder}`,
+            color: C.textDim, cursor: 'pointer', fontSize: 16,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>✕</button>
+        </div>
       </div>
 
       {/* Title */}
