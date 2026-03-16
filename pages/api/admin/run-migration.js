@@ -12,36 +12,40 @@ export default async function handler(req, res) {
 
   const results = {}
 
-  // STEP 1: Deprecate execute_trade
-  const { error: e1 } = await supabase.rpc('run_sql', {
-    query: `CREATE OR REPLACE FUNCTION public.execute_trade(p_email text, p_market_id bigint, p_side text, p_amount numeric)
+  // STEP 5a: Delete test trade
+  try {
+    const r1 = await supabase.from('trades').delete().eq('id', 8138)
+    results.delete_trade_8138 = r1.error ? { error: r1.error.message } : { ok: true }
+  } catch (e) {
+    results.delete_trade_8138 = { error: String(e) }
+  }
+
+  // STEP 5b: Delete test limit order
+  try {
+    const r2 = await supabase.from('limit_orders').delete().eq('id', 191)
+    results.delete_order_191 = r2.error ? { error: r2.error.message } : { ok: true }
+  } catch (e) {
+    results.delete_order_191 = { error: String(e) }
+  }
+
+  // STEP 1: Deprecate execute_trade via SQL
+  // Supabase JS doesn't expose raw DDL — try via pg RPC if available
+  try {
+    const sql = `CREATE OR REPLACE FUNCTION public.execute_trade(p_email text, p_market_id bigint, p_side text, p_amount numeric)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   RETURN jsonb_build_object('success', false, 'error', 'Deprecated: use place_limit_order');
 END;
 $$;`
-  }).catch(() => ({ error: { message: 'run_sql RPC not available' } }))
-
-  if (e1) {
-    // Fallback: try direct pg query via supabase-js
-    // Supabase JS client does not expose raw SQL — must use pg_net or admin API
-    results.step1 = { status: 'skipped', reason: e1.message }
-  } else {
-    results.step1 = { status: 'ok' }
+    const r3 = await supabase.rpc('exec_sql', { sql })
+    if (r3.error) {
+      results.deprecate_execute_trade = { skipped: true, reason: r3.error.message }
+    } else {
+      results.deprecate_execute_trade = { ok: true }
+    }
+  } catch (e) {
+    results.deprecate_execute_trade = { skipped: true, reason: String(e) }
   }
 
-  // STEP 5: Delete test data
-  const { error: e2, count: c2 } = await supabase
-    .from('trades')
-    .delete()
-    .eq('id', 8138)
-  results.step5_trades = e2 ? { status: 'error', error: e2.message } : { status: 'ok', deleted: c2 }
-
-  const { error: e3, count: c3 } = await supabase
-    .from('limit_orders')
-    .delete()
-    .eq('id', 191)
-  results.step5_orders = e3 ? { status: 'error', error: e3.message } : { status: 'ok', deleted: c3 }
-
-  return res.status(200).json({ results })
+  return res.status(200).json({ ok: true, results })
 }
