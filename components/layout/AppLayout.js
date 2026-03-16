@@ -4,6 +4,8 @@ import { useRouter } from 'next/router'
 import { C, getCategoryColor, getCategoryLabel, getCloseInfo } from '../../lib/theme'
 import { useTheme } from '../../lib/themeContext'
 import useTick from '../../hooks/useTick'
+import { supabase } from '../../lib/supabase'
+import { calculatePrices } from '../../lib/amm'
 
 const ALL_CATS = [
   'ECONOMIA', 'TIPOS', 'ENERGIA', 'POLITICA', 'DEPORTES',
@@ -432,6 +434,8 @@ export default function AppLayout({
   const { isDark, toggle } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [discoverOpen, setDiscoverOpen] = useState(false)
+  const [fetchedMarkets, setFetchedMarkets] = useState([])
+  const [discoverLoading, setDiscoverLoading] = useState(false)
   const router = useRouter()
   useDesktopForce()
 
@@ -450,7 +454,33 @@ export default function AppLayout({
     return () => { document.body.style.overflow = '' }
   }, [sidebarOpen])
 
-  const discoverMarkets = activeMarkets.filter(m => !m.isExpired && !m.placeholder)
+  const propsMarkets = activeMarkets.filter(m => !m.isExpired && !m.placeholder)
+
+  // Fetch markets independently when Discover opens and props are empty
+  useEffect(() => {
+    if (!discoverOpen) return
+    if (propsMarkets.length > 0) return
+    setDiscoverLoading(true)
+    supabase
+      .from('markets')
+      .select('id, title, category, yes_pool, no_pool, total_volume, close_date, created_at')
+      .eq('status', 'ACTIVE')
+      .gt('close_date', new Date().toISOString())
+      .order('total_volume', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (data) {
+          setFetchedMarkets(data.map(m => ({
+            ...m,
+            prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
+            isExpired: false,
+          })))
+        }
+        setDiscoverLoading(false)
+      })
+  }, [discoverOpen, propsMarkets.length])
+
+  const discoverMarkets = propsMarkets.length > 0 ? propsMarkets : fetchedMarkets
 
   const sharedProps = {
     router, isDark, toggle,
@@ -478,7 +508,7 @@ export default function AppLayout({
             background: 'rgba(0,0,0,0.5)',
             backdropFilter: 'blur(4px)',
             WebkitBackdropFilter: 'blur(4px)',
-            zIndex: 200,
+            zIndex: 1000,
           }}
         >
           <aside
@@ -589,7 +619,7 @@ export default function AppLayout({
       {/* ─── Discover — TikTok fullscreen modal ─────────────────────────── */}
       {discoverOpen && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 600,
+          position: 'fixed', inset: 0, zIndex: 1100,
           background: 'var(--bg)', overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
         }}>
@@ -602,7 +632,7 @@ export default function AppLayout({
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
             borderBottom: '1px solid var(--card-border)',
-            zIndex: 610,
+            zIndex: 1110,
           }}>
             <button
               onClick={() => setDiscoverOpen(false)}
@@ -629,7 +659,14 @@ export default function AppLayout({
               WebkitOverflowScrolling: 'touch',
             }}
           >
-            {discoverMarkets.length === 0 ? (
+            {discoverLoading ? (
+              <div style={{
+                height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: C.textDim, fontSize: 14,
+              }}>
+                Cargando mercados…
+              </div>
+            ) : discoverMarkets.length === 0 ? (
               <div style={{
                 height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: C.textDim, fontSize: 14,
@@ -641,7 +678,7 @@ export default function AppLayout({
                 <DiscoverCard
                   key={market.id}
                   market={market}
-                  onOpen={(m) => { setDiscoverOpen(false); onOpenMarket?.(m) }}
+                  onOpen={(m) => { onOpenMarket?.(m) }}
                 />
               ))
             )}

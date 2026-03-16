@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { C, getCategoryColor, getCategoryLabel, getCloseInfo, getTypeLabel, getOracleDescription } from '../lib/theme'
 import useTick from '../hooks/useTick'
+import { followMarket, unfollowMarket } from '../lib/watchlist'
 
 function ProbBar({ pct }) {
   const color = pct > 60 ? C.yes : pct < 40 ? C.no : C.warning
@@ -16,6 +18,45 @@ function ProbBar({ pct }) {
 
 export default function MarketCard({ market, onOpen, label, user, isWatching, onToggleWatch }) {
   useTick()  // re-render every minute so countdown stays live
+
+  // Local fallback: read user from localStorage if not provided via props
+  const [localUser, setLocalUser] = useState(null)
+  const [localWatching, setLocalWatching] = useState(false)
+  const [heartBusy, setHeartBusy] = useState(false)
+
+  useEffect(() => {
+    if (user) return  // prop takes priority
+    try {
+      const saved = localStorage.getItem('predi_user')
+      if (saved) setLocalUser(JSON.parse(saved))
+    } catch {}
+  }, [user])
+
+  const effectiveUser     = user || localUser
+  const effectiveWatching = isWatching ? isWatching(market.id) : localWatching
+
+  async function handleHeart(e) {
+    e.stopPropagation()
+    if (heartBusy) return
+    if (!effectiveUser) return  // tooltip only
+
+    if (onToggleWatch) {
+      // Controlled by parent (home page) — fast optimistic update
+      onToggleWatch(market.id)
+    } else {
+      // Self-contained: direct Supabase call for non-home pages
+      setHeartBusy(true)
+      if (effectiveWatching) {
+        await unfollowMarket(effectiveUser.email, market.id)
+        setLocalWatching(false)
+      } else {
+        await followMarket(effectiveUser.email, market.id)
+        setLocalWatching(true)
+      }
+      setHeartBusy(false)
+    }
+  }
+
   const yesP      = parseFloat(market.prices?.yes || 50)
   const catColor  = getCategoryColor(market.category)
   const closeInfo = getCloseInfo(market.resolution_time || market.close_date)
@@ -27,10 +68,7 @@ export default function MarketCard({ market, onOpen, label, user, isWatching, on
   )
 
   const { dateStr, countdown, isUrgent, isExpired } = closeInfo
-
   const probColor = yesP > 60 ? C.yes : yesP < 40 ? C.no : C.warning
-
-  const watching = isWatching ? isWatching(market.id) : false
 
   return (
     <div
@@ -165,25 +203,23 @@ export default function MarketCard({ market, onOpen, label, user, isWatching, on
         </div>
       </div>
 
-      {/* Heart / watchlist button */}
-      {onToggleWatch && (
-        <button
-          onClick={e => { e.stopPropagation(); if (user) onToggleWatch(market.id) }}
-          title={!user ? 'Inicia sesión para guardar' : watching ? 'Quitar de watchlist' : 'Guardar'}
-          style={{
-            position: 'absolute', bottom: 10, right: 10, zIndex: 2,
-            width: 26, height: 26, borderRadius: 13,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: watching ? `${C.no}10` : 'transparent',
-            border: `1px solid ${watching ? `${C.no}30` : C.cardBorder}`,
-            cursor: user ? 'pointer' : 'default',
-            fontSize: 12, color: watching ? C.no : C.textDim,
-            flexShrink: 0,
-          }}
-        >
-          {watching ? '♥' : '♡'}
-        </button>
-      )}
+      {/* Heart / watchlist — always visible */}
+      <button
+        onClick={handleHeart}
+        title={!effectiveUser ? 'Inicia sesión para guardar' : effectiveWatching ? 'Quitar de watchlist' : 'Guardar'}
+        style={{
+          position: 'absolute', bottom: 10, right: 10, zIndex: 2,
+          width: 26, height: 26, borderRadius: 13,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: effectiveWatching ? `${C.no}10` : 'transparent',
+          border: `1px solid ${effectiveWatching ? `${C.no}30` : C.cardBorder}`,
+          cursor: effectiveUser ? 'pointer' : 'default',
+          fontSize: 12, color: effectiveWatching ? C.no : C.textDim,
+          flexShrink: 0, opacity: heartBusy ? 0.5 : 1,
+        }}
+      >
+        {effectiveWatching ? '♥' : '♡'}
+      </button>
     </div>
   )
 }

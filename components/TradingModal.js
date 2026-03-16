@@ -36,7 +36,7 @@ export default function TradingModal({
       position: 'fixed', inset: 0,
       background: 'rgba(15,23,42,0.65)',
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-      zIndex: 50, overflowY: 'auto',
+      zIndex: 1200, overflowY: 'auto',
       WebkitOverflowScrolling: 'touch',
     }}>
       <div style={{
