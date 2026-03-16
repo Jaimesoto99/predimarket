@@ -261,7 +261,7 @@ async function createObjectiveMarkets() {
       p_category: m.category,
       p_market_type: m.type,
       p_duration_hours: Math.round(m.hours),
-      p_initial_pool: 5000
+      p_initial_pool: 0
     })
 
     if (!error) {
@@ -297,7 +297,7 @@ async function createManualMarket(params) {
     p_category: category || 'ACTUALIDAD',
     p_market_type: type || 'SEMANAL',
     p_duration_hours: parseInt(hours) || 168,
-    p_initial_pool: parseInt(pool) || 5000
+    p_initial_pool: parseInt(pool) || 0
   })
 
   if (error) return { error: error.message }
