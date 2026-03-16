@@ -22,7 +22,7 @@ import TransparencySection from '@/components/home/TransparencySection'
 import AuthModal from '@/components/modals/AuthModal'
 import PortfolioModal from '@/components/modals/PortfolioModal'
 import LeaderboardModal from '@/components/modals/LeaderboardModal'
-import DisclaimerModal from '@/components/modals/DisclaimerModal'
+
 
 const TradingModal = dynamic(() => import('../components/TradingModal'), { ssr: false })
 const ProfileModal = dynamic(() => import('../components/ProfileModal'), { ssr: false })
@@ -37,8 +37,7 @@ export default function Home() {
   const [showProfile, setShowProfile] = useState(false)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [showKYC, setShowKYC] = useState(false)
-  const [showDisclaimer, setShowDisclaimer] = useState(false)
-  const [pendingMarket, setPendingMarket] = useState(null)
+
   const [showResolved, setShowResolved] = useState(false)
 
   // ─── Trading state ────────────────────────────────────────────────────────
@@ -133,19 +132,10 @@ export default function Home() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  function hasAcceptedDisclaimer() {
-    try { return localStorage.getItem('disclaimer_accepted') === 'true' } catch { return false }
-  }
-
   // ─── Trade modal ──────────────────────────────────────────────────────────
   function openTradeModal(market) {
     if (market.placeholder) return
     if (!user) { setShowAuth(true); return }
-    if (!hasAcceptedDisclaimer()) {
-      setPendingMarket(market)
-      setShowDisclaimer(true)
-      return
-    }
     setSelectedMarket(market)
     setShowTradeModal(true)
     setOrderMode('MARKET')
@@ -409,15 +399,6 @@ export default function Home() {
         user={user}
       />
 
-      <DisclaimerModal
-        showDisclaimer={showDisclaimer}
-        setShowDisclaimer={setShowDisclaimer}
-        onAccept={() => {
-          setPendingMarket(null)
-          if (pendingMarket) openTradeModal(pendingMarket)
-        }}
-        onCancel={() => setPendingMarket(null)}
-      />
 
       {toast && (
         <div style={{
