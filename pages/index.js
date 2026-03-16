@@ -290,6 +290,8 @@ export default function Home() {
     .sort((a, b) => (b.total_volume || 0) - (a.total_volume || 0))
     .slice(0, 4)
 
+  console.log('[index] markets:', markets.length, '| active:', activeMarkets.length, '| real:', realActiveMarkets.length, '| trending:', trendingMarkets.length)
+
   const totalVolume  = realActiveMarkets.reduce((s, m) => s + (m.total_volume || 0), 0)
   const totalTraders = realActiveMarkets.reduce((s, m) => s + (m.active_traders || m.total_traders || 0), 0)
 
@@ -316,16 +318,16 @@ export default function Home() {
         totalTraders={totalTraders}
       />
 
+      <HowItWorks />
+
+      <TrendingRow markets={trendingMarkets} onOpen={openTradeModal} />
+
       <LiveFeed
         markets={realActiveMarkets}
         loading={loading}
         onTrade={(market, side) => { openTradeModal(market); setTradeSide(side) }}
         onOpen={openTradeModal}
       />
-
-      <HowItWorks />
-
-      <TrendingRow markets={trendingMarkets} onOpen={openTradeModal} />
 
       <MarketFeed
         filtered={filtered}

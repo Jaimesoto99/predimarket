@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getActiveMarkets, getResolvedMarkets } from '../lib/supabase'
+import { getResolvedMarkets } from '../lib/supabase'
 import { calculatePrices } from '../lib/amm'
 import { HIDDEN_CATEGORIES } from '../lib/theme'
+
+// Fetch via /api/markets (service-role key) instead of anon client to avoid RLS issues
+async function fetchMarketsFromApi(options = {}) {
+  const params = new URLSearchParams({ status: 'ACTIVE', limit: '100' })
+  if (options.catFilter && options.catFilter !== 'ALL') params.set('category', options.catFilter)
+  const resp = await fetch(`/api/markets?${params}`)
+  if (!resp.ok) throw new Error(`API error ${resp.status}`)
+  const json = await resp.json()
+  // /api/markets returns { markets: [...] } or just [...]
+  return json.markets || json
+}
 
 // ─── Placeholder markets shown while loading or as fillers ────────────────────
 const now = () => new Date()
@@ -26,12 +37,12 @@ const EXAMPLE_PLACEHOLDERS = [
   { id: 'placeholder_14', title: '¿Ganará el Atlético de Madrid la Liga 2025-26?',              category: 'DEPORTES',   market_type: 'MENSUAL', close_date: daysFromNow(75),  total_volume: 0, active_traders: 0, prices: { yes: 22, no: 78 }, placeholder: true },
 ]
 
-// Wrap getActiveMarkets with a hard 4s timeout so loading never hangs forever
+// Wrap fetch with a hard 6s timeout so loading never hangs forever
 async function fetchWithTimeout(options) {
   const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('timeout')), 4000)
+    setTimeout(() => reject(new Error('timeout')), 6000)
   )
-  return Promise.race([getActiveMarkets(options), timeoutPromise])
+  return Promise.race([fetchMarketsFromApi(options), timeoutPromise])
 }
 
 export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
@@ -62,13 +73,17 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
 
       const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
 
+      console.log(`[useMarkets] raw from API: ${data?.length ?? 0} markets`)
+
       const enriched = (data || [])
         .filter(m => !HIDDEN_CATEGORIES.has(m.category) && CNMV_CATS.has(m.category))
         .map(m => ({
           ...m,
-          prices:    calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
+          prices:    m.prices || calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
           isExpired: new Date(m.close_date) < new Date(),
         }))
+
+      console.log(`[useMarkets] after CNMV filter: ${enriched.length} markets (${enriched.filter(m=>!m.isExpired).length} active)`)
 
       const nonExpiredCount = enriched.filter(m => !m.isExpired).length
       const fillerCount     = Math.max(0, 15 - nonExpiredCount)
