@@ -80,6 +80,14 @@ export default function Home() {
         const u = JSON.parse(savedUser)
         setUser(u)
         loadUserTrades(u.email)
+        // Ensure user exists in DB even when restoring from localStorage
+        getOrCreateUser(u.email).then(r => {
+          if (r?.success && r.user?.balance !== u.balance) {
+            const synced = { ...u, balance: r.user.balance }
+            setUser(synced)
+            localStorage.setItem('predi_user', JSON.stringify(synced))
+          }
+        }).catch(() => {})
       } catch (e) { localStorage.removeItem('predi_user') }
     }
 
@@ -185,6 +193,7 @@ export default function Home() {
   async function placeLimitOrder() {
     if (!user || !selectedMarket || processing) return
     setProcessing(true)
+    await supabase.rpc('get_or_create_user', { p_email: user.email })
     const { data, error } = await supabase.rpc('place_limit_order', {
       p_email: user.email, p_market_id: selectedMarket.id,
       p_side: tradeSide, p_amount: tradeAmount, p_target_price: limitPrice,
