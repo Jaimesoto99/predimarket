@@ -146,6 +146,7 @@ a { color: inherit; text-decoration: none }
 }
 
 @media (max-width: 768px) {
+  .app-desktop-link { display: flex !important; align-items: center; gap: 5px; }
   .app-sidebar { display: none; }
 
   .app-topbar {
@@ -238,12 +239,32 @@ html * { transition: background-color 0.15s ease, border-color 0.15s ease, color
   .desktop-feed { display: none !important }
   .mobile-feed  { display: block }
 
-  /* Snap scroll container */
+  /* Mobile filter bar — sticky under topbar */
+  .mobile-filter-bar {
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--card-border);
+    background: var(--bg-backdrop);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    flex-shrink: 0;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    position: sticky;
+    top: 48px;
+    z-index: 30;
+  }
+  .mobile-filter-bar::-webkit-scrollbar { display: none }
+
+  /* Snap scroll container — height = viewport minus topbar (48) minus filter bar (50) */
   .mobile-snap-container {
     overflow-y: auto;
     scroll-snap-type: y mandatory;
     -webkit-overflow-scrolling: touch;
-    height: calc(100dvh - 48px);  /* viewport minus sticky topbar */
+    height: calc(100dvh - 98px);
     overscroll-behavior-y: contain;
   }
   .mobile-snap-container::-webkit-scrollbar { display: none }
@@ -253,28 +274,10 @@ html * { transition: background-color 0.15s ease, border-color 0.15s ease, color
   .mobile-snap-item {
     scroll-snap-align: start;
     scroll-snap-stop: always;
-    min-height: calc(100dvh - 48px);
+    min-height: calc(100dvh - 98px);
     display: flex;
     flex-direction: column;
   }
-
-  /* Mobile filter bar */
-  .mobile-filter-bar {
-    display: flex;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    gap: 6px;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--card-border);
-    background: var(--bg);
-    flex-shrink: 0;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-    position: sticky;
-    top: 48px;
-    z-index: 30;
-  }
-  .mobile-filter-bar::-webkit-scrollbar { display: none }
 
   /* Trading modal fullscreen on mobile */
   .trading-modal-panel {
@@ -289,22 +292,41 @@ html * { transition: background-color 0.15s ease, border-color 0.15s ease, color
     display: flex !important;
     flex-direction: column !important;
   }
+  /* Override inline padding; !important needed to beat inline styles */
   .trading-modal-scroll {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 16px 12px 80px;
+    flex: 1 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 16px 14px 40px !important;
   }
   .trading-modal-footer {
     position: sticky;
     bottom: 0;
     background: var(--card);
     border-top: 1px solid var(--card-border);
-    padding: 12px 12px;
+    padding: 12px 14px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom));
     z-index: 10;
   }
+
+  /* Horizontal padding for non-feed sections */
+  .app-content {
+    padding: 0 16px 80px !important;
+  }
+  .mobile-feed {
+    margin: 0 -16px;
+  }
 }
+
+/* ─── Force desktop mode (via ?desktop=1) ───────────────────────────────────── */
+[data-force-desktop="1"] .app-sidebar    { display: flex !important; flex-direction: column }
+[data-force-desktop="1"] .app-topbar     { display: none !important }
+[data-force-desktop="1"] .app-content    { padding: 32px 24px 80px !important }
+[data-force-desktop="1"] .desktop-feed   { display: block !important }
+[data-force-desktop="1"] .mobile-feed    { display: none !important; margin: 0 }
+[data-force-desktop="1"] .app-desktop-link { display: none !important }
+[data-force-desktop="1"] .trading-modal-panel  { position: relative !important; inset: auto !important; max-width: 960px !important; width: 100% !important; border-radius: 16px !important; max-height: none !important; height: auto !important; overflow: hidden !important }
+[data-force-desktop="1"] .trading-modal-scroll { padding: 24px 28px !important }
 
 /* ─── Responsive fixes ───────────────────────────────────────────────────────── */
 @media (max-width: 768px) {

@@ -14,7 +14,7 @@ const CATEGORIES = [
   { id: 'CLIMA',      label: 'Clima' },
 ]
 
-function MobileCard({ market, onTrade }) {
+function MobileCard({ market, onTrade, onOpen }) {
   useTick()
   const yesP      = parseFloat(market.prices?.yes || 50)
   const noP       = parseFloat(market.prices?.no  || 50)
@@ -56,13 +56,33 @@ function MobileCard({ market, onTrade }) {
 
       {/* Title */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 20 }}>
-        <p style={{
-          fontSize: 20, fontWeight: 600, color: C.text,
-          lineHeight: 1.35, margin: 0,
-          letterSpacing: '-0.02em',
-        }}>
-          {market.title}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <p
+            onClick={() => onOpen && onOpen(market)}
+            style={{
+              fontSize: 20, fontWeight: 600, color: C.text,
+              lineHeight: 1.35, margin: 0,
+              letterSpacing: '-0.02em', flex: 1,
+              cursor: onOpen ? 'pointer' : 'default',
+            }}
+          >
+            {market.title}
+          </p>
+          {onOpen && !market.placeholder && (
+            <button
+              onClick={() => onOpen(market)}
+              style={{
+                flexShrink: 0, height: 30, padding: '0 10px',
+                borderRadius: 6, border: `1px solid ${C.cardBorder}`,
+                background: C.surface, color: C.textMuted,
+                fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent', whiteSpace: 'nowrap',
+              }}
+            >
+              Oráculo ›
+            </button>
+          )}
+        </div>
 
         {/* Probability */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -170,6 +190,7 @@ export default function MobileMarketFeed({
   catFilter,
   setCatFilter,
   onTrade,
+  onOpen,
 }) {
   const activeMarkets = markets.filter(m => !m.isExpired)
 
@@ -229,7 +250,7 @@ export default function MobileMarketFeed({
           </div>
         ) : (
           activeMarkets.map(m => (
-            <MobileCard key={m.id} market={m} onTrade={onTrade} />
+            <MobileCard key={m.id} market={m} onTrade={onTrade} onOpen={onOpen} />
           ))
         )}
       </div>

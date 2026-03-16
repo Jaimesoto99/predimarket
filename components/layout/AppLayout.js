@@ -282,6 +282,17 @@ function SidebarInner({
   )
 }
 
+function useDesktopForce() {
+  const router = useRouter()
+  useEffect(() => {
+    const stored = typeof localStorage !== 'undefined' && localStorage.getItem('predi_force_desktop') === '1'
+    if (stored || router.query?.desktop === '1') {
+      document.documentElement.setAttribute('data-force-desktop', '1')
+      if (router.query?.desktop === '1') localStorage.setItem('predi_force_desktop', '1')
+    }
+  }, [router.query?.desktop])
+}
+
 export default function AppLayout({
   user,
   openTradesCount = 0,
@@ -300,6 +311,7 @@ export default function AppLayout({
   const { isDark, toggle } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
+  useDesktopForce()
 
   const activeCats = new Set(activeMarkets.map(m => m.category).filter(Boolean))
   const allCount = activeMarkets.length
@@ -429,6 +441,24 @@ export default function AppLayout({
         <main className="app-content">
           {children}
         </main>
+
+        {/* Ver versión completa — only on mobile */}
+        <a
+          href="?desktop=1"
+          className="app-desktop-link"
+          style={{
+            position: 'fixed', bottom: 16, right: 16,
+            zIndex: 90,
+            padding: '6px 12px', borderRadius: 20,
+            background: 'var(--card)', border: '1px solid var(--card-border)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+            fontSize: 11, color: 'var(--text-muted)', fontWeight: 500,
+            textDecoration: 'none', display: 'none',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          🖥 Versión completa
+        </a>
       </div>
     </div>
   )

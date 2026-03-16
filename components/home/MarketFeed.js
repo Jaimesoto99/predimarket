@@ -79,6 +79,7 @@ export default function MarketFeed({
           catFilter={catFilter}
           setCatFilter={setCatFilter}
           onTrade={onTrade}
+          onOpen={onOpen}
         />
       </div>
     </>

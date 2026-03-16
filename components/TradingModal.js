@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { C } from '../lib/theme'
 import OrderBook from './OrderBook'
 import ProbabilityChart from './ProbabilityChart'
@@ -25,6 +26,11 @@ export default function TradingModal({
   relatedMarkets = [],
   onClose, onExecuteTrade, onLimitOrder, onCancelOrder, onSell, onPostComment, onLikeComment, onOpenMarket,
 }) {
+  const scrollRef = useRef(null)
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+  }, [market?.id])
+
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -46,7 +52,7 @@ export default function TradingModal({
           {/* ── MarketHeader ─────────────────────────────────────────────── */}
           <MarketHeader market={market} onClose={onClose} />
 
-          <div className="trading-modal-scroll" style={{ padding: '24px 28px' }}>
+          <div ref={scrollRef} className="trading-modal-scroll" style={{ padding: '24px 28px' }}>
 
             {/* ── PriceChart ───────────────────────────────────────────────── */}
             {priceHistory.length > 1 && (
