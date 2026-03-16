@@ -60,5 +60,44 @@ export default async function handler(req, res) {
     return res.json(results)
   }
 
+  // ── Fix 1 confirmed: unlock_jobs (update rows where locked) ──────────────
+  if (fix === 'unlock_jobs') {
+    const { data, error } = await supabaseAdmin
+      .from('scheduler_jobs')
+      .update({ locked_at: null, locked_by: null })
+      .not('locked_at', 'is', null)
+      .select('id, status, locked_at')
+
+    if (error) return res.status(500).json({ error: error.message, hint: 'Table may not exist' })
+    return res.json({ ok: true, unlocked: data?.length ?? 0, jobs: data })
+  }
+
+  // ── test_trade: call place_limit_order with a real-ish user ───────────
+  if (fix === 'test_trade') {
+    const email = req.query.email || 'test@predimarket.com'
+    const marketId = parseInt(req.query.market_id || '253')
+
+    // First check the user exists
+    const { data: userData, error: userErr } = await supabaseAdmin
+      .rpc('get_or_create_user', { p_email: email })
+
+    // Try the trade
+    const { data: tradeData, error: tradeErr } = await supabaseAdmin
+      .rpc('place_limit_order', {
+        p_email: email,
+        p_market_id: marketId,
+        p_side: 'YES',
+        p_amount: 5,
+        p_target_price: 0.50,
+      })
+
+    return res.json({
+      user: userData,
+      user_error: userErr?.message ?? null,
+      trade_result: tradeData,
+      trade_error: tradeErr?.message ?? null,
+    })
+  }
+
   return res.status(400).json({ error: 'Unknown fix' })
 }
