@@ -14,7 +14,7 @@ function ProbBar({ pct }) {
   )
 }
 
-export default function MarketCard({ market, onOpen, label }) {
+export default function MarketCard({ market, onOpen, label, user, isWatching, onToggleWatch }) {
   useTick()  // re-render every minute so countdown stays live
   const yesP      = parseFloat(market.prices?.yes || 50)
   const catColor  = getCategoryColor(market.category)
@@ -29,6 +29,8 @@ export default function MarketCard({ market, onOpen, label }) {
   const { dateStr, countdown, isUrgent, isExpired } = closeInfo
 
   const probColor = yesP > 60 ? C.yes : yesP < 40 ? C.no : C.warning
+
+  const watching = isWatching ? isWatching(market.id) : false
 
   return (
     <div
@@ -46,6 +48,7 @@ export default function MarketCard({ market, onOpen, label }) {
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
         transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.12s',
+        position: 'relative',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = C.cardBorderHover
@@ -161,6 +164,26 @@ export default function MarketCard({ market, onOpen, label }) {
           </div>
         </div>
       </div>
+
+      {/* Heart / watchlist button */}
+      {onToggleWatch && (
+        <button
+          onClick={e => { e.stopPropagation(); if (user) onToggleWatch(market.id) }}
+          title={!user ? 'Inicia sesión para guardar' : watching ? 'Quitar de watchlist' : 'Guardar'}
+          style={{
+            position: 'absolute', bottom: 10, right: 10, zIndex: 2,
+            width: 26, height: 26, borderRadius: 13,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: watching ? `${C.no}10` : 'transparent',
+            border: `1px solid ${watching ? `${C.no}30` : C.cardBorder}`,
+            cursor: user ? 'pointer' : 'default',
+            fontSize: 12, color: watching ? C.no : C.textDim,
+            flexShrink: 0,
+          }}
+        >
+          {watching ? '♥' : '♡'}
+        </button>
+      )}
     </div>
   )
 }

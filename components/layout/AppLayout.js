@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { C, getCategoryColor, getCategoryLabel } from '../../lib/theme'
+import { C, getCategoryColor, getCategoryLabel, getCloseInfo } from '../../lib/theme'
 import { useTheme } from '../../lib/themeContext'
+import useTick from '../../hooks/useTick'
 
 const ALL_CATS = [
   'ECONOMIA', 'TIPOS', 'ENERGIA', 'POLITICA', 'DEPORTES',
@@ -20,13 +21,115 @@ const NAV_ITEMS = [
   { href: '/stats',      label: 'Estadísticas' },
 ]
 
+// ─── TikTok-style Discover card ───────────────────────────────────────────
+
+function DiscoverCard({ market, onOpen }) {
+  useTick()
+  const yesP      = parseFloat(market.prices?.yes || 50)
+  const noP       = parseFloat(market.prices?.no  || 50)
+  const catColor  = getCategoryColor(market.category)
+  const { countdown, isUrgent, isExpired } = getCloseInfo(market.resolution_time || market.close_date)
+  const probColor = yesP > 60 ? C.yes : yesP < 40 ? C.no : C.warning
+
+  return (
+    <div style={{
+      height: 'calc(100dvh - 48px)',
+      scrollSnapAlign: 'start',
+      scrollSnapStop: 'always',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '32px 24px',
+      gap: 20,
+      borderBottom: `1px solid ${C.cardBorder}`,
+      background: C.bg,
+    }}>
+
+      {/* Category */}
+      <span style={{
+        fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+        textTransform: 'uppercase', color: catColor,
+        background: `${catColor}15`, padding: '4px 10px', borderRadius: 20,
+      }}>
+        {getCategoryLabel(market.category)}
+      </span>
+
+      {/* Title */}
+      <h2 style={{
+        fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em',
+        color: C.text, lineHeight: 1.35, textAlign: 'center', margin: 0,
+        maxWidth: 340,
+      }}>
+        {market.title}
+      </h2>
+
+      {/* Big probability */}
+      <div style={{
+        fontSize: 72, fontWeight: 900, letterSpacing: '-0.05em',
+        color: probColor, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+      }}>
+        {yesP.toFixed(0)}%
+      </div>
+
+      {/* Prob bar */}
+      <div style={{ width: '100%', maxWidth: 280, height: 4, background: C.cardBorder, borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{ width: `${yesP}%`, height: '100%', background: probColor, borderRadius: 2 }} />
+      </div>
+
+      {/* YES / NO prices */}
+      <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2, fontWeight: 600 }}>SÍ</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: C.yes, fontVariantNumeric: 'tabular-nums' }}>{yesP.toFixed(0)}¢</div>
+        </div>
+        <div style={{ width: 1, height: 32, background: C.cardBorder }} />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2, fontWeight: 600 }}>NO</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: C.no, fontVariantNumeric: 'tabular-nums' }}>{noP.toFixed(0)}¢</div>
+        </div>
+      </div>
+
+      {/* Countdown */}
+      <div style={{
+        fontSize: 12, color: isUrgent ? C.no : C.textDim,
+        fontWeight: isUrgent ? 700 : 400,
+      }}>
+        {isExpired ? 'Resolviendo' : `Cierra ${countdown}`}
+      </div>
+
+      {/* CTA buttons */}
+      <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 280 }}>
+        <button
+          onClick={() => onOpen(market)}
+          style={{
+            flex: 1, padding: '14px 0', background: C.yes, border: 'none', borderRadius: 12,
+            color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          Comprar SÍ
+        </button>
+        <button
+          onClick={() => onOpen(market)}
+          style={{
+            flex: 1, padding: '14px 0', background: C.no, border: 'none', borderRadius: 12,
+            color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          Comprar NO
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SidebarInner({
   router, isDark, toggle,
   user, openTradesCount,
   onShowPortfolio, onShowLeaderboard, onShowProfile, onShowAuth, onLogout,
   filter, setFilter, catFilter, setCatFilter,
   activeMarkets, timeFilters, activeCats,
-  onClose,
+  onClose, onOpenDiscover,
 }) {
   const showFilters = router.pathname === '/' && typeof setFilter === 'function'
 
@@ -96,6 +199,23 @@ function SidebarInner({
             </Link>
           )
         })}
+
+        {/* Discover — TikTok-style fullscreen */}
+        <button
+          onClick={() => { onOpenDiscover?.(); onClose?.() }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '7px 10px', borderRadius: 7, marginBottom: 1,
+            fontSize: 13, fontWeight: 400,
+            color: C.textMuted,
+            background: 'transparent',
+            border: 'none', cursor: 'pointer',
+            width: '100%', textAlign: 'left', fontFamily: 'inherit',
+            position: 'relative',
+          }}
+        >
+          Discover
+        </button>
       </nav>
 
       {/* Filters — only on home page */}
@@ -301,6 +421,7 @@ export default function AppLayout({
   onShowProfile,
   onShowAuth,
   onLogout,
+  onOpenMarket,
   filter,
   setFilter,
   catFilter,
@@ -310,6 +431,7 @@ export default function AppLayout({
 }) {
   const { isDark, toggle } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [discoverOpen, setDiscoverOpen] = useState(false)
   const router = useRouter()
   useDesktopForce()
 
@@ -328,12 +450,15 @@ export default function AppLayout({
     return () => { document.body.style.overflow = '' }
   }, [sidebarOpen])
 
+  const discoverMarkets = activeMarkets.filter(m => !m.isExpired && !m.placeholder)
+
   const sharedProps = {
     router, isDark, toggle,
     user, openTradesCount,
     onShowPortfolio, onShowLeaderboard, onShowProfile, onShowAuth, onLogout,
     filter, setFilter, catFilter, setCatFilter,
     activeMarkets, timeFilters, activeCats,
+    onOpenDiscover: () => setDiscoverOpen(true),
   }
 
   return (
@@ -460,6 +585,69 @@ export default function AppLayout({
           🖥 Versión completa
         </a>
       </div>
+
+      {/* ─── Discover — TikTok fullscreen modal ─────────────────────────── */}
+      {discoverOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 600,
+          background: 'var(--bg)', overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          {/* Header */}
+          <div style={{
+            height: 48, flexShrink: 0,
+            display: 'flex', alignItems: 'center',
+            padding: '0 16px', gap: 12,
+            background: 'var(--bg-backdrop)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderBottom: '1px solid var(--card-border)',
+            zIndex: 610,
+          }}>
+            <button
+              onClick={() => setDiscoverOpen(false)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 13, color: C.textMuted, fontFamily: 'inherit', padding: '4px 0',
+              }}
+            >
+              ← Volver
+            </button>
+            <span style={{ fontSize: 14, fontWeight: 700, color: C.text, letterSpacing: '-0.02em' }}>
+              Discover
+            </span>
+          </div>
+
+          {/* Snap-scroll cards */}
+          <div
+            className="no-scrollbar"
+            style={{
+              flex: 1,
+              overflowY: 'scroll',
+              scrollSnapType: 'y mandatory',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            {discoverMarkets.length === 0 ? (
+              <div style={{
+                height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: C.textDim, fontSize: 14,
+              }}>
+                No hay mercados disponibles
+              </div>
+            ) : (
+              discoverMarkets.map(market => (
+                <DiscoverCard
+                  key={market.id}
+                  market={market}
+                  onOpen={(m) => { setDiscoverOpen(false); onOpenMarket?.(m) }}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

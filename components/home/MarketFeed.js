@@ -16,6 +16,9 @@ export default function MarketFeed({
   catFilter,
   setCatFilter,
   activeMarkets,
+  user,
+  isWatching,
+  onToggleWatch,
 }) {
   const isUnfiltered = filter === 'ALL' && catFilter === 'ALL'
 
@@ -50,6 +53,9 @@ export default function MarketFeed({
               showResolved={showResolved}
               setShowResolved={setShowResolved}
               onOpen={onOpen}
+              user={user}
+              isWatching={isWatching}
+              onToggleWatch={onToggleWatch}
             />
           </>
         ) : (
@@ -61,6 +67,9 @@ export default function MarketFeed({
             showResolved={showResolved}
             setShowResolved={setShowResolved}
             onOpen={onOpen}
+            user={user}
+            isWatching={isWatching}
+            onToggleWatch={onToggleWatch}
           />
         )}
       </div>

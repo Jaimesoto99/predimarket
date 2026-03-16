@@ -116,6 +116,9 @@ export default function MarketGrid({
   showResolved,
   setShowResolved,
   onOpen,
+  user,
+  isWatching,
+  onToggleWatch,
 }) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
   const [loadingTooLong, setLoadingTooLong] = useState(false)
@@ -198,7 +201,7 @@ export default function MarketGrid({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {visible.map(m => (
-              <MarketCard key={m.id} market={m} onOpen={onOpen} label={labelMap[m.id]} />
+              <MarketCard key={m.id} market={m} onOpen={onOpen} label={labelMap[m.id]} user={user} isWatching={isWatching} onToggleWatch={onToggleWatch} />
             ))}
           </div>
 

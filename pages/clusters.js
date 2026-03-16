@@ -7,25 +7,13 @@ import MarketCard from '@/components/MarketCard'
 import { ClusterBadge } from '@/components/analytics/MarketScoreIndicator'
 import { calculatePrices } from '../lib/amm'
 
-// ─── All known clusters ───────────────────────────────────────────────────
+// ─── Clusters regulatorios CNMV-friendly (Economía, Tipos, Energía) ─────
 
 const CLUSTERS = [
-  { id: 'CRYPTO_MARKETS',    label: 'Criptomonedas',     icon: '₿' },
-  { id: 'STOCK_INDICES',     label: 'Índices bursátiles', icon: '📈' },
-  { id: 'EU_ECONOMY',        label: 'Economía UE',        icon: '🇪🇺' },
-  { id: 'RATES_INFLATION',   label: 'Tipos e Inflación',  icon: '🏦' },
-  { id: 'COMMODITIES',       label: 'Materias primas',    icon: '🛢' },
-  { id: 'SPANISH_FOOTBALL',  label: 'Fútbol español',     icon: '⚽' },
-  { id: 'CHAMPIONS_LEAGUE',  label: 'Champions League',   icon: '🏆' },
-  { id: 'LA_LIGA',           label: 'La Liga',            icon: '⚽' },
-  { id: 'ES_POLITICS',       label: 'Política española',  icon: '🏛' },
-  { id: 'EU_POLITICS',       label: 'Política europea',   icon: '🇪🇺' },
-  { id: 'AI_TECH',           label: 'IA & Tecnología',    icon: '🤖' },
-  { id: 'BIG_TECH',          label: 'Big Tech',           icon: '💻' },
-  { id: 'ELECTRICITY',       label: 'Electricidad',       icon: '⚡' },
-  { id: 'OIL_GAS',           label: 'Petróleo & Gas',     icon: '🛢' },
-  { id: 'WAR_CONFLICT',      label: 'Conflictos',         icon: '🌍' },
-  { id: 'TRADE_GEOPOLITICS', label: 'Geopolítica',        icon: '🌐' },
+  { id: 'RATES_INFLATION', label: 'Política Monetaria BCE',     icon: '🏦' },
+  { id: 'STOCK_INDICES',   label: 'Mercados de Renta Fija',     icon: '📊' },
+  { id: 'EU_ECONOMY',      label: 'Indicadores Macroeconómicos', icon: '📈' },
+  { id: 'ELECTRICITY',     label: 'Energía y Materias Primas',  icon: '⚡' },
 ]
 
 export default function ClustersPage() {

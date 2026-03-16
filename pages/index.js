@@ -17,7 +17,6 @@ import KYCModal from '@/components/KYCModal'
 import HomeHero from '@/components/home/HomeHero'
 import HowItWorks from '@/components/home/HowItWorks'
 import MarketFeed from '@/components/home/MarketFeed'
-import LiveFeed from '@/components/LiveFeed'
 import TransparencySection from '@/components/home/TransparencySection'
 
 import AuthModal from '@/components/modals/AuthModal'
@@ -305,6 +304,7 @@ export default function Home() {
       onShowProfile={() => { setShowProfile(true); if (user) loadUserTrades(user.email) }}
       onShowAuth={() => setShowAuth(true)}
       onLogout={handleLogout}
+      onOpenMarket={openTradeModal}
       filter={filter}
       setFilter={setFilter}
       catFilter={catFilter}
@@ -336,16 +336,10 @@ export default function Home() {
         catFilter={catFilter}
         setCatFilter={setCatFilter}
         activeMarkets={realActiveMarkets}
+        user={user}
+        isWatching={isWatching}
+        onToggleWatch={toggleWatch}
       />
-
-      <div className="discover-mobile-only">
-        <LiveFeed
-          markets={realActiveMarkets}
-          loading={loading}
-          onTrade={(market, side) => { openTradeModal(market); setTradeSide(side) }}
-          onOpen={openTradeModal}
-        />
-      </div>
 
       <TransparencySection />
 
