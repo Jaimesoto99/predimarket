@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react'
 import { C, getCategoryColor, getCategoryLabel, getTypeLabel, isExpiredDate } from '../../lib/theme'
-import { followMarket, unfollowMarket } from '../../lib/watchlist'
 import ResolutionCountdown from './ResolutionCountdown'
 import MarketDurationBadge from './MarketDurationBadge'
+
+async function watchlistCall(email, marketId, action) {
+  const res = await fetch('/api/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, marketId, action }),
+  })
+  const data = await res.json()
+  if (!res.ok) console.error('[watchlist]', data.error)
+  return res.ok
+}
 
 export default function MarketHeader({ market, onClose, user, isWatching, onToggleWatch }) {
   const expired  = isExpiredDate(market.close_date)
@@ -33,11 +43,8 @@ export default function MarketHeader({ market, onClose, user, isWatching, onTogg
     const willWatch = !watching
     setWatching(willWatch)   // instant visual flip
     setHeartBusy(true)
-    if (willWatch) {
-      await followMarket(effectiveUser.email, market.id)
-    } else {
-      await unfollowMarket(effectiveUser.email, market.id)
-    }
+    const ok = await watchlistCall(effectiveUser.email, market.id, willWatch ? 'follow' : 'unfollow')
+    if (!ok) setWatching(!willWatch)  // rollback on failure
     setHeartBusy(false)
   }
 
