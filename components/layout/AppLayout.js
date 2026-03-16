@@ -5,8 +5,8 @@ import { C, getCategoryColor, getCategoryLabel } from '../../lib/theme'
 import { useTheme } from '../../lib/themeContext'
 
 const ALL_CATS = [
-  'ECONOMIA', 'POLITICA', 'DEPORTES', 'ENERGIA',
-  'CRIPTO', 'ACTUALIDAD', 'GEOPOLITICA', 'CLIMA', 'TECNOLOGIA',
+  'ECONOMIA', 'TIPOS', 'ENERGIA', 'POLITICA', 'DEPORTES',
+  'ACTUALIDAD', 'GEOPOLITICA', 'CLIMA', 'TECNOLOGIA',
   'CIENCIA', 'SOCIEDAD', 'CULTURA', 'INTERNACIONAL',
 ]
 

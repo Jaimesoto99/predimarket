@@ -60,6 +60,15 @@ function deriveConditions(market) {
   if (t.includes('euribor')) {
     return { si: 'El Euríbor 12M publicado cumple la condición del título.', no: 'El Euríbor no cumple la condición.', source: 'BCE / Banco de España', url: 'bde.es/es/estadisticas/tipos-de-interes-y-tipos-de-cambio', method: 'Publicación oficial del tipo Euríbor' }
   }
+  if (t.includes('prima de riesgo') || (t.includes('prima') && t.includes('riesgo'))) {
+    return { si: 'El diferencial bono España 10Y – Bund alemán 10Y supera el umbral indicado al cierre de la sesión.', no: 'El diferencial cierra en el umbral o por debajo.', source: 'Banco de España / Investing.com', url: 'investing.com/rates-bonds/spain-10-year-bond-yield', method: 'Diferencial de rendimientos al cierre de sesión bursátil (17:35h CET)' }
+  }
+  if (t.includes('bono') && (t.includes('10 año') || t.includes('10y') || t.includes('diez año'))) {
+    return { si: 'El rendimiento del Bono del Estado español a 10 años supera el umbral indicado al cierre.', no: 'El Bono español cierra en el umbral o por debajo.', source: 'Bolsa de Madrid / Banco de España', url: 'bde.es/es/estadisticas/tipos-de-interes-y-tipos-de-cambio', method: 'Rendimiento oficial del Bono del Estado a 10 años al cierre de sesión' }
+  }
+  if ((t.includes('bce') || t.includes('banco central europeo')) && (t.includes('tipo') || t.includes('interés'))) {
+    return { si: 'El BCE sube el tipo de interés de referencia de la facilidad de depósito en la reunión indicada.', no: 'El BCE mantiene o baja los tipos en esa reunión.', source: 'Banco Central Europeo', url: 'ecb.europa.eu/press/pr/date', method: 'Comunicado oficial del Consejo de Gobierno del BCE el día de la reunión de política monetaria' }
+  }
   if (t.includes('temperatura') || t.includes('°c') || t.includes('grados')) {
     return { si: 'La temperatura máxima registrada supera el umbral indicado.', no: 'La temperatura no supera el umbral.', source: 'AEMET / Open-Meteo', url: 'open-meteo.com', method: 'Datos meteorológicos de Open-Meteo y verificación AEMET' }
   }

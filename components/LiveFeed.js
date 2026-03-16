@@ -7,13 +7,12 @@ import useTick from '../hooks/useTick'
 const CATS = [
   { id: 'ALL',        label: 'Todo' },
   { id: 'ECONOMIA',   label: 'Economía' },
+  { id: 'TIPOS',      label: 'Tipos' },
+  { id: 'ENERGIA',    label: 'Energía' },
   { id: 'DEPORTES',   label: 'Deportes' },
   { id: 'POLITICA',   label: 'Política' },
-  { id: 'CRIPTO',     label: 'Cripto' },
   { id: 'ACTUALIDAD', label: 'Actualidad' },
-  { id: 'ENERGIA',    label: 'Energía' },
   { id: 'TECNOLOGIA', label: 'Tecnología' },
-  { id: 'FINANZAS',   label: 'Finanzas' },
   { id: 'CLIMA',      label: 'Clima' },
 ]
 
