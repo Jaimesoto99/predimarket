@@ -64,11 +64,11 @@ export default function HomeSections({ markets, onOpen, onTrade }) {
       .slice(0, 8)
   )
 
-  // 4. Popular — top by active_traders in CNMV categories
+  // 4. Popular — top by total_volume in CNMV categories (active_traders not in schema)
   const popular = unique(
     active
       .filter(m => CNMV_CATS.has(m.category))
-      .sort((a, b) => (parseFloat(b.active_traders) || 0) - (parseFloat(a.active_traders) || 0))
+      .sort((a, b) => (parseFloat(b.total_volume) || 0) - (parseFloat(a.total_volume) || 0))
       .slice(0, 8)
   )
 

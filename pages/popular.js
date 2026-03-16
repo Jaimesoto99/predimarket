@@ -6,28 +6,31 @@ import AppLayout from '@/components/layout/AppLayout'
 import MarketCard from '@/components/MarketCard'
 
 const SORTS = [
-  { key: 'active_traders', label: 'Traders' },
-  { key: 'total_volume',   label: 'Volumen' },
+  { key: 'total_volume', label: 'Volumen' },
+  { key: 'created_at',   label: 'Recientes' },
 ]
 
 export default function PopularPage() {
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [sort, setSort]       = useState('active_traders')
+  const [sort, setSort]       = useState('total_volume')
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       const { data, error } = await supabase
         .from('markets')
-        .select('id, title, category, yes_pool, no_pool, total_volume, close_date, active_traders, market_score, cluster_id, trending, prob_change_6h, prob_change_24h, vol_24h, created_at')
+        .select('id, title, category, yes_pool, no_pool, total_volume, close_date, created_at, resolution_time')
         .eq('status', 'ACTIVE')
         .in('category', ['ECONOMIA', 'TIPOS', 'ENERGIA'])
         .gt('close_date', new Date().toISOString())
         .order(sort, { ascending: false })
         .limit(50)
 
-      if (!error && data) {
+      if (error) {
+        console.error('[popular] supabase error:', error.message)
+      }
+      if (data) {
         setMarkets(data.map(m => ({
           ...m,
           prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),

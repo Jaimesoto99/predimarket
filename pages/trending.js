@@ -9,22 +9,24 @@ import { calculatePrices } from '../lib/amm'
 export default function TrendingPage() {
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [sort, setSort] = useState('volume') // 'volume' | 'traders'
+  const [sort, setSort] = useState('total_volume') // 'total_volume' | 'created_at'
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const col = sort === 'traders' ? 'active_traders' : 'total_volume'
       const { data, error } = await supabase
         .from('markets')
-        .select('id, title, category, yes_pool, no_pool, total_volume, close_date, market_score, cluster_id, trending, prob_change_6h, prob_change_24h, vol_24h, created_at, active_traders')
+        .select('id, title, category, yes_pool, no_pool, total_volume, close_date, created_at, resolution_time')
         .eq('status', 'ACTIVE')
         .in('category', ['ECONOMIA', 'TIPOS', 'ENERGIA'])
         .gt('close_date', new Date().toISOString())
-        .order(col, { ascending: false })
+        .order(sort, { ascending: false })
         .limit(50)
 
-      if (!error && data) {
+      if (error) {
+        console.error('[trending] supabase error:', error.message)
+      }
+      if (data) {
         setMarkets(data.map(m => ({
           ...m,
           prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
@@ -54,7 +56,7 @@ export default function TrendingPage() {
             display: 'flex', background: C.surface, borderRadius: 8, padding: 3,
             border: `1px solid ${C.cardBorder}`,
           }}>
-            {[['volume', 'Volumen'], ['traders', 'Traders']].map(([k, label]) => (
+            {[['total_volume', 'Volumen'], ['created_at', 'Recientes']].map(([k, label]) => (
               <button key={k} onClick={() => setSort(k)} style={{
                 padding: '5px 12px', fontSize: 12, borderRadius: 6, border: 'none',
                 cursor: 'pointer', fontFamily: 'inherit', fontWeight: sort === k ? 600 : 400,
