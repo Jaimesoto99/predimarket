@@ -10,6 +10,18 @@ const supabaseAdmin = createClient(
 )
 
 export default async function handler(req, res) {
+  // GET /api/watchlist?email=... → returns market_id list
+  if (req.method === 'GET') {
+    const email = req.query.email
+    if (!email) return res.status(400).json({ error: 'Missing email' })
+    const { data, error } = await supabaseAdmin
+      .from('user_watchlists')
+      .select('market_id')
+      .eq('user_email', email.toLowerCase().trim())
+    if (error) return res.status(500).json({ error: error.message })
+    return res.json({ ids: (data || []).map(r => r.market_id) })
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { email, marketId, action } = req.body
