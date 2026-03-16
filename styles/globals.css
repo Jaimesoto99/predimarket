@@ -269,6 +269,12 @@ html * { transition: background-color 0.15s ease, border-color 0.15s ease, color
 
 /* ─── Discover section (YouTube Shorts–style horizontal row) ─────────────────── */
 
+/* Mobile-only wrapper: hide Discover on desktop */
+.discover-mobile-only { display: block }
+@media (min-width: 768px) {
+  .discover-mobile-only { display: none !important }
+}
+
 /* Hide scrollbar on the horizontal card row */
 .discover-row::-webkit-scrollbar { display: none }
 .discover-row { -ms-overflow-style: none; scrollbar-width: none }

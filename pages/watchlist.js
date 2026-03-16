@@ -28,9 +28,8 @@ export default function WatchlistPage() {
     if (loading || watchlistMarkets.length > 0) return
     supabase
       .from('markets')
-      .select('id, title, category, yes_pool, no_pool, total_volume, close_date, created_at, resolution_time')
+      .select('id, title, category, yes_pool, no_pool, total_volume, close_date, created_at')
       .eq('status', 'ACTIVE')
-      .in('category', ['ECONOMIA', 'TIPOS', 'ENERGIA'])
       .gt('close_date', new Date().toISOString())
       .order('close_date', { ascending: true })
       .limit(4)

@@ -322,13 +322,6 @@ export default function Home() {
 
       <TrendingRow markets={trendingMarkets} onOpen={openTradeModal} />
 
-      <LiveFeed
-        markets={realActiveMarkets}
-        loading={loading}
-        onTrade={(market, side) => { openTradeModal(market); setTradeSide(side) }}
-        onOpen={openTradeModal}
-      />
-
       <MarketFeed
         filtered={filtered}
         loading={loading}
@@ -344,6 +337,15 @@ export default function Home() {
         setCatFilter={setCatFilter}
         activeMarkets={realActiveMarkets}
       />
+
+      <div className="discover-mobile-only">
+        <LiveFeed
+          markets={realActiveMarkets}
+          loading={loading}
+          onTrade={(market, side) => { openTradeModal(market); setTradeSide(side) }}
+          onOpen={openTradeModal}
+        />
+      </div>
 
       <TransparencySection />
 

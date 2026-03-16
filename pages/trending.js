@@ -16,9 +16,8 @@ export default function TrendingPage() {
       setLoading(true)
       const { data, error } = await supabase
         .from('markets')
-        .select('id, title, category, yes_pool, no_pool, total_volume, close_date, created_at, resolution_time')
+        .select('id, title, category, yes_pool, no_pool, total_volume, close_date, created_at')
         .eq('status', 'ACTIVE')
-        .in('category', ['ECONOMIA', 'TIPOS', 'ENERGIA'])
         .gt('close_date', new Date().toISOString())
         .order(sort, { ascending: false })
         .limit(50)
