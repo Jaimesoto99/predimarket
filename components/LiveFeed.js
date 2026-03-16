@@ -220,7 +220,8 @@ function SkeletonCard() {
 export default function LiveFeed({ markets = [], loading, onTrade, onOpen }) {
   const [cat, setCat] = useState('ALL')
 
-  const active   = markets.filter(m => !m.isExpired && !m.placeholder)
+  const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
+  const active   = markets.filter(m => !m.isExpired && !m.placeholder && CNMV_CATS.has(m.category))
   const filtered = cat === 'ALL' ? active : active.filter(m => m.category === cat)
 
   const activeCatIds = new Set(active.map(m => m.category).filter(Boolean))

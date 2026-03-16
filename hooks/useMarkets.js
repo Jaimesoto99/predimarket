@@ -60,8 +60,10 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
         return
       }
 
+      const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
+
       const enriched = (data || [])
-        .filter(m => !HIDDEN_CATEGORIES.has(m.category))
+        .filter(m => !HIDDEN_CATEGORIES.has(m.category) && CNMV_CATS.has(m.category))
         .map(m => ({
           ...m,
           prices:    calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
@@ -70,7 +72,7 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
 
       const nonExpiredCount = enriched.filter(m => !m.isExpired).length
       const fillerCount     = Math.max(0, 15 - nonExpiredCount)
-      const fillers         = EXAMPLE_PLACEHOLDERS.slice(0, fillerCount)
+      const fillers         = EXAMPLE_PLACEHOLDERS.filter(p => CNMV_CATS.has(p.category)).slice(0, fillerCount)
 
       setMarkets([...enriched, ...fillers])
       console.log(`[useMarkets] setMarkets: ${enriched.length} real + ${fillers.length} placeholders`)

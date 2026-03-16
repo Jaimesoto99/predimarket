@@ -19,13 +19,16 @@ function durationHours(market) {
 // ─── HomeSections ─────────────────────────────────────────────────────────
 // Pure client-side filtering — uses the markets array already loaded by useMarkets().
 
+const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
+
 export default function HomeSections({ markets, onOpen, onTrade }) {
   const now   = Date.now()
   const in24h = now + 24 * 3600000
 
-  // Only active, non-expired, non-placeholder markets
+  // Only active, non-expired, non-placeholder CNMV markets
   const active = markets.filter(m =>
-    !m.isExpired && !m.placeholder && m.status !== 'RESOLVED' && m.status !== 'CLOSED'
+    !m.isExpired && !m.placeholder && m.status !== 'RESOLVED' && m.status !== 'CLOSED' &&
+    CNMV_CATS.has(m.category)
   )
 
   // Deduplication — markets appear in at most one section (priority order)
@@ -54,20 +57,16 @@ export default function HomeSections({ markets, onOpen, onTrade }) {
       .slice(0, 8)
   )
 
-  const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
-
-  // 3. Trending — top by total_volume in CNMV categories
+  // 3. Trending — top by total_volume (active already CNMV-filtered)
   const trending = unique(
     active
-      .filter(m => CNMV_CATS.has(m.category))
       .sort((a, b) => (parseFloat(b.total_volume) || 0) - (parseFloat(a.total_volume) || 0))
       .slice(0, 8)
   )
 
-  // 4. Popular — top by total_volume in CNMV categories (active_traders not in schema)
+  // 4. Popular — top by total_volume with recency tiebreak
   const popular = unique(
     active
-      .filter(m => CNMV_CATS.has(m.category))
       .sort((a, b) => (parseFloat(b.total_volume) || 0) - (parseFloat(a.total_volume) || 0))
       .slice(0, 8)
   )
