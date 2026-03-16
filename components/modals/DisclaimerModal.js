@@ -1,13 +1,6 @@
 import { C, panelStyle } from '../../lib/theme'
 
-export default function DisclaimerModal({
-  showDisclaimer,
-  setShowDisclaimer,
-  pendingTradeAction,
-  setPendingTradeAction,
-  onExecuteTrade,
-  onLimitOrder,
-}) {
+export default function DisclaimerModal({ showDisclaimer, setShowDisclaimer, onAccept, onCancel }) {
   if (!showDisclaimer) return null
 
   return (
@@ -41,7 +34,7 @@ export default function DisclaimerModal({
         </label>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => { setShowDisclaimer(false); setPendingTradeAction(null) }}
+            onClick={() => { setShowDisclaimer(false); onCancel?.() }}
             style={{ flex: 1, padding: '11px 0', borderRadius: 7, border: `1px solid ${C.cardBorder}`, background: 'transparent', color: C.textDim, fontSize: 13, cursor: 'pointer' }}
           >
             Cancelar
@@ -51,11 +44,9 @@ export default function DisclaimerModal({
             disabled
             style={{ flex: 2, padding: '11px 0', borderRadius: 7, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.15s' }}
             onClick={() => {
-              localStorage.setItem('predi_disclaimer_v1', 'accepted')
+              localStorage.setItem('disclaimer_accepted', 'true')
               setShowDisclaimer(false)
-              if (pendingTradeAction === 'MARKET') onExecuteTrade()
-              else if (pendingTradeAction === 'LIMIT') onLimitOrder()
-              setPendingTradeAction(null)
+              onAccept?.()
             }}
           >
             Acepto — Continuar

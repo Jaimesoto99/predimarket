@@ -38,7 +38,7 @@ export default function Home() {
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [showKYC, setShowKYC] = useState(false)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
-  const [pendingTradeAction, setPendingTradeAction] = useState(null)
+  const [pendingMarket, setPendingMarket] = useState(null)
   const [showResolved, setShowResolved] = useState(false)
 
   // ─── Trading state ────────────────────────────────────────────────────────
@@ -134,13 +134,18 @@ export default function Home() {
   }
 
   function hasAcceptedDisclaimer() {
-    try { return localStorage.getItem('predi_disclaimer_v1') === 'accepted' } catch { return false }
+    try { return localStorage.getItem('disclaimer_accepted') === 'true' } catch { return false }
   }
 
   // ─── Trade modal ──────────────────────────────────────────────────────────
   function openTradeModal(market) {
     if (market.placeholder) return
     if (!user) { setShowAuth(true); return }
+    if (!hasAcceptedDisclaimer()) {
+      setPendingMarket(market)
+      setShowDisclaimer(true)
+      return
+    }
     setSelectedMarket(market)
     setShowTradeModal(true)
     setOrderMode('MARKET')
@@ -167,7 +172,6 @@ export default function Home() {
 
   async function executeTrade() {
     if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid || processing) return
-    if (!hasAcceptedDisclaimer()) { setPendingTradeAction('MARKET'); setShowDisclaimer(true); return }
     setProcessing(true)
     const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount, selectedMarket)
     setProcessing(false)
@@ -190,7 +194,6 @@ export default function Home() {
 
   async function placeLimitOrder() {
     if (!user || !selectedMarket || processing) return
-    if (!hasAcceptedDisclaimer()) { setPendingTradeAction('LIMIT'); setShowDisclaimer(true); return }
     setProcessing(true)
     const { data, error } = await supabase.rpc('place_limit_order', {
       p_email: user.email, p_market_id: selectedMarket.id,
@@ -409,10 +412,11 @@ export default function Home() {
       <DisclaimerModal
         showDisclaimer={showDisclaimer}
         setShowDisclaimer={setShowDisclaimer}
-        pendingTradeAction={pendingTradeAction}
-        setPendingTradeAction={setPendingTradeAction}
-        onExecuteTrade={executeTrade}
-        onLimitOrder={placeLimitOrder}
+        onAccept={() => {
+          setPendingMarket(null)
+          if (pendingMarket) openTradeModal(pendingMarket)
+        }}
+        onCancel={() => setPendingMarket(null)}
       />
 
       {toast && (
