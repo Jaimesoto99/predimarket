@@ -118,7 +118,8 @@ a { color: inherit; text-decoration: none }
   border-right: 1px solid var(--card-border);
   background: var(--card);
   height: 100vh;
-  position: sticky;
+  position: fixed;
+  left: 0;
   top: 0;
   overflow-y: auto;
   display: flex;
@@ -132,6 +133,7 @@ a { color: inherit; text-decoration: none }
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  margin-left: 240px;
 }
 
 .app-topbar {
@@ -169,6 +171,7 @@ a { color: inherit; text-decoration: none }
 
   .app-main {
     padding-top: 48px;
+    margin-left: 0;
   }
 
   .app-content {
