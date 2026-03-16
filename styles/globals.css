@@ -267,42 +267,21 @@ html * { transition: background-color 0.15s ease, border-color 0.15s ease, color
   }
 }
 
-/* ─── Live Feed ("En directo") ───────────────────────────────────────────────── */
+/* ─── Discover section (YouTube Shorts–style horizontal row) ─────────────────── */
 
-@keyframes live-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 2px #ef444430 }
-  50%       { opacity: 0.7; box-shadow: 0 0 0 4px #ef444420 }
-}
+/* Hide scrollbar on the horizontal card row */
+.discover-row::-webkit-scrollbar { display: none }
+.discover-row { -ms-overflow-style: none; scrollbar-width: none }
 
-/* Section: full viewport height, breaks out of app-content horizontal padding */
-.live-section {
-  height: 100dvh;
-  margin: 0 -24px;   /* desktop: app-content has padding: 0 24px */
-  overflow: hidden;
-}
-
-/* Snap container: hide native scrollbar on all browsers */
-.live-snap::-webkit-scrollbar { display: none }
-.live-snap { -ms-overflow-style: none; scrollbar-width: none }
-
-/* Category filter pills: hide scrollbar */
-.live-filter-pills::-webkit-scrollbar { display: none }
-.live-filter-pills { -ms-overflow-style: none; scrollbar-width: none }
-
-@media (max-width: 768px) {
-  .live-section {
-    /* minus mobile topbar (48px) */
-    height: calc(100dvh - 48px);
-    margin: 0 -16px;  /* mobile: app-content padding: 0 16px */
-  }
-}
+/* Hide scrollbar on the category pills */
+.discover-pills::-webkit-scrollbar { display: none }
+.discover-pills { -ms-overflow-style: none; scrollbar-width: none }
 
 /* ─── Force desktop mode (via ?desktop=1) ───────────────────────────────────── */
 [data-force-desktop="1"] .app-sidebar    { display: flex !important; flex-direction: column }
 [data-force-desktop="1"] .app-topbar     { display: none !important }
 [data-force-desktop="1"] .app-content    { padding: 32px 24px 80px !important }
 [data-force-desktop="1"] .app-desktop-link { display: none !important }
-[data-force-desktop="1"] .live-section   { height: 100dvh; margin: 0 -24px }
 [data-force-desktop="1"] .trading-modal-panel  { position: relative !important; inset: auto !important; max-width: 960px !important; width: 100% !important; border-radius: 16px !important; max-height: none !important; height: auto !important; overflow: hidden !important }
 [data-force-desktop="1"] .trading-modal-scroll { padding: 24px 28px !important }
 

@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { C, getCategoryColor, getCategoryLabel, getCloseInfo } from '../lib/theme'
 import useTick from '../hooks/useTick'
 
-// ─── Category filter data ─────────────────────────────────────────────────────
+// ─── Category pills ───────────────────────────────────────────────────────────
 
 const CATS = [
   { id: 'ALL',        label: 'Todo' },
@@ -13,307 +13,285 @@ const CATS = [
   { id: 'POLITICA',   label: 'Política' },
   { id: 'ACTUALIDAD', label: 'Actualidad' },
   { id: 'TECNOLOGIA', label: 'Tecnología' },
-  { id: 'CLIMA',      label: 'Clima' },
 ]
 
-// ─── Single card ─────────────────────────────────────────────────────────────
+// ─── Vertical short card (9:16, 180×320px) ───────────────────────────────────
 
-function LiveCard({ market, idx, total, onTrade, onOpen }) {
+function ShortCard({ market, onTrade, onOpen }) {
   useTick()
 
-  const yesP       = parseFloat(market.prices?.yes || 50)
-  const noP        = parseFloat(market.prices?.no  || 50)
-  const catColor   = getCategoryColor(market.category)
-  const closeInfo  = getCloseInfo(market.resolution_time || market.close_date)
-  const { countdown, isExpired, isUrgent, dateStr } = closeInfo
-  const volume     = market.total_volume || 0
-  const probColor  = yesP > 60 ? C.yes : yesP < 40 ? C.no : C.warning
+  const yesP      = parseFloat(market.prices?.yes || 50)
+  const noP       = parseFloat(market.prices?.no  || 50)
+  const catColor  = getCategoryColor(market.category)
+  const { countdown, isExpired, isUrgent } = getCloseInfo(
+    market.resolution_time || market.close_date
+  )
+  const probColor = yesP > 60 ? C.yes : yesP < 40 ? C.no : C.warning
 
   return (
     <div
+      onClick={() => !market.placeholder && onOpen && onOpen(market)}
       style={{
-        // ── Snap target ───────────────────────────────────────────────
-        height: '100%',
-        scrollSnapAlign: 'start',
-        scrollSnapStop: 'always',
-        // ── Layout ────────────────────────────────────────────────────
-        display: 'flex',
-        flexDirection: 'column',
-        boxSizing: 'border-box',
-        background: C.card,
-        borderBottom: `1px solid ${C.cardBorder}`,
-        // ── Top padding so content clears the overlay header ──────────
-        paddingTop: 80,
+        // ── Dimensions: ~9:16 ratio ───────────────────────────────────
+        width:     180,
+        height:    320,
+        flexShrink: 0,
+        // ── Appearance ───────────────────────────────────────────────
+        borderRadius: 12,
+        background:   C.card,
+        border:       `1px solid ${C.cardBorder}`,
+        overflow:     'hidden',
+        cursor:       market.placeholder ? 'default' : 'pointer',
+        display:      'flex',
+        flexDirection:'column',
+        transition:   'border-color 0.12s ease, transform 0.12s ease',
+        WebkitTapHighlightColor: 'transparent',
+        userSelect:   'none',
+      }}
+      onMouseEnter={e => {
+        if (!market.placeholder) {
+          e.currentTarget.style.borderColor = C.cardBorderHover
+          e.currentTarget.style.transform   = 'translateY(-2px)'
+        }
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = C.cardBorder
+        e.currentTarget.style.transform   = 'translateY(0)'
       }}
     >
-
-      {/* ── Scrollable inner content ─────────────────────────────────── */}
+      {/* ── Top gradient area: category + timer ─────────────────────── */}
       <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '0 20px 20px',
-        gap: 20,
+        padding:    '10px 10px 8px',
+        flexShrink: 0,
+        background: `linear-gradient(135deg, ${catColor}18 0%, transparent 100%)`,
+        borderBottom: `1px solid ${C.cardBorder}`,
       }}>
-
-        {/* Category + timer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
           <span style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.07em',
+            fontSize: 9, fontWeight: 700, letterSpacing: '0.07em',
             textTransform: 'uppercase', color: catColor,
-            background: `${catColor}12`, padding: '3px 8px', borderRadius: 4,
+            background: `${catColor}15`, padding: '2px 6px', borderRadius: 3,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            maxWidth: 90,
           }}>
             {getCategoryLabel(market.category)}
           </span>
-          <div style={{ textAlign: 'right' }}>
-            {dateStr && (
-              <div style={{ fontSize: 9, color: C.textDim, marginBottom: 1 }}>
-                Cierra: {dateStr}
-              </div>
-            )}
-            <div style={{
-              fontSize: 11, fontWeight: 600,
-              color: isExpired ? C.warning : isUrgent ? C.no : C.textDim,
-            }}>
-              {isExpired ? 'Resolviendo…' : countdown}
-            </div>
-          </div>
+          <span style={{
+            fontSize: 9, fontWeight: 500,
+            color: isExpired ? C.warning : isUrgent ? C.no : C.textDim,
+            flexShrink: 0,
+          }}>
+            {isExpired ? '⏱' : countdown?.split(' ').slice(0, 2).join(' ')}
+          </span>
         </div>
+      </div>
 
-        {/* Title */}
+      {/* ── Title ───────────────────────────────────────────────────── */}
+      <div style={{
+        flex:    1,
+        padding: '10px 10px 6px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        minHeight: 0,
+      }}>
         <p style={{
-          fontSize: 22, fontWeight: 700, color: C.text,
-          lineHeight: 1.3, margin: 0,
-          letterSpacing: '-0.025em',
+          fontSize:   12,
+          fontWeight: 600,
+          color:      C.text,
+          lineHeight: 1.4,
+          margin:     0,
+          letterSpacing: '-0.01em',
+          // clamp to 4 lines
+          display:           '-webkit-box',
+          WebkitLineClamp:   4,
+          WebkitBoxOrient:   'vertical',
+          overflow:          'hidden',
         }}>
           {market.title}
         </p>
 
-        {/* Probability */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span style={{
-              fontSize: 56, fontWeight: 800, letterSpacing: '-0.04em',
-              fontVariantNumeric: 'tabular-nums', color: probColor, lineHeight: 1,
-            }}>
-              {yesP.toFixed(0)}%
-            </span>
-            <span style={{ fontSize: 13, color: C.textMuted, fontWeight: 500 }}>
-              probabilidad SÍ
-            </span>
+        {/* ── Probability ─────────────────────────────────────────── */}
+        <div style={{ marginTop: 8 }}>
+          <div style={{
+            fontSize: 32, fontWeight: 800,
+            letterSpacing: '-0.04em',
+            fontVariantNumeric: 'tabular-nums',
+            color: probColor, lineHeight: 1,
+            marginBottom: 6,
+          }}>
+            {yesP.toFixed(0)}%
           </div>
 
           {/* Bar */}
           <div style={{
-            height: 6, borderRadius: 6,
+            height: 4, borderRadius: 4,
             background: C.cardBorder, overflow: 'hidden',
+            marginBottom: 5,
           }}>
             <div style={{
-              height: '100%', borderRadius: 6,
+              height: '100%', borderRadius: 4,
               width: `${yesP}%`, background: probColor,
               transition: 'width 0.5s cubic-bezier(0.4,0,0.2,1)',
             }} />
           </div>
 
-          {/* SÍ / NO + volume */}
-          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: '2px 6px',
-                borderRadius: 3, background: `${C.yes}12`, color: C.yes,
-              }}>SÍ</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.yes, fontVariantNumeric: 'tabular-nums' }}>
-                {yesP.toFixed(0)}¢
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: '2px 6px',
-                borderRadius: 3, background: `${C.no}10`, color: C.no,
-              }}>NO</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.no, fontVariantNumeric: 'tabular-nums' }}>
-                {noP.toFixed(0)}¢
-              </span>
-            </div>
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: C.textDim, fontVariantNumeric: 'tabular-nums' }}>
-              Vol {volume > 1000 ? `€${(volume / 1000).toFixed(1)}K` : `€${volume.toFixed(0)}`}
+          {/* SÍ / NO labels */}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 9, color: C.yes, fontWeight: 600 }}>
+              SÍ {yesP.toFixed(0)}¢
+            </span>
+            <span style={{ fontSize: 9, color: C.no, fontWeight: 600 }}>
+              NO {noP.toFixed(0)}¢
             </span>
           </div>
         </div>
+      </div>
 
-        {/* Oracle / detail link */}
-        {onOpen && !market.placeholder && (
+      {/* ── CTA ─────────────────────────────────────────────────────── */}
+      {!market.placeholder && !isExpired && (
+        <div style={{ padding: '0 8px 10px', flexShrink: 0, display: 'flex', gap: 5 }}>
           <button
-            onClick={() => onOpen(market)}
+            onClick={e => { e.stopPropagation(); onTrade && onTrade(market, 'YES') }}
             style={{
-              alignSelf: 'flex-start',
-              padding: '5px 12px', borderRadius: 6,
-              border: `1px solid ${C.cardBorder}`,
-              background: 'transparent', color: C.textMuted,
-              fontSize: 12, fontWeight: 500, cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
+              flex: 1, height: 28, borderRadius: 6,
+              background: C.yes, border: 'none',
+              color: '#fff', fontSize: 10, fontWeight: 700,
+              cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            Ver oráculo →
+            SÍ
           </button>
-        )}
-
-      </div>
-
-      {/* ── CTA buttons (pinned bottom) ───────────────────────────────── */}
-      <div style={{
-        padding: '14px 20px',
-        paddingBottom: 'calc(14px + env(safe-area-inset-bottom))',
-        background: C.card,
-        borderTop: `1px solid ${C.cardBorder}`,
-        flexShrink: 0,
-      }}>
-        {!market.placeholder && !isExpired ? (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              onClick={() => onTrade && onTrade(market, 'YES')}
-              style={{
-                flex: 1, height: 52, borderRadius: 10,
-                background: C.yes, border: 'none',
-                color: '#fff', fontSize: 15, fontWeight: 700,
-                cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              Comprar SÍ
-            </button>
-            <button
-              onClick={() => onTrade && onTrade(market, 'NO')}
-              style={{
-                flex: 1, height: 52, borderRadius: 10,
-                background: C.no, border: 'none',
-                color: '#fff', fontSize: 15, fontWeight: 700,
-                cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              Comprar NO
-            </button>
-          </div>
-        ) : (
-          <div style={{
-            height: 52, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', borderRadius: 10,
-            background: C.surface, fontSize: 13,
-            color: C.textDim, fontWeight: 500,
-          }}>
-            {isExpired ? 'Mercado en resolución' : 'Próximamente'}
-          </div>
-        )}
-
-        {/* Card counter */}
-        <div style={{
-          marginTop: 10,
-          display: 'flex', justifyContent: 'center', gap: 4,
-        }}>
-          {Array.from({ length: Math.min(total, 10) }).map((_, i) => (
-            <div key={i} style={{
-              width: i === idx ? 16 : 4, height: 4,
-              borderRadius: 2,
-              background: i === idx ? C.text : C.cardBorder,
-              transition: 'width 0.25s ease, background 0.25s ease',
-            }} />
-          ))}
+          <button
+            onClick={e => { e.stopPropagation(); onTrade && onTrade(market, 'NO') }}
+            style={{
+              flex: 1, height: 28, borderRadius: 6,
+              background: C.no, border: 'none',
+              color: '#fff', fontSize: 10, fontWeight: 700,
+              cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            NO
+          </button>
         </div>
-      </div>
-
+      )}
+      {(market.placeholder || isExpired) && (
+        <div style={{
+          margin: '0 8px 10px', height: 28, borderRadius: 6,
+          background: C.surface, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 9, color: C.textDim, fontWeight: 500,
+        }}>
+          {isExpired ? 'Resolviendo' : 'Próximamente'}
+        </div>
+      )}
     </div>
   )
 }
 
-// ─── Section wrapper ──────────────────────────────────────────────────────────
+// ─── Skeleton card ────────────────────────────────────────────────────────────
+
+function SkeletonCard() {
+  return (
+    <div style={{
+      width: 180, height: 320, flexShrink: 0,
+      borderRadius: 12, overflow: 'hidden',
+      background: C.card, border: `1px solid ${C.cardBorder}`,
+      display: 'flex', flexDirection: 'column',
+      padding: 10, gap: 8,
+    }}>
+      <div className="skeleton" style={{ height: 18, width: '60%', borderRadius: 4 }} />
+      <div className="skeleton" style={{ height: 14, width: '95%', borderRadius: 4 }} />
+      <div className="skeleton" style={{ height: 14, width: '80%', borderRadius: 4 }} />
+      <div className="skeleton" style={{ height: 14, width: '70%', borderRadius: 4 }} />
+      <div style={{ flex: 1 }} />
+      <div className="skeleton" style={{ height: 36, width: '50%', borderRadius: 4 }} />
+      <div className="skeleton" style={{ height: 4,  width: '100%', borderRadius: 4 }} />
+      <div style={{ display: 'flex', gap: 5 }}>
+        <div className="skeleton" style={{ flex: 1, height: 28, borderRadius: 6 }} />
+        <div className="skeleton" style={{ flex: 1, height: 28, borderRadius: 6 }} />
+      </div>
+    </div>
+  )
+}
+
+// ─── Discover section ─────────────────────────────────────────────────────────
 
 export default function LiveFeed({ markets = [], loading, onTrade, onOpen }) {
-  const [cat, setCat]         = useState('ALL')
-  const snapRef               = useRef(null)
-  const [activeIdx, setActiveIdx] = useState(0)
+  const [cat, setCat] = useState('ALL')
 
-  // Only active, non-placeholder markets
   const active   = markets.filter(m => !m.isExpired && !m.placeholder)
   const filtered = cat === 'ALL' ? active : active.filter(m => m.category === cat)
 
-  // Which categories actually have markets
   const activeCatIds = new Set(active.map(m => m.category).filter(Boolean))
   const visibleCats  = CATS.filter(c => c.id === 'ALL' || activeCatIds.has(c.id))
 
-  // Track current snap index via scroll events
-  function handleScroll() {
-    if (!snapRef.current) return
-    const { scrollTop, clientHeight } = snapRef.current
-    const idx = Math.round(scrollTop / clientHeight)
-    setActiveIdx(idx)
-  }
-
-  if (!loading && filtered.length === 0) return null
+  // Don't render if no markets and not loading
+  if (!loading && active.length === 0) return null
 
   return (
-    // ── Outer section: breaks out of app-content horizontal padding ───
-    <section
-      className="live-section"
-      style={{ position: 'relative' }}
-    >
+    <section style={{ marginBottom: 32 }}>
 
-      {/* ── Overlay header (label + category filters) ──────────────── */}
-      <div
-        style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          zIndex: 10, pointerEvents: 'none',
-          padding: '12px 20px 28px',
-          background: 'linear-gradient(to bottom, var(--bg) 55%, transparent)',
-        }}
-      >
-        {/* Live label */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
-          pointerEvents: 'none',
-        }}>
-          <span style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: '#ef4444', flexShrink: 0,
-            boxShadow: '0 0 0 2px #ef444430',
-            animation: 'live-pulse 2s ease-in-out infinite',
-          }} />
-          <span style={{
-            fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', color: C.text,
+      {/* ── Section header ─────────────────────────────────────────── */}
+      <div style={{
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'space-between',
+        marginBottom:   14,
+        flexWrap:       'wrap',
+        gap:            10,
+      }}>
+        {/* Title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h2 style={{
+            fontSize: 16, fontWeight: 700,
+            letterSpacing: '-0.025em',
+            color: C.text, margin: 0,
           }}>
-            En directo
-          </span>
-          <span style={{ fontSize: 11, color: C.textDim }}>
-            {filtered.length} mercado{filtered.length !== 1 ? 's' : ''}
-          </span>
+            Discover
+          </h2>
+          {!loading && (
+            <span style={{
+              fontSize: 11, color: C.textDim,
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {filtered.length} mercado{filtered.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
 
-        {/* Category filter pills — pointer-events re-enabled */}
+        {/* Category pills */}
         <div
-          className="live-filter-pills"
+          className="discover-pills"
           style={{
-            display: 'flex', gap: 6, overflowX: 'auto',
-            flexWrap: 'nowrap', pointerEvents: 'auto',
+            display:    'flex',
+            gap:        6,
+            overflowX:  'auto',
+            flexWrap:   'nowrap',
+            flexShrink: 1,
+            minWidth:   0,
           }}
         >
           {visibleCats.map(c => {
-            const active = cat === c.id
+            const isActive = cat === c.id
             return (
               <button
                 key={c.id}
-                onClick={() => { setCat(c.id); setActiveIdx(0); snapRef.current?.scrollTo({ top: 0 }) }}
+                onClick={() => setCat(c.id)}
                 style={{
-                  flexShrink: 0,
-                  height: 28, padding: '0 11px',
-                  borderRadius: 14,
-                  background: active ? C.text : 'var(--surface)',
-                  border: `1px solid ${active ? C.text : C.cardBorder}`,
-                  color: active ? C.card : C.textMuted,
-                  fontSize: 12, fontWeight: active ? 600 : 400,
-                  cursor: 'pointer',
+                  flexShrink:  0,
+                  height:      26,
+                  padding:     '0 10px',
+                  borderRadius: 13,
+                  background:  isActive ? C.text : C.surface,
+                  border:      `1px solid ${isActive ? C.text : C.cardBorder}`,
+                  color:       isActive ? C.card : C.textMuted,
+                  fontSize:    11,
+                  fontWeight:  isActive ? 600 : 400,
+                  cursor:      'pointer',
+                  whiteSpace:  'nowrap',
                   WebkitTapHighlightColor: 'transparent',
-                  whiteSpace: 'nowrap',
+                  transition:  'all 0.12s',
                 }}
               >
                 {c.label}
@@ -323,43 +301,31 @@ export default function LiveFeed({ markets = [], loading, onTrade, onOpen }) {
         </div>
       </div>
 
-      {/* ── Snap scroll container ─────────────────────────────────────── */}
+      {/* ── Horizontal scroll row ──────────────────────────────────── */}
       <div
-        ref={snapRef}
-        onScroll={handleScroll}
-        className="live-snap"
+        className="discover-row"
         style={{
-          // Fill the section exactly
-          height: '100%',
-          // Snap engine
-          overflowY: 'scroll',
-          scrollSnapType: 'y mandatory',
-          WebkitOverflowScrolling: 'touch',
+          display:    'flex',
+          gap:        12,
+          overflowX:  'scroll',
+          overflowY:  'visible',
+          paddingBottom: 4,  // room for shadow/hover lift
         }}
       >
         {loading ? (
-          // ── Skeleton ─────────────────────────────────────────────────
+          Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : filtered.length === 0 ? (
           <div style={{
-            height: '100%', scrollSnapAlign: 'start',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            gap: 16, padding: '80px 20px 20px',
-            background: C.card,
+            height: 320, display: 'flex', alignItems: 'center',
+            color: C.textDim, fontSize: 13,
           }}>
-            {[90, 70, 50, 100, 100, 50].map((w, i) => (
-              <div key={i} className="skeleton" style={{
-                height: i === 2 ? 56 : i === 4 ? 52 : 18,
-                width: `${w}%`, borderRadius: 8,
-              }} />
-            ))}
+            Sin mercados en esta categoría.
           </div>
         ) : (
-          filtered.map((m, i) => (
-            <LiveCard
+          filtered.map(m => (
+            <ShortCard
               key={m.id}
               market={m}
-              idx={i}
-              total={filtered.length}
               onTrade={onTrade}
               onOpen={onOpen}
             />
