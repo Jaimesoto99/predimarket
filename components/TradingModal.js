@@ -56,7 +56,6 @@ export default function TradingModal({
             onClose={onClose}
             user={user}
             isWatching={isWatching}
-            onToggleWatch={onToggleWatch}
           />
 
           <div ref={scrollRef} className="trading-modal-scroll" style={{ padding: '24px 28px' }}>

@@ -9,8 +9,13 @@ export default function MarketHeader({ market, onClose, user, isWatching, onTogg
   const catColor = getCategoryColor(market.category)
 
   const [localUser, setLocalUser] = useState(null)
-  const [localWatching, setLocalWatching] = useState(false)
+  const [watching, setWatching] = useState(false)
   const [heartBusy, setHeartBusy] = useState(false)
+
+  // Sync local state from parent when modal opens or isWatching changes
+  useEffect(() => {
+    if (isWatching !== undefined) setWatching(isWatching)
+  }, [isWatching])
 
   useEffect(() => {
     if (user) return
@@ -20,26 +25,20 @@ export default function MarketHeader({ market, onClose, user, isWatching, onTogg
     } catch {}
   }, [user])
 
-  const effectiveUser     = user || localUser
-  const effectiveWatching = isWatching !== undefined ? isWatching : localWatching
+  const effectiveUser = user || localUser
 
   async function handleHeart(e) {
     e.stopPropagation()
-    if (heartBusy) return
-    if (!effectiveUser) return
-    if (onToggleWatch) {
-      onToggleWatch(market.id)
+    if (heartBusy || !effectiveUser) return
+    const willWatch = !watching
+    setWatching(willWatch)   // instant visual flip
+    setHeartBusy(true)
+    if (willWatch) {
+      await followMarket(effectiveUser.email, market.id)
     } else {
-      setHeartBusy(true)
-      if (effectiveWatching) {
-        await unfollowMarket(effectiveUser.email, market.id)
-        setLocalWatching(false)
-      } else {
-        await followMarket(effectiveUser.email, market.id)
-        setLocalWatching(true)
-      }
-      setHeartBusy(false)
+      await unfollowMarket(effectiveUser.email, market.id)
     }
+    setHeartBusy(false)
   }
 
   return (
@@ -60,18 +59,18 @@ export default function MarketHeader({ market, onClose, user, isWatching, onTogg
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <button
             onClick={handleHeart}
-            title={!effectiveUser ? 'Inicia sesión para guardar' : effectiveWatching ? 'Quitar de watchlist' : 'Guardar en watchlist'}
+            title={!effectiveUser ? 'Inicia sesión para guardar' : watching ? 'Quitar de watchlist' : 'Guardar en watchlist'}
             style={{
               width: 32, height: 32, borderRadius: 8,
-              background: effectiveWatching ? `${C.no}12` : 'transparent',
-              border: `1px solid ${effectiveWatching ? `${C.no}40` : C.cardBorder}`,
-              color: effectiveWatching ? C.no : C.textDim,
+              background: watching ? `${C.no}12` : 'transparent',
+              border: `1px solid ${watching ? `${C.no}40` : C.cardBorder}`,
+              color: watching ? C.no : C.textDim,
               cursor: effectiveUser ? 'pointer' : 'default',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 15, opacity: heartBusy ? 0.5 : 1,
             }}
           >
-            {effectiveWatching ? '♥' : '♡'}
+            {watching ? '♥' : '♡'}
           </button>
           <button onClick={onClose} style={{
             width: 32, height: 32, borderRadius: 8,
