@@ -138,6 +138,7 @@ export default function TradingModal({
                   userOrders={userOrders}
                   onExecuteTrade={onExecuteTrade} onLimitOrder={onLimitOrder}
                   onCancelOrder={onCancelOrder} onSell={onSell}
+                  onClose={onClose}
                 />
               </div>
             </div>

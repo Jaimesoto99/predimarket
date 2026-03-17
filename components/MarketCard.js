@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { C, getCategoryColor, getCategoryLabel, getCloseInfo, getTypeLabel, getOracleDescription } from '../lib/theme'
 import useTick from '../hooks/useTick'
 
@@ -14,8 +15,18 @@ function ProbBar({ pct }) {
   )
 }
 
-export default function MarketCard({ market, onOpen, label }) {
+export default function MarketCard({ market, onOpen, label, user, isWatching, onToggleWatch }) {
   useTick()  // re-render every minute so countdown stays live
+  const [heartBusy, setHeartBusy] = useState(false)
+  const watching = isWatching ? isWatching(market.id) : false
+
+  async function handleHeart(e) {
+    e.stopPropagation()
+    if (!user || heartBusy) return
+    setHeartBusy(true)
+    await onToggleWatch?.(market.id)
+    setHeartBusy(false)
+  }
 
   const yesP      = parseFloat(market.prices?.yes || 50)
   const catColor  = getCategoryColor(market.category)
@@ -58,6 +69,26 @@ export default function MarketCard({ market, onOpen, label }) {
         e.currentTarget.style.boxShadow = 'none'
         e.currentTarget.style.transform = 'translateY(0)'
       }}>
+
+      {/* Heart button — top-right corner */}
+      {user && (
+        <button
+          onClick={handleHeart}
+          title={watching ? 'Quitar de watchlist' : 'Guardar en watchlist'}
+          style={{
+            position: 'absolute', top: 8, right: 8, zIndex: 2,
+            width: 28, height: 28, borderRadius: 7,
+            background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(4px)',
+            border: `1px solid ${watching ? `${C.no}40` : 'rgba(255,255,255,0.08)'}`,
+            cursor: heartBusy ? 'wait' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, color: watching ? C.no : C.textDim,
+            transition: 'all 0.15s', padding: 0,
+          }}
+        >
+          {watching ? '♥' : '♡'}
+        </button>
+      )}
 
       {/* Category strip */}
       <div className="market-cat-strip" style={{

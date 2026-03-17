@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { C, badge, isExpiredDate, inputStyle } from '../../lib/theme'
 import SectionTitle from './SectionTitle'
 
@@ -5,8 +6,33 @@ export default function TradePanel({
   market, user, userTrades, tradeSide, setTradeSide,
   tradeAmount, setTradeAmount, orderMode, setOrderMode,
   limitPrice, setLimitPrice, tradeImpact, processing,
-  userOrders, onExecuteTrade, onLimitOrder, onCancelOrder, onSell,
+  userOrders, onExecuteTrade, onLimitOrder, onCancelOrder, onSell, onClose,
 }) {
+  const [step, setStep] = useState('form')   // 'form' | 'confirm' | 'success' | 'error'
+  const [resultMsg, setResultMsg] = useState('')
+  const [resultShares, setResultShares] = useState(null)
+
+  // Reset to form when market changes
+  useEffect(() => { setStep('form') }, [market?.id])
+
+  // Auto-close after success
+  useEffect(() => {
+    if (step !== 'success') return
+    const t = setTimeout(() => onClose?.(), 2000)
+    return () => clearTimeout(t)
+  }, [step])
+
+  async function handleConfirm() {
+    const result = await (orderMode === 'MARKET' ? onExecuteTrade() : onLimitOrder())
+    if (result?.success) {
+      setResultShares(result.shares ?? result.amount ?? tradeAmount)
+      setStep('success')
+    } else {
+      setResultMsg(result?.error || 'Error desconocido')
+      setStep('error')
+    }
+  }
+
   const expired  = isExpiredDate(market.close_date)
   const myTrades = userTrades.filter(t => t.market_id === market.id && t.status === 'OPEN')
 
@@ -23,6 +49,102 @@ export default function TradePanel({
   }
 
   const disabledBuy = !tradeImpact?.valid || tradeAmount > (user?.balance || 0) || processing
+
+  // ── Success screen ──────────────────────────────────────────────────────
+  if (step === 'success') {
+    return (
+      <div style={{ padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%', background: `${C.yes}18`,
+          border: `2px solid ${C.yes}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.3s ease',
+        }}>
+          <span style={{ fontSize: 28, color: C.yes }}>✓</span>
+        </div>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>¡Orden ejecutada!</div>
+          <div style={{ fontSize: 13, color: C.textMuted }}>
+            {tradeSide === 'YES' ? 'SÍ' : 'NO'} · €{tradeAmount}
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: C.textDim }}>Cerrando...</div>
+      </div>
+    )
+  }
+
+  // ── Error screen ────────────────────────────────────────────────────────
+  if (step === 'error') {
+    return (
+      <div style={{ padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%', background: `${C.no}18`,
+          border: `2px solid ${C.no}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontSize: 28, color: C.no }}>✕</span>
+        </div>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>Error al ejecutar</div>
+          <div style={{ fontSize: 12, color: C.no }}>{resultMsg}</div>
+        </div>
+        <button onClick={() => setStep('form')} style={{
+          padding: '10px 24px', borderRadius: 8, border: `1px solid ${C.cardBorder}`,
+          background: 'transparent', color: C.textMuted, fontSize: 13, cursor: 'pointer',
+        }}>
+          Reintentar
+        </button>
+      </div>
+    )
+  }
+
+  // ── Confirm screen ──────────────────────────────────────────────────────
+  if (step === 'confirm') {
+    const sideColor = tradeSide === 'YES' ? C.yes : C.no
+    const sideLabel = tradeSide === 'YES' ? 'SÍ' : 'NO'
+    const priceLabel = orderMode === 'MARKET'
+      ? `${tradeSide === 'YES' ? market.prices?.yes : market.prices?.no}¢`
+      : `${(limitPrice * 100).toFixed(0)}¢ (límite)`
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: '8px 0' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: C.textDim, marginBottom: 8 }}>Confirmar orden</div>
+          <div style={{
+            padding: '18px 20px', borderRadius: 10,
+            background: C.surface, border: `1px solid ${C.cardBorder}`,
+            borderLeft: `3px solid ${sideColor}`,
+          }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: sideColor, marginBottom: 6 }}>
+              {sideLabel} · €{tradeAmount}
+            </div>
+            <div style={{ fontSize: 12, color: C.textMuted }}>
+              Precio: {priceLabel}
+            </div>
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>
+              Saldo tras orden: €{((user?.balance || 0) - tradeAmount).toFixed(2)}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setStep('form')} style={{
+            flex: 1, height: 46, borderRadius: 9,
+            border: `1px solid ${C.cardBorder}`, background: 'transparent',
+            color: C.textDim, fontSize: 13, cursor: 'pointer',
+          }}>
+            Cancelar
+          </button>
+          <button onClick={handleConfirm} disabled={processing} style={{
+            flex: 2, height: 46, borderRadius: 9, border: 'none',
+            background: processing ? C.surface : sideColor,
+            color: processing ? C.textDim : '#fff',
+            fontSize: 14, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer',
+            boxShadow: processing ? 'none' : `0 4px 16px ${sideColor}30`,
+            transition: 'all 0.15s',
+          }}>
+            {processing ? 'Procesando...' : 'Confirmar'}
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -169,7 +291,7 @@ export default function TradePanel({
       {/* Execute button */}
       {orderMode === 'MARKET' ? (
         <button
-          onClick={onExecuteTrade}
+          onClick={() => !disabledBuy && setStep('confirm')}
           disabled={disabledBuy}
           style={{
             width: '100%', height: 52, borderRadius: 10,
@@ -193,7 +315,7 @@ export default function TradePanel({
           }
         </button>
       ) : (
-        <button onClick={onLimitOrder} disabled={processing || tradeAmount > (user?.balance || 0)} style={{
+        <button onClick={() => !(processing || tradeAmount > (user?.balance || 0)) && setStep('confirm')} disabled={processing || tradeAmount > (user?.balance || 0)} style={{
           width: '100%', height: 52, borderRadius: 10,
           fontWeight: 700, fontSize: 14, border: 'none',
           cursor: (processing || tradeAmount > (user?.balance || 0)) ? 'not-allowed' : 'pointer',

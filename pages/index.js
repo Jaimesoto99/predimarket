@@ -169,7 +169,7 @@ export default function Home() {
   }
 
   async function executeTrade() {
-    if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid || processing) return
+    if (!user || !selectedMarket || !tradeImpact || !tradeImpact.valid || processing) return { success: false, error: 'No disponible' }
     setProcessing(true)
     const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount, selectedMarket)
     setProcessing(false)
@@ -180,14 +180,10 @@ export default function Home() {
       setTradeAmount(10)
       loadUserTrades(user.email)
       loadMarkets()
-      if (result.matched) {
-        showToast(`Orden ejecutada: ${tradeSide === 'YES' ? 'SÍ' : 'NO'} €${tradeAmount} ✓`)
-      } else {
-        showToast(`Orden colocada. Esperando contraparte.`)
-      }
     } else {
       showToast(result.error || 'Error al ejecutar orden', 'error')
     }
+    return result
   }
 
   async function placeLimitOrder() {
@@ -199,14 +195,14 @@ export default function Home() {
       p_side: tradeSide, p_amount: tradeAmount, p_target_price: limitPrice,
     })
     setProcessing(false)
-    if (error) { showToast(error.message, 'error'); return }
-    if (data && !data.success) { showToast(data.error, 'error'); return }
+    if (error) { showToast(error.message, 'error'); return { success: false, error: error.message } }
+    if (data && !data.success) { showToast(data.error, 'error'); return { success: false, error: data.error } }
     const newUser = { ...user, balance: data.new_balance }
     setUser(newUser)
     localStorage.setItem('predi_user', JSON.stringify(newUser))
     loadOrderBook(selectedMarket.id)
     loadUserTrades(user.email)
-    showToast(`Orden límite colocada: ${tradeSide} a ${(limitPrice * 100).toFixed(0)}¢`)
+    return { success: true, new_balance: data.new_balance, matched: false }
   }
 
   async function cancelOrder(orderId) {
