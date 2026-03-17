@@ -1,14 +1,14 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { C } from '../lib/theme'
 import { getAlertMarkets } from '../lib/watchlist'
-import { supabase } from '../lib/supabase'
-import { createTrade, getPriceHistory } from '../lib/supabase'
+import { supabase, createTrade, getPriceHistory } from '../lib/supabase'
 import { calculatePrices, previewTrade } from '../lib/amm'
 import AppLayout from '@/components/layout/AppLayout'
 import MarketCard from '@/components/MarketCard'
-import WatchButton from '@/components/WatchButton'
 import useWatchlist from '@/hooks/useWatchlist'
-import TradingModal from '@/components/TradingModal'
+
+const TradingModal = dynamic(() => import('../components/TradingModal'), { ssr: false })
 
 export default function WatchlistPage() {
   const [user, setUser] = useState(null)

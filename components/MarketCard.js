@@ -70,26 +70,6 @@ export default function MarketCard({ market, onOpen, label, user, isWatching, on
         e.currentTarget.style.transform = 'translateY(0)'
       }}>
 
-      {/* Heart button — top-right corner */}
-      {user && (
-        <button
-          onClick={handleHeart}
-          title={watching ? 'Quitar de watchlist' : 'Guardar en watchlist'}
-          style={{
-            position: 'absolute', top: 8, right: 8, zIndex: 2,
-            width: 28, height: 28, borderRadius: 7,
-            background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(4px)',
-            border: `1px solid ${watching ? `${C.no}40` : 'rgba(255,255,255,0.08)'}`,
-            cursor: heartBusy ? 'wait' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, color: watching ? C.no : C.textDim,
-            transition: 'all 0.15s', padding: 0,
-          }}
-        >
-          {watching ? '♥' : '♡'}
-        </button>
-      )}
-
       {/* Category strip */}
       <div className="market-cat-strip" style={{
         width: 3, flexShrink: 0,
@@ -174,6 +154,24 @@ export default function MarketCard({ market, onOpen, label, user, isWatching, on
               <span style={{ fontWeight: 500 }}>Res.: </span>
               {oracle.source}
             </span>
+            {user && (
+              <button
+                onClick={handleHeart}
+                title={watching ? 'Quitar de watchlist' : 'Guardar en watchlist'}
+                style={{
+                  marginLeft: 'auto', flexShrink: 0,
+                  width: 24, height: 24, borderRadius: 6, padding: 0,
+                  background: watching ? `${C.no}12` : 'transparent',
+                  border: `1px solid ${watching ? `${C.no}30` : C.cardBorder}`,
+                  cursor: heartBusy ? 'wait' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, color: watching ? C.no : C.textDim,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {watching ? '♥' : '♡'}
+              </button>
+            )}
           </div>
         </div>
 
