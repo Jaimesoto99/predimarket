@@ -227,7 +227,7 @@ export default function WatchlistPage() {
           modalTab={modalTab}       setModalTab={setModalTab}
           tradeImpact={tradeImpact} processing={processing}
           priceHistory={priceHistory}
-          recentActivity={[]} orderBook={{}} userOrders={userOrders}
+          recentActivity={[]} orderBook={[]} userOrders={userOrders}
           comments={[]} newComment='' setNewComment={() => {}} topHolders={[]}
           isWatching={isWatching(selectedMarket.id)}
           onClose={() => setShowTradeModal(false)}
