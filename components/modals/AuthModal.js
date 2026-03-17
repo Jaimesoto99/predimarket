@@ -47,7 +47,7 @@ export default function AuthModal({ showAuth, setShowAuth, handleLogin }) {
       position: 'fixed', inset: 0,
       background: 'rgba(0,0,0,0.92)',
       backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-      zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      zIndex: 1500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
     }}>
       <div style={{ ...panelStyle, maxWidth: 400, width: '100%', borderRadius: '16px 16px 0 0' }} className="anim-fade-up">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>

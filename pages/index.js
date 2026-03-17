@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
 import { getOrCreateUser, createTrade, getPriceHistory, onAuthStateChange } from '../lib/supabase'
 import { supabase } from '../lib/supabase'
@@ -67,6 +68,7 @@ export default function Home() {
   const [toast, setToast] = useState(null)
 
   // ─── Hooks ────────────────────────────────────────────────────────────────
+  const router = useRouter()
   const { markets, resolvedMarkets, loading, loadMarkets } = useMarkets(catFilter, filter)
   const { userTrades, openTrades, loadUserTrades, handleSell } = useTrades({ user, setUser, onRefreshMarkets: loadMarkets })
   const { leaderboard, loading: leaderboardLoading, loadLeaderboard } = useLeaderboard()
@@ -117,6 +119,15 @@ export default function Home() {
       setTradeImpact(preview)
     }
   }, [tradeAmount, tradeSide, selectedMarket])
+
+  // ─── Discover deep-link: ?openMarket=ID (redirect from non-home pages) ────
+  useEffect(() => {
+    const marketId = router.query.openMarket
+    if (!marketId || !markets.length) return
+    const found = markets.find(m => String(m.id) === String(marketId))
+    if (found) openTradeModal(found)
+    router.replace('/', undefined, { shallow: true })
+  }, [router.query.openMarket, markets])
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
   function handleLogin(prediUser) {

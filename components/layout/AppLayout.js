@@ -681,7 +681,14 @@ export default function AppLayout({
                 <DiscoverCard
                   key={market.id}
                   market={market}
-                  onOpen={(m) => { onOpenMarket?.(m) }}
+                  onOpen={(m) => {
+                    if (onOpenMarket) {
+                      onOpenMarket(m)
+                    } else {
+                      setDiscoverOpen(false)
+                      router.push(`/?openMarket=${m.id}`)
+                    }
+                  }}
                 />
               ))
             )}
