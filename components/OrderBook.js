@@ -7,14 +7,16 @@ export default function OrderBook({ market, orderBook }) {
   const np = parseFloat(market.no_pool)
   const ammBook = computeAMMBook(yp, np)
 
-  const hasBids = orderBook.some(o => o.side === 'YES')
-  const hasAsks = orderBook.some(o => o.side === 'NO')
+  const safeOrderBook = Array.isArray(orderBook) ? orderBook : []
+
+  const hasBids = safeOrderBook.some(o => o.side === 'YES')
+  const hasAsks = safeOrderBook.some(o => o.side === 'NO')
 
   const rawBids = hasBids
-    ? orderBook.filter(o => o.side === 'YES').map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount) }))
+    ? safeOrderBook.filter(o => o.side === 'YES').map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount) }))
     : ammBook.bids
   const rawAsks = hasAsks
-    ? orderBook.filter(o => o.side === 'NO').map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount) }))
+    ? safeOrderBook.filter(o => o.side === 'NO').map(o => ({ price: o.target_price * 100, amount: parseFloat(o.total_amount) }))
     : ammBook.asks
 
   // ASK: buy YES (green), sorted highest first (worst deal at top, best near center)
