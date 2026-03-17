@@ -149,7 +149,8 @@ a { color: inherit; text-decoration: none }
 
 @media (max-width: 768px) {
   .app-desktop-link { display: flex !important; align-items: center; gap: 5px; }
-  .app-sidebar { display: none; }
+  .app-sidebar { display: none !important; }
+  [data-force-desktop="1"] .app-sidebar { display: none !important; }
 
   .app-topbar {
     display: flex;
