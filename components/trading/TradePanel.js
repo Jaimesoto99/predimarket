@@ -252,7 +252,8 @@ export default function TradePanel({
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <div>
-                <div style={{ fontSize: 11, color: C.textDim }}>{tradeImpact.shares.toFixed(2)} contratos</div>
+                <div style={{ fontSize: 11, color: C.textDim, marginBottom: 3 }}>{tradeImpact.shares.toFixed(2)} contratos</div>
+                <div style={{ fontSize: 11, color: C.textDim }}>impacto {tradeImpact.priceImpactPercent}¢</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 9, color: C.textDim, marginBottom: 3 }}>Si acierta</div>
