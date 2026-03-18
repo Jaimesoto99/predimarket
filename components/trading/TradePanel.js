@@ -11,6 +11,7 @@ export default function TradePanel({
   const [step, setStep] = useState('form')   // 'form' | 'confirm' | 'success' | 'error'
   const [resultMsg, setResultMsg] = useState('')
   const [resultShares, setResultShares] = useState(null)
+  const [impactoTooltip, setImpactoTooltip] = useState(false)
 
   // Reset to form when market changes
   useEffect(() => { setStep('form') }, [market?.id])
@@ -253,7 +254,43 @@ export default function TradePanel({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <div>
                 <div style={{ fontSize: 11, color: C.textDim, marginBottom: 3 }}>{tradeImpact.shares.toFixed(2)} contratos</div>
-                <div style={{ fontSize: 11, color: C.textDim }}>impacto {tradeImpact.priceImpactPercent}¢</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ fontSize: 11, color: C.textDim }}>impacto {tradeImpact.priceImpactPercent}¢</span>
+                  <span
+                    style={{ position: 'relative', display: 'inline-flex' }}
+                    onMouseEnter={() => setImpactoTooltip(true)}
+                    onMouseLeave={() => setImpactoTooltip(false)}
+                    onClick={() => setImpactoTooltip(v => !v)}
+                  >
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 13, height: 13, borderRadius: '50%',
+                      border: `1px solid ${C.textDim}`, color: C.textDim,
+                      fontSize: 8, fontWeight: 700, cursor: 'default', lineHeight: 1,
+                      userSelect: 'none',
+                    }}>?</span>
+                    {impactoTooltip && (
+                      <span style={{
+                        position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: '#111', color: '#fff',
+                        fontSize: 11, lineHeight: 1.5,
+                        padding: '7px 10px', borderRadius: 7,
+                        width: 220, whiteSpace: 'normal',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                        zIndex: 999, pointerEvents: 'none',
+                      }}>
+                        El impacto indica cuánto moverá tu compra el precio del mercado. A mayor impacto, más caro pagarán los siguientes compradores.
+                        <span style={{
+                          position: 'absolute', top: '100%', left: '50%',
+                          transform: 'translateX(-50%)',
+                          borderWidth: 5, borderStyle: 'solid',
+                          borderColor: '#111 transparent transparent transparent',
+                        }} />
+                      </span>
+                    )}
+                  </span>
+                </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 9, color: C.textDim, marginBottom: 3 }}>Si acierta</div>
