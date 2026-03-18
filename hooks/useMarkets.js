@@ -114,8 +114,12 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
   }, [loadMarkets])
 
   useEffect(() => {
-    getResolvedMarkets(10)
-      .then(data => setResolvedMarkets(data || []))
+    const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
+    getResolvedMarkets(50)
+      .then(data => {
+        const filtered = (data || []).filter(m => CNMV_CATS.has(m.category))
+        setResolvedMarkets(filtered)
+      })
       .catch(() => {})
   }, [])
 
