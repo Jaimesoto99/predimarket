@@ -600,23 +600,6 @@ export default function AppLayout({
           {children}
         </main>
 
-        {/* Ver versión completa — only on mobile */}
-        <a
-          href="?desktop=1"
-          className="app-desktop-link"
-          style={{
-            position: 'fixed', bottom: 16, right: 16,
-            zIndex: 90,
-            padding: '6px 12px', borderRadius: 20,
-            background: 'var(--card)', border: '1px solid var(--card-border)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-            fontSize: 11, color: 'var(--text-muted)', fontWeight: 500,
-            textDecoration: 'none', display: 'none',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          🖥 Versión completa
-        </a>
       </div>
 
       {/* ─── Discover — TikTok fullscreen modal ─────────────────────────── */}
