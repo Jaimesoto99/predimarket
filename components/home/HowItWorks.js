@@ -57,10 +57,6 @@ export default function HowItWorks() {
               {n}
             </div>
             <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: C.textDim, marginBottom: 14,
-            }} />
-            <div style={{
               fontSize: 13, fontWeight: 600, color: C.text,
               marginBottom: 8, lineHeight: 1.3,
             }}>
