@@ -7,6 +7,9 @@ import useTick from '../../hooks/useTick'
 import { supabase } from '../../lib/supabase'
 import { calculatePrices } from '../../lib/amm'
 
+// ─── Feature flags ────────────────────────────────────────────────────────────
+const DISCOVER_ENABLED = false  // cambiar a true para activar Discover
+
 const ALL_CATS = [
   'ECONOMIA', 'TIPOS', 'ENERGIA', 'POLITICA', 'DEPORTES',
   'ACTUALIDAD', 'GEOPOLITICA', 'CLIMA', 'TECNOLOGIA',
@@ -206,7 +209,7 @@ function SidebarInner({
         })}
 
         {/* Discover — TikTok-style fullscreen */}
-        <button
+        {DISCOVER_ENABLED && <button
           onClick={() => { onOpenDiscover?.(); onClose?.() }}
           style={{
             display: 'flex', alignItems: 'center', gap: 10,
@@ -220,7 +223,7 @@ function SidebarInner({
           }}
         >
           Discover
-        </button>
+        </button>}
       </nav>
 
       {/* Filters — only on home page */}
@@ -603,7 +606,7 @@ export default function AppLayout({
       </div>
 
       {/* ─── Discover — TikTok fullscreen modal ─────────────────────────── */}
-      {discoverOpen && (
+      {DISCOVER_ENABLED && discoverOpen && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1100,
           background: 'var(--bg)', overflow: 'hidden',
