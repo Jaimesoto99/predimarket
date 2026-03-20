@@ -528,6 +528,24 @@ export default function AppLayout({
               overflowY: 'auto',
             }}
           >
+            {/* X close button — fixed top-right of the panel */}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Cerrar menú"
+              style={{
+                position: 'sticky', top: 0, float: 'right',
+                width: 44, height: 44,
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, color: C.textMuted,
+                zIndex: 10,
+                flexShrink: 0,
+              }}
+            >
+              ✕
+            </button>
             <SidebarInner {...sharedProps} onClose={() => setSidebarOpen(false)} />
           </aside>
         </div>
