@@ -539,18 +539,28 @@ export default function AppLayout({
         {/* Mobile top bar */}
         <div className="app-topbar">
           <button
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Menú"
+            onClick={() => setSidebarOpen(v => !v)}
+            aria-label={sidebarOpen ? 'Cerrar menú' : 'Menú'}
             style={{
               width: 36, height: 36, borderRadius: 8,
               background: 'transparent', border: '1px solid var(--card-border)',
               cursor: 'pointer', display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 4, padding: 0,
+              position: 'relative',
             }}
           >
-            <div style={{ width: 14, height: 1.5, background: C.textMuted, borderRadius: 1 }} />
-            <div style={{ width: 10, height: 1.5, background: C.textMuted, borderRadius: 1 }} />
-            <div style={{ width: 12, height: 1.5, background: C.textMuted, borderRadius: 1 }} />
+            {sidebarOpen ? (
+              <>
+                <div style={{ width: 14, height: 1.5, background: C.textMuted, borderRadius: 1, transform: 'rotate(45deg) translate(2px, 2px)' }} />
+                <div style={{ width: 14, height: 1.5, background: C.textMuted, borderRadius: 1, transform: 'rotate(-45deg) translate(2px, -2px)' }} />
+              </>
+            ) : (
+              <>
+                <div style={{ width: 14, height: 1.5, background: C.textMuted, borderRadius: 1 }} />
+                <div style={{ width: 10, height: 1.5, background: C.textMuted, borderRadius: 1 }} />
+                <div style={{ width: 12, height: 1.5, background: C.textMuted, borderRadius: 1 }} />
+              </>
+            )}
           </button>
 
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}>

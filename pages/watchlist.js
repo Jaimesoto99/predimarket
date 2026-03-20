@@ -64,10 +64,13 @@ export default function WatchlistPage() {
     const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount, selectedMarket)
     setProcessing(false)
     if (result.success) {
-      const newUser = { ...user, balance: result.new_balance }
-      setUser(newUser)
-      localStorage.setItem('predi_user', JSON.stringify(newUser))
+      if (result.new_balance != null) {
+        const newUser = { ...user, balance: result.new_balance }
+        setUser(newUser)
+        localStorage.setItem('predi_user', JSON.stringify(newUser))
+      }
       setTradeAmount(10)
+      loadMarkets()
     }
     return result
   }
@@ -83,9 +86,11 @@ export default function WatchlistPage() {
     setProcessing(false)
     if (error) return { success: false, error: error.message }
     if (data && !data.success) return { success: false, error: data.error }
-    const newUser = { ...user, balance: data.new_balance }
-    setUser(newUser)
-    localStorage.setItem('predi_user', JSON.stringify(newUser))
+    if (data?.new_balance != null) {
+      const newUser = { ...user, balance: data.new_balance }
+      setUser(newUser)
+      localStorage.setItem('predi_user', JSON.stringify(newUser))
+    }
     return { success: true, new_balance: data.new_balance }
   }
 
@@ -164,7 +169,10 @@ export default function WatchlistPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {suggestions.map(market => (
-                  <MarketCard key={market.id} market={market} onOpen={openMarket} />
+                  <MarketCard key={market.id} market={market} onOpen={openMarket}
+                    user={user} isWatching={isWatching}
+                    onToggleWatch={async (id) => { await toggleWatch(id); loadMarkets() }}
+                  />
                 ))}
               </div>
             </div>

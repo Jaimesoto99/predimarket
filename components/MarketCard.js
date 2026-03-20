@@ -187,7 +187,7 @@ export default function MarketCard({ market, onOpen, label, user, isWatching, on
           <ProbBar pct={yesP} />
           <div style={{ display: 'flex', gap: 4 }}>
             <span style={{ fontSize: 10, color: C.textDim, fontWeight: 500 }}>SÍ</span>
-            <span style={{ fontSize: 10, color: C.yes, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{market.prices?.yes}¢</span>
+            <span style={{ fontSize: 10, color: C.yes, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{parseFloat(market.prices?.yes || 50).toFixed(0)}¢</span>
           </div>
         </div>
       </div>

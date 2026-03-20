@@ -41,3 +41,13 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+.env*.local
+
+# local test/debug artifacts
+*.json
+stacktest.mjs
+!package.json
+!package-lock.json
+!tsconfig.json
+!jsconfig.json
+!next.config.js

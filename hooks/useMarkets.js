@@ -55,7 +55,6 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
   const loadMarkets = useCallback(async () => {
     const fetchId = ++fetchIdRef.current
     setLoading(true)
-    console.log(`[useMarkets] loading started (id=${fetchId}, cat=${catFilter}, type=${typeFilter})`)
 
     try {
       const options = {}
@@ -63,17 +62,11 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
       if (typeFilter !== 'ALL') options.typeFilter = typeFilter
 
       const data = await fetchWithTimeout(options)
-      console.log(`[useMarkets] got ${data?.length ?? 0} markets (id=${fetchId})`)
 
       // Abort if a newer fetch already started
-      if (fetchId !== fetchIdRef.current) {
-        console.log(`[useMarkets] stale fetch ignored (id=${fetchId})`)
-        return
-      }
+      if (fetchId !== fetchIdRef.current) return
 
       const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
-
-      console.log(`[useMarkets] raw from API: ${data?.length ?? 0} markets`)
 
       const enriched = (data || [])
         .filter(m => !HIDDEN_CATEGORIES.has(m.category) && CNMV_CATS.has(m.category))
@@ -83,25 +76,17 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
           isExpired: new Date(m.close_date) < new Date(),
         }))
 
-      console.log(`[useMarkets] after CNMV filter: ${enriched.length} markets (${enriched.filter(m=>!m.isExpired).length} active)`)
-
       const nonExpiredCount = enriched.filter(m => !m.isExpired).length
       const fillerCount     = Math.max(0, 15 - nonExpiredCount)
       const fillers         = EXAMPLE_PLACEHOLDERS.filter(p => CNMV_CATS.has(p.category)).slice(0, fillerCount)
 
       setMarkets([...enriched, ...fillers])
-      console.log(`[useMarkets] setMarkets: ${enriched.length} real + ${fillers.length} placeholders`)
     } catch (err) {
       console.error('[useMarkets] error:', err?.message || err)
       if (fetchId !== fetchIdRef.current) return
-      // Show placeholders on any error so loading always ends
       setMarkets(EXAMPLE_PLACEHOLDERS.slice(0, 15))
     } finally {
-      // Always clear loading — even if this fetch was superseded
-      if (fetchId === fetchIdRef.current) {
-        setLoading(false)
-        console.log(`[useMarkets] loading done (id=${fetchId})`)
-      }
+      if (fetchId === fetchIdRef.current) setLoading(false)
     }
   }, [catFilter, typeFilter])
 

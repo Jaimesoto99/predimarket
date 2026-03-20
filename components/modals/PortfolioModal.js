@@ -20,7 +20,7 @@ export default function PortfolioModal({ showPortfolio, setShowPortfolio, openTr
               {openTrades.map(trade => (
                 <div key={trade.id} style={{ background: C.surface, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: 16 }}>
                   <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 10, lineHeight: 1.45 }}>
-                    {trade.markets.title}
+                    {trade.markets?.title || 'Mercado'}
                   </div>
                   <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
                     <span style={badge(trade.side === 'YES' ? C.yes : C.no)}>

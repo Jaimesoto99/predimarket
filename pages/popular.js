@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import { C } from '../lib/theme'
 import { calculatePrices } from '../lib/amm'
@@ -11,6 +12,7 @@ const SORTS = [
 ]
 
 export default function PopularPage() {
+  const router = useRouter()
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
   const [sort, setSort]       = useState('total_volume')
@@ -98,7 +100,7 @@ export default function PopularPage() {
                 {idx + 1}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <MarketCard market={market} onOpen={() => {}} />
+                <MarketCard market={market} onOpen={m => router.push(`/?openMarket=${m.id}`)} />
               </div>
             </div>
           ))}

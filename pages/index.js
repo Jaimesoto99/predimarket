@@ -185,9 +185,11 @@ export default function Home() {
     const result = await createTrade(user.email, selectedMarket.id, tradeSide, tradeAmount, selectedMarket)
     setProcessing(false)
     if (result.success) {
-      const newUser = { ...user, balance: result.new_balance }
-      setUser(newUser)
-      localStorage.setItem('predi_user', JSON.stringify(newUser))
+      if (result.new_balance != null) {
+        const newUser = { ...user, balance: result.new_balance }
+        setUser(newUser)
+        localStorage.setItem('predi_user', JSON.stringify(newUser))
+      }
       setTradeAmount(10)
       loadUserTrades(user.email)
       loadMarkets()
@@ -208,9 +210,11 @@ export default function Home() {
     setProcessing(false)
     if (error) { showToast(error.message, 'error'); return { success: false, error: error.message } }
     if (data && !data.success) { showToast(data.error, 'error'); return { success: false, error: data.error } }
-    const newUser = { ...user, balance: data.new_balance }
-    setUser(newUser)
-    localStorage.setItem('predi_user', JSON.stringify(newUser))
+    if (data?.new_balance != null) {
+      const newUser = { ...user, balance: data.new_balance }
+      setUser(newUser)
+      localStorage.setItem('predi_user', JSON.stringify(newUser))
+    }
     loadOrderBook(selectedMarket.id)
     loadUserTrades(user.email)
     return { success: true, new_balance: data.new_balance, matched: false }
@@ -218,8 +222,8 @@ export default function Home() {
 
   async function cancelOrder(orderId) {
     const { data, error } = await supabase.rpc('cancel_limit_order', { p_order_id: orderId, p_email: user.email })
-    if (error) { alert(error.message); return }
-    if (data && !data.success) { alert(data.error); return }
+    if (error) { showToast(error.message, 'error'); return }
+    if (data && !data.success) { showToast(data.error, 'error'); return }
     const newUser = { ...user, balance: data.new_balance }
     setUser(newUser)
     localStorage.setItem('predi_user', JSON.stringify(newUser))
@@ -297,8 +301,6 @@ export default function Home() {
   const trendingMarkets = [...filtered.filter(m => !m.placeholder)]
     .sort((a, b) => (b.total_volume || 0) - (a.total_volume || 0))
     .slice(0, 4)
-
-  console.log('[index] markets:', markets.length, '| active:', activeMarkets.length, '| real:', realActiveMarkets.length, '| trending:', trendingMarkets.length)
 
   const totalVolume  = realActiveMarkets.reduce((s, m) => s + (m.total_volume || 0), 0)
   const totalTraders = realActiveMarkets.reduce((s, m) => s + (m.active_traders || m.total_traders || 0), 0)

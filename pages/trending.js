@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import { C, getTimeLeft } from '../lib/theme'
 import AppLayout from '@/components/layout/AppLayout'
@@ -7,6 +8,7 @@ import MarketTrendBadge from '@/components/analytics/MarketTrendBadge'
 import { calculatePrices } from '../lib/amm'
 
 export default function TrendingPage() {
+  const router = useRouter()
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState('total_volume') // 'total_volume' | 'created_at'
@@ -84,7 +86,7 @@ export default function TrendingPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {markets.map(market => (
             <div key={market.id} style={{ position: 'relative' }}>
-              <MarketCard market={market} onOpen={() => {}} />
+              <MarketCard market={market} onOpen={m => router.push(`/?openMarket=${m.id}`)} />
               {/* Trend overlay badge */}
               <div style={{ position: 'absolute', top: 10, right: 16, zIndex: 2 }}>
                 <MarketTrendBadge market={market} size="lg" />
