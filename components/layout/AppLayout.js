@@ -4,6 +4,8 @@ import { useRouter } from 'next/router'
 import { C, getCategoryColor, getCategoryLabel, getCloseInfo } from '../../lib/theme'
 import { useTheme } from '../../lib/themeContext'
 import useTick from '../../hooks/useTick'
+import { supabase } from '../../lib/supabase'
+import { calculatePrices } from '../../lib/amm'
 
 const ALL_CATS = [
   'ECONOMIA', 'TIPOS', 'ENERGIA', 'POLITICA', 'DEPORTES',
@@ -132,7 +134,7 @@ function SidebarInner({
   onShowPortfolio, onShowLeaderboard, onShowProfile, onShowAuth, onLogout,
   filter, setFilter, catFilter, setCatFilter,
   activeMarkets, timeFilters, activeCats,
-  onClose,
+  onClose, onOpenDiscover,
 }) {
   const showFilters = router.pathname === '/' && typeof setFilter === 'function'
 
@@ -203,6 +205,22 @@ function SidebarInner({
           )
         })}
 
+        {/* Discover — TikTok-style fullscreen */}
+        <button
+          onClick={() => { onOpenDiscover?.(); onClose?.() }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '7px 10px', borderRadius: 7, marginBottom: 1,
+            fontSize: 13, fontWeight: 400,
+            color: C.textMuted,
+            background: 'transparent',
+            border: 'none', cursor: 'pointer',
+            width: '100%', textAlign: 'left', fontFamily: 'inherit',
+            position: 'relative',
+          }}
+        >
+          Discover
+        </button>
       </nav>
 
       {/* Filters — only on home page */}
@@ -418,6 +436,9 @@ export default function AppLayout({
 }) {
   const { isDark, toggle } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [discoverOpen, setDiscoverOpen] = useState(false)
+  const [fetchedMarkets, setFetchedMarkets] = useState([])
+  const [discoverLoading, setDiscoverLoading] = useState(false)
   const router = useRouter()
   useDesktopForce()
 
@@ -436,12 +457,41 @@ export default function AppLayout({
     return () => { document.body.style.overflow = '' }
   }, [sidebarOpen])
 
+  const propsMarkets = activeMarkets.filter(m => !m.isExpired && !m.placeholder)
+
+  // Fetch markets independently when Discover opens and props are empty
+  useEffect(() => {
+    if (!discoverOpen) return
+    if (propsMarkets.length > 0) return
+    setDiscoverLoading(true)
+    supabase
+      .from('markets')
+      .select('id, title, category, yes_pool, no_pool, total_volume, close_date, created_at')
+      .eq('status', 'ACTIVE')
+      .gt('close_date', new Date().toISOString())
+      .order('total_volume', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (data) {
+          setFetchedMarkets(data.map(m => ({
+            ...m,
+            prices: calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
+            isExpired: false,
+          })))
+        }
+        setDiscoverLoading(false)
+      })
+  }, [discoverOpen, propsMarkets.length])
+
+  const discoverMarkets = propsMarkets.length > 0 ? propsMarkets : fetchedMarkets
+
   const sharedProps = {
     router, isDark, toggle,
     user, openTradesCount,
     onShowPortfolio, onShowLeaderboard, onShowProfile, onShowAuth, onLogout,
     filter, setFilter, catFilter, setCatFilter,
     activeMarkets, timeFilters, activeCats,
+    onOpenDiscover: () => setDiscoverOpen(true),
   }
 
   return (
@@ -552,6 +602,82 @@ export default function AppLayout({
 
       </div>
 
+      {/* ─── Discover — TikTok fullscreen modal ─────────────────────────── */}
+      {discoverOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1100,
+          background: 'var(--bg)', overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          {/* Header */}
+          <div style={{
+            height: 48, flexShrink: 0,
+            display: 'flex', alignItems: 'center',
+            padding: '0 16px', gap: 12,
+            background: 'var(--bg-backdrop)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderBottom: '1px solid var(--card-border)',
+            zIndex: 1110,
+          }}>
+            <button
+              onClick={() => setDiscoverOpen(false)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 13, color: C.textMuted, fontFamily: 'inherit', padding: '4px 0',
+              }}
+            >
+              ← Volver
+            </button>
+            <span style={{ fontSize: 14, fontWeight: 700, color: C.text, letterSpacing: '-0.02em' }}>
+              Discover
+            </span>
+          </div>
+
+          {/* Snap-scroll cards */}
+          <div
+            className="no-scrollbar"
+            style={{
+              flex: 1,
+              overflowY: 'scroll',
+              scrollSnapType: 'y mandatory',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            {discoverLoading ? (
+              <div style={{
+                height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: C.textDim, fontSize: 14,
+              }}>
+                Cargando mercados…
+              </div>
+            ) : discoverMarkets.length === 0 ? (
+              <div style={{
+                height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: C.textDim, fontSize: 14,
+              }}>
+                No hay mercados disponibles
+              </div>
+            ) : (
+              discoverMarkets.map(market => (
+                <DiscoverCard
+                  key={market.id}
+                  market={market}
+                  onOpen={(m) => {
+                    if (onOpenMarket) {
+                      onOpenMarket(m)
+                    } else {
+                      setDiscoverOpen(false)
+                      router.push(`/?openMarket=${m.id}`)
+                    }
+                  }}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
