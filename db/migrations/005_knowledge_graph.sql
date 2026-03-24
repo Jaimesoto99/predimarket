@@ -1,5 +1,5 @@
 -- ============================================================
--- PrediMarket — Phase 5: Knowledge Graph
+-- Forsii — Phase 5: Knowledge Graph
 -- Migration 005: entity registry, relationship graph,
 --                event graph, market-entity links
 -- ============================================================

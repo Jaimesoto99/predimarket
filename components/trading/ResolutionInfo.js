@@ -201,7 +201,7 @@ export default function ResolutionInfo({ market }) {
           fontSize: 11, color: C.textDim, lineHeight: 1.5,
           textAlign: 'center',
         }}>
-          PrediMarket actúa como intermediario tecnológico. No emite opinión sobre el resultado.{' '}
+          Forsii actúa como intermediario tecnológico. No emite opinión sobre el resultado.{' '}
           <a href="/metodologia" style={{ color: C.textDim, textDecoration: 'underline' }}>Ver metodología</a>
         </div>
       </div>
@@ -215,7 +215,7 @@ export default function ResolutionInfo({ market }) {
       }}>
         <div style={{ fontSize: 11, color: C.warning, fontWeight: 600, marginBottom: 3 }}>Aviso de riesgo</div>
         <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.6 }}>
-          PrediMarket opera con créditos virtuales. No constituye asesoramiento financiero.
+          Forsii opera con créditos virtuales. No constituye asesoramiento financiero.
           La resolución se basa en fuentes públicas verificables.
         </div>
       </div>

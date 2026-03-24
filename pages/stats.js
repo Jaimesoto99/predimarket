@@ -85,11 +85,11 @@ export default function Stats() {
   return (
     <>
       <Head>
-        <title>PrediMarket — Estadísticas de la plataforma</title>
-        <meta name="description" content="Dashboard de métricas de PrediMarket: mercados activos, volumen negociado, usuarios registrados y distribución por categoría." />
-        <meta property="og:title" content="PrediMarket — Estadísticas" />
-        <meta property="og:description" content="Métricas en tiempo real de la plataforma de contratos de predicción PrediMarket." />
-        <link rel="canonical" href="https://predimarket.vercel.app/stats" />
+        <title>Forsii — Estadísticas de la plataforma</title>
+        <meta name="description" content="Dashboard de métricas de Forsii: mercados activos, volumen negociado, usuarios registrados y distribución por categoría." />
+        <meta property="og:title" content="Forsii — Estadísticas" />
+        <meta property="og:description" content="Métricas en tiempo real de la plataforma de contratos de predicción Forsii." />
+        <link rel="canonical" href="https://forsii.com/stats" />
       </Head>
 
       <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, sans-serif', fontSize: 14, display: 'flex', flexDirection: 'column' }}>
@@ -97,7 +97,7 @@ export default function Stats() {
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
               <div style={{ width: 26, height: 26, background: C.accent, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>P</div>
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', color: C.text }}>PrediMarket</span>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', color: C.text }}>Forsii</span>
             </Link>
             <nav style={{ display: 'flex', gap: 2 }}>
               {NAV.map(({ href, label }) => (
@@ -115,7 +115,7 @@ export default function Stats() {
               <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.04em', color: C.text }}>Estadísticas de la plataforma</h1>
               <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', color: C.yes, background: `${C.yes}15`, border: `1px solid ${C.yes}30`, padding: '2px 8px', borderRadius: 4 }}>LIVE</span>
             </div>
-            <p style={{ fontSize: 13, color: C.textDim }}>Métricas en tiempo real de PrediMarket — fase de pruebas, saldos virtuales</p>
+            <p style={{ fontSize: 13, color: C.textDim }}>Métricas en tiempo real de Forsii — fase de pruebas, saldos virtuales</p>
           </div>
 
           {loading ? (
@@ -250,7 +250,7 @@ export default function Stats() {
               {/* Nota regulatoria */}
               <div style={{ marginTop: 32, padding: '14px 20px', background: `${C.accent}06`, border: `1px solid ${C.accent}15`, borderRadius: 8 }}>
                 <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.6 }}>
-                  Este dashboard muestra métricas de la fase de pruebas de PrediMarket. Todos los saldos son virtuales. No se ha procesado dinero real. La plataforma está pendiente de evaluación regulatoria.
+                  Este dashboard muestra métricas de la fase de pruebas de Forsii. Todos los saldos son virtuales. No se ha procesado dinero real. La plataforma está pendiente de evaluación regulatoria.
                 </div>
               </div>
             </>

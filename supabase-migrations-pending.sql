@@ -1,5 +1,5 @@
 -- ============================================================
--- MIGRACIONES PENDIENTES — PrediMarket
+-- MIGRACIONES PENDIENTES — Forsii
 -- Ejecutar en Supabase SQL Editor en el orden indicado.
 -- ============================================================
 
@@ -30,7 +30,7 @@ WHERE
 
 -- ─── 1. match_orders RPC ─────────────────────────────────────────────────────
 -- Busca pares YES/NO que se cruzan (bid_yes + bid_no >= 1.00) y los ejecuta.
--- PrediMarket cobra 2% de comisión del total del contrato (1€).
+-- Forsii cobra 2% de comisión del total del contrato (1€).
 -- Llamar tras cada place_limit_order, o desde un cron cada pocos minutos.
 
 CREATE OR REPLACE FUNCTION match_orders(p_market_id BIGINT)

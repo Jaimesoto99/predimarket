@@ -21,7 +21,7 @@ export default function Footer() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <div style={{ width: 22, height: 22, background: C.accent, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>P</div>
-              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.02em' }}>PrediMarket</span>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.02em' }}>Forsii</span>
             </div>
             <p style={{ fontSize: 12, color: C.textDim, maxWidth: 340, lineHeight: 1.7, margin: 0 }}>
               Plataforma de contratos financieros binarios sobre indicadores económicos verificables. Resolución automática por oráculo público.
@@ -59,10 +59,10 @@ export default function Footer() {
 
         {/* Bottom row */}
         <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-          <span style={{ fontSize: 11, color: C.textDim }}>© 2026 PrediMarket — Plataforma de contratos financieros binarios</span>
+          <span style={{ fontSize: 11, color: C.textDim }}>© 2026 Forsii — Plataforma de contratos financieros binarios</span>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: C.textDim }}>
-              PrediMarket no está autorizada como entidad de servicios de inversión. Fase de pruebas.
+              Forsii no está autorizada como entidad de servicios de inversión. Fase de pruebas.
             </span>
             <a href="mailto:jaimesotoenrile@gmail.com" style={{ fontSize: 11, color: C.textDim, textDecoration: 'none' }}>
               jaimesotoenrile@gmail.com

@@ -112,11 +112,11 @@ export default function About() {
   return (
     <>
       <Head>
-        <title>PrediMarket — Sobre nosotros</title>
-        <meta name="description" content="Qué es PrediMarket, cómo funcionan los contratos de predicción, oráculos públicos y el equipo detrás del proyecto." />
-        <meta property="og:title" content="PrediMarket — Sobre nosotros" />
+        <title>Forsii — Sobre nosotros</title>
+        <meta name="description" content="Qué es Forsii, cómo funcionan los contratos de predicción, oráculos públicos y el equipo detrás del proyecto." />
+        <meta property="og:title" content="Forsii — Sobre nosotros" />
         <meta property="og:description" content="Plataforma de contratos financieros binarios sobre indicadores económicos verificables. Resolución automática por oráculo público." />
-        <link rel="canonical" href="https://predimarket.vercel.app/about" />
+        <link rel="canonical" href="https://forsii.com/about" />
       </Head>
 
       <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, sans-serif', fontSize: 14, display: 'flex', flexDirection: 'column' }}>
@@ -124,7 +124,7 @@ export default function About() {
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
               <div style={{ width: 26, height: 26, background: C.accent, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>P</div>
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', color: C.text }}>PrediMarket</span>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', color: C.text }}>Forsii</span>
             </Link>
             <nav style={{ display: 'flex', gap: 2 }}>
               {[{ href: '/', label: 'Mercados' }, { href: '/demo', label: 'Demo' }, { href: '/stats', label: 'Stats' }, { href: '/about', label: 'Nosotros' }].map(({ href, label }) => (
@@ -138,16 +138,16 @@ export default function About() {
 
         <main style={{ maxWidth: 900, margin: '0 auto', padding: '56px 24px', flex: 1, width: '100%' }}>
           <div style={{ marginBottom: 56 }}>
-            <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.04em', color: C.text, marginBottom: 12 }}>Sobre PrediMarket</h1>
+            <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.04em', color: C.text, marginBottom: 12 }}>Sobre Forsii</h1>
             <p style={{ fontSize: 15, color: C.textMuted, lineHeight: 1.7, maxWidth: 640 }}>
               Plataforma de contratos financieros binarios sobre indicadores económicos verificables. Cada mercado se resuelve automáticamente mediante oráculos que consultan fuentes públicas oficiales.
             </p>
           </div>
 
           {/* Qué es */}
-          <Section id="que-es" title="Qué es PrediMarket">
-            <P>PrediMarket es un mercado de predicción financiero donde los usuarios compran y venden contratos binarios sobre eventos verificables: si el IBEX 35 superará un nivel determinado, si el precio de la luz bajará esta semana, si Bitcoin alcanzará cierto precio.</P>
-            <P>A diferencia de los mercados de predicción basados en opinión, todos los mercados de PrediMarket se resuelven mediante oráculos automatizados que consultan fuentes públicas oficiales. No hay subjetividad, no hay árbitros: los datos mandan.</P>
+          <Section id="que-es" title="Qué es Forsii">
+            <P>Forsii es un mercado de predicción financiero donde los usuarios compran y venden contratos binarios sobre eventos verificables: si el IBEX 35 superará un nivel determinado, si el precio de la luz bajará esta semana, si Bitcoin alcanzará cierto precio.</P>
+            <P>A diferencia de los mercados de predicción basados en opinión, todos los mercados de Forsii se resuelven mediante oráculos automatizados que consultan fuentes públicas oficiales. No hay subjetividad, no hay árbitros: los datos mandan.</P>
             <P>La plataforma opera actualmente en fase de pruebas con saldos virtuales. No se requiere dinero real. El objetivo es demostrar el modelo antes de solicitar autorización regulatoria.</P>
 
             <div style={{ display: 'flex', gap: 16, marginTop: 24, flexWrap: 'wrap' }}>
@@ -263,7 +263,7 @@ export default function About() {
             <div style={{ padding: '20px 24px', background: `${C.accent}08`, border: `1px solid ${C.accent}20`, borderRadius: 8, marginBottom: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 8 }}>Fase de pruebas — Saldos virtuales</div>
               <div style={{ fontSize: 13, color: C.textDim, lineHeight: 1.7 }}>
-                PrediMarket opera actualmente en fase de demostración con saldos virtuales. No se requiere dinero real y no hay pérdidas económicas reales. La plataforma no está autorizada como entidad de servicios de inversión y está pendiente de evaluación regulatoria por la CNMV.
+                Forsii opera actualmente en fase de demostración con saldos virtuales. No se requiere dinero real y no hay pérdidas económicas reales. La plataforma no está autorizada como entidad de servicios de inversión y está pendiente de evaluación regulatoria por la CNMV.
               </div>
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -291,7 +291,7 @@ export default function About() {
                 <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>Jaime de Soto Enrile</div>
                 <div style={{ fontSize: 12, color: C.accent, marginBottom: 10 }}>Fundador — Madrid, España</div>
                 <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.7, maxWidth: 520 }}>
-                  Diseño, desarrollo y operación de PrediMarket. Responsable del tratamiento de datos personales conforme al RGPD y la LOPDGDD.
+                  Diseño, desarrollo y operación de Forsii. Responsable del tratamiento de datos personales conforme al RGPD y la LOPDGDD.
                 </div>
                 <div style={{ marginTop: 12 }}>
                   <a href="mailto:jaimesotoenrile@gmail.com" style={{ fontSize: 12, color: C.accentLight, textDecoration: 'none' }}>

@@ -147,7 +147,7 @@ async function createMarkets() {
 
   // Try calling the Vercel deployment
   const urls = [
-    `https://predimarket-new.vercel.app/api/create-markets?mode=objective&key=${ADMIN_KEY}`,
+    `https://forsii.com/api/create-markets?mode=objective&key=${ADMIN_KEY}`,
     `http://localhost:3000/api/create-markets?mode=objective&key=${ADMIN_KEY}`,
   ]
 
@@ -197,7 +197,7 @@ ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log('PrediMarket DB Migration Script')
+  console.log('Forsii DB Migration Script')
   console.log('================================')
 
   await cleanUtf8()

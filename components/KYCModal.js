@@ -29,7 +29,7 @@ const STEPS = [
   {
     n: 4,
     title: 'Verificación completada',
-    desc: '¡Tu identidad ha sido verificada! Ya puedes operar con fondos reales en PrediMarket.',
+    desc: '¡Tu identidad ha sido verificada! Ya puedes operar con fondos reales en Forsii.',
     done: true,
   },
 ]

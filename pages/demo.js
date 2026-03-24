@@ -140,11 +140,11 @@ export default function Demo() {
   return (
     <>
       <Head>
-        <title>PrediMarket — Demo interactiva</title>
-        <meta name="description" content="Aprende a operar en PrediMarket con esta guía interactiva paso a paso: desde elegir un mercado hasta la liquidación automática por oráculo." />
-        <meta property="og:title" content="PrediMarket — Demo interactiva" />
-        <meta property="og:description" content="Guía paso a paso de cómo funcionan los contratos de predicción en PrediMarket." />
-        <link rel="canonical" href="https://predimarket.vercel.app/demo" />
+        <title>Forsii — Demo interactiva</title>
+        <meta name="description" content="Aprende a operar en Forsii con esta guía interactiva paso a paso: desde elegir un mercado hasta la liquidación automática por oráculo." />
+        <meta property="og:title" content="Forsii — Demo interactiva" />
+        <meta property="og:description" content="Guía paso a paso de cómo funcionan los contratos de predicción en Forsii." />
+        <link rel="canonical" href="https://forsii.com/demo" />
       </Head>
 
       <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, sans-serif', fontSize: 14, display: 'flex', flexDirection: 'column' }}>
@@ -152,7 +152,7 @@ export default function Demo() {
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
               <div style={{ width: 26, height: 26, background: C.accent, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>P</div>
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', color: C.text }}>PrediMarket</span>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', color: C.text }}>Forsii</span>
             </Link>
             <nav style={{ display: 'flex', gap: 2 }}>
               {NAV.map(({ href, label }) => (
@@ -166,7 +166,7 @@ export default function Demo() {
 
         <main style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px', flex: 1, width: '100%' }}>
           <div style={{ marginBottom: 40 }}>
-            <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.04em', color: C.text, marginBottom: 8 }}>Cómo operar en PrediMarket</h1>
+            <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.04em', color: C.text, marginBottom: 8 }}>Cómo operar en Forsii</h1>
             <p style={{ fontSize: 13, color: C.textDim, maxWidth: 560 }}>Guía interactiva del ciclo completo de un contrato de predicción, desde la selección del mercado hasta la liquidación.</p>
           </div>
 

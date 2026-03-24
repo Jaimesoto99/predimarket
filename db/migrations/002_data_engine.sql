@@ -1,5 +1,5 @@
 -- ============================================================
--- PrediMarket — Phase 2: Data Engine
+-- Forsii — Phase 2: Data Engine
 -- Migration 002: articles, signals, probability_snapshots,
 --                activity_events, scheduler_jobs
 -- ============================================================

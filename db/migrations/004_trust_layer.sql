@@ -1,5 +1,5 @@
 -- ============================================================
--- PrediMarket — Phase 4: Trust Layer
+-- Forsii — Phase 4: Trust Layer
 -- Migration 004: source trust scores, oracle reliability,
 --                manipulation alerts, market trust scores
 -- ============================================================

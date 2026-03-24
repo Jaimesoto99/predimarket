@@ -1,5 +1,5 @@
 -- ============================================================
--- PrediMarket — Phase 3: Market Creation Engine
+-- Forsii — Phase 3: Market Creation Engine
 -- Migration 003: market_candidates, lifecycle states,
 --                oracle_type + resolution_method on markets
 -- ============================================================

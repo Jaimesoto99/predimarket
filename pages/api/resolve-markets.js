@@ -71,7 +71,7 @@ async function checkIBEXThreshold(threshold) {
 async function checkPrecioLuz(threshold = 100) {
   const today = new Date().toISOString().split('T')[0]
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (compatible; PrediMarket/1.0)',
+    'User-Agent': 'Mozilla/5.0 (compatible; Forsii/1.0)',
     'Accept': 'application/json',
   }
 

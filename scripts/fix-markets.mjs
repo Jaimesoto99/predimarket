@@ -151,7 +151,7 @@ async function fillResolutionRules() {
     const m = markets.find(x => x.id === id)
     if (!m) continue
     const closeStr = fmtDate(m.close_date)
-    const rr = `Este contrato se resolverá como SÍ si ${info.cond} según los datos publicados por ${info.src} (${info.url}). Se resolverá como NO en caso contrario. Fecha límite de resolución: ${closeStr}. La resolución se basa en datos públicos verificables. PrediMarket actúa como intermediario tecnológico y no es parte del contrato.`
+    const rr = `Este contrato se resolverá como SÍ si ${info.cond} según los datos publicados por ${info.src} (${info.url}). Se resolverá como NO en caso contrario. Fecha límite de resolución: ${closeStr}. La resolución se basa en datos públicos verificables. Forsii actúa como intermediario tecnológico y no es parte del contrato.`
     const ok = await patch(id, { resolution_rules: rr, resolution_source: info.src })
     if (ok) { count++; console.log(`  ✓ [${id}] ${m.title.slice(0,55)}`) }
     else console.log(`  ✗ [${id}]`)
@@ -277,7 +277,7 @@ async function createShortTermMarkets() {
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log('PrediMarket Market Fix Script — 2026-03-14')
+  console.log('Forsii Market Fix Script — 2026-03-14')
   console.log('===========================================')
   await fixDatesAndTypes()
   await fillResolutionRules()

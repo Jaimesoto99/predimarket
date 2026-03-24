@@ -37,11 +37,11 @@ export default function Legal() {
   return (
     <>
       <Head>
-        <title>PrediMarket — Términos y Condiciones</title>
-        <meta name="description" content="Términos y Condiciones de uso y Política de Privacidad de PrediMarket, plataforma de contratos financieros binarios." />
-        <meta property="og:title" content="PrediMarket — Términos y Condiciones" />
-        <meta property="og:description" content="Términos de uso y política de privacidad de PrediMarket." />
-        <link rel="canonical" href="https://predimarket.vercel.app/legal" />
+        <title>Forsii — Términos y Condiciones</title>
+        <meta name="description" content="Términos y Condiciones de uso y Política de Privacidad de Forsii, plataforma de contratos financieros binarios." />
+        <meta property="og:title" content="Forsii — Términos y Condiciones" />
+        <meta property="og:description" content="Términos de uso y política de privacidad de Forsii." />
+        <link rel="canonical" href="https://forsii.com/legal" />
       </Head>
 
       <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Inter, -apple-system, sans-serif', fontSize: 14, display: 'flex', flexDirection: 'column' }}>
@@ -50,7 +50,7 @@ export default function Legal() {
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
               <div style={{ width: 26, height: 26, background: C.accent, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>P</div>
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', color: C.text }}>PrediMarket</span>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', color: C.text }}>Forsii</span>
             </Link>
             <Link href="/" style={{ fontSize: 12, color: C.textDim, textDecoration: 'none' }}>← Volver a mercados</Link>
           </div>
@@ -71,13 +71,13 @@ export default function Legal() {
           {/* ── SECCIÓN 1: T&C ── */}
           <Section id="terminos" title="Términos y Condiciones de Uso">
             <H3>1. Naturaleza de la plataforma</H3>
-            <P>PrediMarket es una plataforma tecnológica de negociación de contratos financieros binarios. Los contratos se resuelven automáticamente mediante oráculos que consultan fuentes públicas oficiales (INE, BCE, BME, OMIE, CoinGecko, football-data.org y otras APIs verificables).</P>
-            <P>PrediMarket actúa exclusivamente como intermediario tecnológico. PrediMarket NO emite opiniones, recomendaciones de inversión, ni garantiza resultados. El usuario es el único responsable de sus decisiones operativas.</P>
+            <P>Forsii es una plataforma tecnológica de negociación de contratos financieros binarios. Los contratos se resuelven automáticamente mediante oráculos que consultan fuentes públicas oficiales (INE, BCE, BME, OMIE, CoinGecko, football-data.org y otras APIs verificables).</P>
+            <P>Forsii actúa exclusivamente como intermediario tecnológico. Forsii NO emite opiniones, recomendaciones de inversión, ni garantiza resultados. El usuario es el único responsable de sus decisiones operativas.</P>
 
             <H3>2. Riesgo</H3>
             <Item>El usuario acepta que puede perder el 100% del importe invertido en cada contrato.</Item>
             <Item>Cada contrato tiene un subyacente verificable, una fuente oficial de resolución y una fecha de liquidación predeterminada.</Item>
-            <Item>La resolución depende de la disponibilidad de los oráculos externos. Si la fuente no está disponible, PrediMarket se reserva el derecho de cancelar el mercado y reembolsar a todos los participantes íntegramente.</Item>
+            <Item>La resolución depende de la disponibilidad de los oráculos externos. Si la fuente no está disponible, Forsii se reserva el derecho de cancelar el mercado y reembolsar a todos los participantes íntegramente.</Item>
 
             <H3>3. Requisitos de acceso</H3>
             <Item>Edad mínima: 18 años.</Item>
@@ -85,11 +85,11 @@ export default function Legal() {
             <Item>Durante la fase de pruebas: máximo 500€ por usuario, máximo 100€ por operación.</Item>
 
             <H3>4. Situación regulatoria</H3>
-            <P>PrediMarket no está autorizada actualmente como entidad de servicios de inversión. La plataforma opera en fase de pruebas bajo evaluación regulatoria. No se garantiza la continuidad del servicio.</P>
+            <P>Forsii no está autorizada actualmente como entidad de servicios de inversión. La plataforma opera en fase de pruebas bajo evaluación regulatoria. No se garantiza la continuidad del servicio.</P>
             <P>Jurisdicción: legislación española. Cualquier disputa se resolverá ante los tribunales competentes del domicilio social.</P>
 
             <H3>5. Modificaciones</H3>
-            <P>PrediMarket se reserva el derecho de modificar estos términos con 15 días de preaviso. El uso continuado de la plataforma implica la aceptación de los nuevos términos.</P>
+            <P>Forsii se reserva el derecho de modificar estos términos con 15 días de preaviso. El uso continuado de la plataforma implica la aceptación de los nuevos términos.</P>
           </Section>
 
           {/* ── SECCIÓN 2: PRIVACIDAD ── */}

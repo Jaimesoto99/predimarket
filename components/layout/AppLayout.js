@@ -161,7 +161,7 @@ function SidebarInner({
             fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0,
           }}>P</div>
           <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.03em', color: C.text }}>
-            PrediMarket
+            Forsii
           </span>
           <span style={{
             fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
@@ -588,7 +588,7 @@ export default function AppLayout({
               fontSize: 11, fontWeight: 800, color: '#fff',
             }}>P</div>
             <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.03em', color: C.text }}>
-              PrediMarket
+              Forsii
             </span>
           </Link>
 

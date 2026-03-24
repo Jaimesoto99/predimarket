@@ -59,7 +59,7 @@ export default function MarketSharePage({ market }) {
 
   const ogTitle = `${market.title} — ${yesP.toFixed(0)}% probabilidad | Predimarket`
   const ogDesc  = `El mercado colectivo estima un ${yesP.toFixed(0)}% de probabilidad de que ocurra este evento. ${market.description || ''}`
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://predimarket.vercel.app'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://forsii.com'
   const shareUrl = `${siteUrl}/prediccion/${market.slugified || market.id}`
 
   return (

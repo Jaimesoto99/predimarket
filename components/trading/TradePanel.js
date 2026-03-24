@@ -424,7 +424,7 @@ export default function TradePanel({
 
       {/* Disclaimer */}
       <p style={{ fontSize: 10, color: C.textDim, lineHeight: 1.5, margin: 0 }}>
-        PrediMarket usa <strong style={{ color: C.textMuted }}>créditos virtuales</strong> sin valor monetario real. Puedes perder el 100% del crédito invertido. No es asesoramiento financiero.
+        Forsii usa <strong style={{ color: C.textMuted }}>créditos virtuales</strong> sin valor monetario real. Puedes perder el 100% del crédito invertido. No es asesoramiento financiero.
       </p>
     </div>
   )

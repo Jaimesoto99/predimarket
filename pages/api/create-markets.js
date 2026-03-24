@@ -6,7 +6,7 @@ const supabase = createClient(
 )
 
 // ============================================================
-// GENERADOR DE MERCADOS — PrediMarket
+// GENERADOR DE MERCADOS — Forsii
 // Llama a: /api/create-markets?mode=objective   → mercados curados 100% objetivos
 //          /api/create-markets?mode=manual&title=...  → crear 1 mercado manual
 //          /api/create-markets?mode=trending     → trending (desactivado, usa objective)
