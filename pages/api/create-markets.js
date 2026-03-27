@@ -1,9 +1,53 @@
 import { createClient } from '@supabase/supabase-js'
+import { sendEmail } from '../../lib/email/sendEmail'
+import { buildMarketReviewEmail } from '../../lib/email/reviewTemplate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
+
+const ADMIN_EMAIL = 'jaime@forsii.com'
+
+function getSiteUrl() {
+  return (process.env.NEXT_PUBLIC_SITE_URL || 'https://forsii.com').replace(/\/$/, '')
+}
+
+async function sendReviewEmail(market) {
+  try {
+    const siteUrl    = getSiteUrl()
+    const token      = market.review_token
+    const approveUrl = `${siteUrl}/api/admin/approve-market?token=${token}`
+    const withdrawUrl = `${siteUrl}/api/admin/withdraw-market?token=${token}`
+    const adminUrl   = `${siteUrl}/admin?market_id=${market.id}`
+
+    const yesPool = parseFloat(market.yes_pool) || 5000
+    const noPool  = parseFloat(market.no_pool)  || 5000
+    const probability = yesPool / (yesPool + noPool)
+
+    await sendEmail({
+      to:      ADMIN_EMAIL,
+      subject: `🆕 Nuevo mercado pendiente de revisión — ${market.title}`,
+      html:    buildMarketReviewEmail({
+        market: {
+          id:                market.id,
+          title:             market.title,
+          description:       market.description || '',
+          category:          market.category || '',
+          close_date:        market.close_date || null,
+          oracle_type:       market.oracle_type || null,
+          resolution_source: market.resolution_source || null,
+        },
+        probability,
+        approveUrl,
+        withdrawUrl,
+        adminMarketUrl: adminUrl,
+      }),
+    })
+  } catch (err) {
+    console.error('[create-markets] sendReviewEmail error:', err.message)
+  }
+}
 
 // ============================================================
 // GENERADOR DE MERCADOS — Forsii
@@ -267,6 +311,20 @@ async function createObjectiveMarkets() {
     if (!error) {
       created.push({ title: m.title, category: m.category, type: m.type, hours: Math.round(m.hours) })
       existingTitles.push(m.title)
+
+      // Fetch the created market to get its review_token and send review email
+      const { data: newMarket } = await supabase
+        .from('markets')
+        .select('id, title, description, category, close_date, review_token, yes_pool, no_pool, oracle_type, resolution_source')
+        .eq('title', m.title)
+        .eq('status', 'ACTIVE')
+        .order('open_date', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (newMarket) {
+        await sendReviewEmail(newMarket)
+      }
     } else {
       console.error('Error creating market:', m.title, error.message)
       skipped.push({ title: m.title, reason: error.message })
@@ -301,6 +359,19 @@ async function createManualMarket(params) {
   })
 
   if (error) return { error: error.message }
+
+  // Fetch created market and send review email
+  const marketId = data?.market_id || data?.id
+  if (marketId) {
+    const { data: newMarket } = await supabase
+      .from('markets')
+      .select('id, title, description, category, close_date, review_token, yes_pool, no_pool, oracle_type, resolution_source')
+      .eq('id', marketId)
+      .single()
+
+    if (newMarket) await sendReviewEmail(newMarket)
+  }
+
   return { success: true, data }
 }
 

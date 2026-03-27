@@ -1,7 +1,7 @@
 // pages/api/auto-markets.js
 // Generación automática de mercados diarios
 // Fuentes: Yahoo Finance · CoinGecko · Open-Meteo · preciodelaluz.org
-// Invocación: POST /api/auto-markets  con header x-admin-key: predi-admin-2026
+// Invocación: POST /api/auto-markets  con header x-admin-key: forsii-admin-2026
 // También se puede configurar como cron job en vercel.json
 
 import { createClient } from '@supabase/supabase-js';
@@ -11,7 +11,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY // service role para escritura sin RLS
 );
 
-const ADMIN_KEY = process.env.ADMIN_KEY || 'predi-admin-2026';
+const ADMIN_KEY = process.env.ADMIN_KEY || 'forsii-admin-2026';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

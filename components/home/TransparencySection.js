@@ -5,7 +5,7 @@ const links = [
   {
     href: '/metodologia',
     label: 'Metodología',
-    desc: 'Cómo se calcula la probabilidad y el mecanismo AMM.',
+    desc: 'Cómo se forma el precio mediante el libro de órdenes P2P y los oráculos de resolución.',
   },
   {
     href: '/reglas',

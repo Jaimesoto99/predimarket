@@ -6,7 +6,7 @@
 const SUPABASE_URL = 'https://mrdkhfbwesehffbystto.supabase.co'
 const SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZGtoZmJ3ZXNlaGZmYnlzdHRvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDY2OTk1MywiZXhwIjoyMDg2MjQ1OTUzfQ.yPlUU55lXEx1EVfXdF58sNjlblsKsXL4iz2eawnewxg'
 const PROJECT_REF  = 'mrdkhfbwesehffbystto'
-const ADMIN_KEY    = 'predi-admin-2026'
+const ADMIN_KEY    = 'forsii-admin-2026'
 
 const headers = {
   'Authorization': `Bearer ${SERVICE_KEY}`,
@@ -169,7 +169,7 @@ async function createMarkets() {
       console.log(`  Failed: ${e.message}`)
     }
   }
-  console.log('NOTE: Run create-markets manually: npm run dev → GET /api/create-markets?mode=objective&key=predi-admin-2026')
+  console.log('NOTE: Run create-markets manually: npm run dev → GET /api/create-markets?mode=objective&key=forsii-admin-2026')
 }
 
 // ── 6. Print DDL that needs manual execution ───────────────────────────────────

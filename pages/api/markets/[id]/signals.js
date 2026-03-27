@@ -70,7 +70,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       market_id:            id,
-      amm_probability:      ammProb,
+      implied_probability:  ammProb,
       adjusted_probability: impact.adjusted,
       signal_delta:         impact.delta,
       dominant_direction:   impact.dominantType,

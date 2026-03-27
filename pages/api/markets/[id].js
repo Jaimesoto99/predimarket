@@ -48,6 +48,11 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Market not found' })
     }
 
+    // Hide markets pending review or withdrawn from public access
+    if (market.review_status === 'pending_review' || market.review_status === 'withdrawn') {
+      return res.status(404).json({ error: 'Market not found' })
+    }
+
     const yp     = parseFloat(market.yes_pool) || 5000
     const np     = parseFloat(market.no_pool)  || 5000
     const prices = calculatePrices(yp, np)
@@ -85,14 +90,14 @@ export default async function handler(req, res) {
         no_pool:  np,
         prices,
         probability: {
-          amm:        prob.yes,
+          implied:    prob.yes,
           adjusted:   view.adjusted_probability,
           delta:      view.signal_delta,
           change_24h: change,
           direction:  view.dominant_direction,
         },
         liquidity:       liq,
-        amm_book:        book,
+        order_book:      book,
         trade_preview:   tradePreview,
         trades_24h:      tradeCount || 0,
         last_snapshot:   lastSnap?.created_at || null,

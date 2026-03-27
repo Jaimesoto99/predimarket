@@ -7,7 +7,7 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   const key = req.headers['x-admin-key'] || req.query.key;
-  if (key !== (process.env.ADMIN_API_KEY || 'predi-admin-2026')) {
+  if (key !== (process.env.ADMIN_API_KEY || 'forsii-admin-2026')) {
     return res.status(401).json({ error: 'No autorizado' });
   }
 

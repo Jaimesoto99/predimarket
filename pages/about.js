@@ -79,7 +79,7 @@ const STEPS = [
   {
     n: 2,
     title: 'Los usuarios negocian',
-    desc: 'Cada usuario compra contratos SÍ o NO. El precio refleja la probabilidad implícita del mercado calculada mediante AMM (Fixed Product Market Maker).',
+    desc: 'Cada usuario compra contratos SÍ o NO. El precio refleja la probabilidad implícita colectiva, determinada por el cruce de órdenes entre compradores y vendedores (libro de órdenes P2P).',
   },
   {
     n: 3,
@@ -153,7 +153,7 @@ export default function About() {
             <div style={{ display: 'flex', gap: 16, marginTop: 24, flexWrap: 'wrap' }}>
               {[
                 { label: 'Contratos binarios', desc: 'SÍ o NO sobre un evento verificable' },
-                { label: 'AMM automático', desc: 'Precios determinados por el mercado (FPMM)' },
+                { label: 'Libro de órdenes P2P', desc: 'Precios determinados por el cruce de órdenes entre usuarios' },
                 { label: 'Resolución por oráculo', desc: 'Fuentes públicas oficiales, sin árbitros' },
                 { label: 'Fase de pruebas', desc: 'Saldos virtuales, sin dinero real' },
               ].map(({ label, desc }) => (
@@ -185,10 +185,9 @@ export default function About() {
             </div>
 
             <div style={{ marginTop: 8, padding: '16px 20px', background: `${C.accent}08`, border: `1px solid ${C.accent}20`, borderRadius: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 4 }}>Mecánica AMM (Fixed Product Market Maker)</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 4 }}>Descubrimiento de precio P2P</div>
               <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.6 }}>
-                El precio de los contratos SÍ y NO se calcula como: <code style={{ background: C.surface, padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>precio_SÍ = pool_NO / (pool_SÍ + pool_NO)</code>.
-                Cada operación mueve los pools y ajusta el precio automáticamente, sin libro de órdenes centralizado.
+                El precio de los contratos SÍ y NO emerge del cruce de órdenes entre compradores y vendedores. Cada orden ejecutada actualiza el precio de referencia del mercado de forma continua.
               </div>
             </div>
           </Section>
@@ -245,7 +244,7 @@ export default function About() {
                 { title: 'Umbrales verificables', desc: 'Cada mercado incluye el umbral exacto sobre el que se negocia. Los umbrales se fijan al crear el mercado y no se modifican.' },
                 { title: 'Fuentes oficiales', desc: 'Todas las fuentes de datos son públicas y accesibles por cualquier usuario. No se usan APIs privadas ni datos de pago exclusivos.' },
                 { title: 'Reglas de resolución', desc: 'Las reglas se aplican igual para todos los mercados de la misma categoría. No hay discrecionalidad en la resolución.' },
-                { title: 'Código abierto (próximamente)', desc: 'La lógica del AMM, los oráculos y las reglas de resolución se publicarán en GitHub para revisión pública.' },
+                { title: 'Código abierto (próximamente)', desc: 'La lógica del libro de órdenes, los oráculos y las reglas de resolución se publicarán en GitHub para revisión pública.' },
               ].map(({ title, desc }) => (
                 <div key={title} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '14px 16px', background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8 }}>
                   <div style={{ width: 6, height: 6, borderRadius: 3, background: C.yes, flexShrink: 0, marginTop: 5 }} />

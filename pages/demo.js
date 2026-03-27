@@ -33,9 +33,9 @@ const STEPS = [
     tag: 'ANÁLISIS',
     desc: 'El precio de un contrato SÍ refleja la probabilidad implícita que el mercado asigna al evento. Si el precio SÍ es €0,62, el mercado estima un 62% de probabilidad de que ocurra.',
     formula: {
-      label: 'Cálculo del precio (AMM)',
-      eq: 'precio_SÍ = pool_NO / (pool_SÍ + pool_NO)',
-      explain: 'Cada compra mueve los pools y ajusta el precio automáticamente. Sin libro de órdenes, sin market makers centralizados.',
+      label: 'Descubrimiento de precio P2P',
+      eq: 'precio = última orden cruzada (comprador ↔ vendedor)',
+      explain: 'El precio refleja el último cruce entre una orden de compra y una de venta. A más compradores de SÍ, el precio de SÍ sube. El mercado agrega la información colectiva de todos los participantes.',
     },
     tip: 'Si crees que la probabilidad real es mayor al precio actual, comprar SÍ tiene valor esperado positivo.',
   },
@@ -56,7 +56,7 @@ const STEPS = [
     tag: 'EJECUCIÓN',
     desc: 'Introduce el importe que quieres invertir. Puedes usar orden de mercado (ejecución inmediata al precio actual) o orden límite (solo ejecuta si el precio baja al nivel que tú marcas).',
     orderTypes: [
-      { type: 'Orden Mercado', desc: 'Ejecución inmediata al precio del AMM. Puede tener slippage en operaciones grandes.' },
+      { type: 'Orden Mercado', desc: 'Cruza inmediatamente contra las órdenes disponibles en el libro. El precio de ejecución puede variar ligeramente en operaciones grandes.' },
       { type: 'Orden Límite', desc: 'Se ejecuta solo si el precio llega a tu nivel. Útil para entrar en retrocesos.' },
     ],
     tip: 'El máximo por operación en fase beta es €100. Usa importes pequeños para entender el mecanismo.',
@@ -263,8 +263,8 @@ export default function Demo() {
                   <p style={{ fontSize: 12, color: C.textDim, lineHeight: 1.6, margin: 0 }}>{current.formula.explain}</p>
                   <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[
-                      { label: 'Pool SÍ = 5.000, Pool NO = 8.065', result: 'precio SÍ = 62%' },
-                      { label: 'Compras €10 en SÍ → pools se ajustan', result: 'precio SÍ sube a ~63%' },
+                      { label: 'Órdenes SÍ a 62¢ vs órdenes NO a 38¢', result: 'precio SÍ = 62%' },
+                      { label: 'Nueva compra SÍ a 63¢ se cruza', result: 'precio SÍ sube a ~63%' },
                     ].map(({ label, result }) => (
                       <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: `${C.accent}08`, borderRadius: 6 }}>
                         <span style={{ fontSize: 11, color: C.textDim }}>{label}</span>

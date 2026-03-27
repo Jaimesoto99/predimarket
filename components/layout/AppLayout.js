@@ -413,10 +413,10 @@ function SidebarInner({
 function useDesktopForce() {
   const router = useRouter()
   useEffect(() => {
-    const stored = typeof localStorage !== 'undefined' && localStorage.getItem('predi_force_desktop') === '1'
+    const stored = typeof localStorage !== 'undefined' && localStorage.getItem('forsii_force_desktop') === '1'
     if (stored || router.query?.desktop === '1') {
       document.documentElement.setAttribute('data-force-desktop', '1')
-      if (router.query?.desktop === '1') localStorage.setItem('predi_force_desktop', '1')
+      if (router.query?.desktop === '1') localStorage.setItem('forsii_force_desktop', '1')
     }
   }, [router.query?.desktop])
 }

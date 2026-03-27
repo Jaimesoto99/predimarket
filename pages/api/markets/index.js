@@ -58,12 +58,17 @@ export default async function handler(req, res) {
 
     // Status filter
     if (status === 'ALL') {
-      // no filter
+      // no filter — but still hide pending_review and withdrawn
+      query = query.neq('review_status', 'pending_review').neq('review_status', 'withdrawn')
     } else if (status === 'ACTIVE') {
       query = query.in('status', ['ACTIVE', 'CLOSED'])
         .gt('close_date', new Date().toISOString())
+        .neq('review_status', 'pending_review')
+        .neq('review_status', 'withdrawn')
     } else {
       query = query.eq('status', status)
+        .neq('review_status', 'pending_review')
+        .neq('review_status', 'withdrawn')
     }
 
     // Optional filters
@@ -110,7 +115,7 @@ export default async function handler(req, res) {
         no_pool:        np,
         prices,
         probability: {
-          amm:        prob.yes,
+          implied:    prob.yes,
           adjusted:   impact.adjusted,
           delta:      impact.delta,
           change_24h: change,

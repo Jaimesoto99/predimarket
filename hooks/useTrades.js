@@ -26,7 +26,7 @@ export default function useTrades({ user, setUser, onRefreshMarkets }) {
     if (result.success) {
       const newUser = { ...user, balance: result.new_balance }
       setUser(newUser)
-      localStorage.setItem('predi_user', JSON.stringify(newUser))
+      localStorage.setItem('forsii_user', JSON.stringify(newUser))
       loadUserTrades(user.email)
       onRefreshMarkets?.()
     } else {

@@ -26,7 +26,7 @@ export default function Metodologia() {
           Metodología
         </h1>
         <p style={{ fontSize: 15, color: C.textMuted, marginBottom: 40, lineHeight: 1.6 }}>
-          Cómo funcionan los mercados de predicción y el mecanismo de precios en Predimarket.
+          Cómo funcionan los mercados de predicción y el mecanismo de precios en Forsii.
         </p>
 
         <Section title="¿Qué es un mercado de predicción?">
@@ -38,31 +38,31 @@ export default function Metodologia() {
           </P>
         </Section>
 
-        <Section title="Mecanismo AMM (Automated Market Maker)">
+        <Section title="Mecanismo de precios P2P (libro de órdenes)">
           <P>
-            Predimarket utiliza un <strong style={{ color: C.text }}>Fixed Product Market Maker (FPMM)</strong>, el mismo modelo que usan los exchanges descentralizados. Cada mercado tiene dos pools de liquidez: una para SÍ y otra para NO.
+            Forsii utiliza un <strong style={{ color: C.text }}>libro de órdenes descentralizado</strong> entre pares (P2P). Los usuarios publican órdenes de compra o venta de contratos SÍ/NO a un precio límite; cuando una orden de compra y una de venta se cruzan, se ejecuta la operación y el precio de referencia se actualiza.
           </P>
           <P>
-            La fórmula de precio es simple:
+            El precio de un contrato en cada momento refleja el último cruce de órdenes ejecutado:
           </P>
           <div style={{
             background: C.surface, border: `1px solid ${C.cardBorder}`,
             borderRadius: 8, padding: '14px 18px', marginBottom: 14,
             fontFamily: 'ui-monospace, monospace', fontSize: 13, color: C.text,
           }}>
-            Precio SÍ = Pool NO / (Pool SÍ + Pool NO) × 100¢
+            Precio SÍ = precio de la última orden cruzada (SÍ) · Precio NO = 100¢ − Precio SÍ
           </div>
           <P>
-            Cuando un usuario compra contratos SÍ, añade al pool NO y extrae del pool SÍ, lo que sube el precio de SÍ. Cuando compra NO, el precio de SÍ baja. Esto garantiza que SÍ + NO = 100¢ en todo momento.
+            Cuando hay más demanda de contratos SÍ que oferta, el precio de SÍ sube. Cuando la presión es vendedora, baja. En todo momento SÍ + NO = 100¢, lo que garantiza que los precios son probabilidades implícitas consistentes.
           </P>
           <P>
-            El pool inicial es de 5.000 créditos por cada lado. El máximo por operación es de €500.
+            El máximo por operación en fase beta es €100.
           </P>
         </Section>
 
         <Section title="Probabilidad ajustada por señales">
           <P>
-            Además de la probabilidad AMM pura, el sistema incorpora señales externas provenientes de fuentes verificadas (Reuters, Expansión, BOE, etc.) para mostrar una probabilidad ajustada. Esta probabilidad ajustada es <strong style={{ color: C.text }}>solo informativa</strong> — no modifica los pools de liquidez ni los precios de ejecución.
+            Además de la probabilidad implícita del libro de órdenes, el sistema incorpora señales externas provenientes de fuentes verificadas (Reuters, Expansión, BOE, etc.) para mostrar una probabilidad ajustada. Esta probabilidad ajustada es <strong style={{ color: C.text }}>solo informativa</strong> — no modifica los precios de ejecución ni las órdenes pendientes.
           </P>
           <P>
             El delta máximo por señal es ±25 puntos porcentuales, acotado entre 5% y 95%.
@@ -74,13 +74,13 @@ export default function Metodologia() {
             Cada mercado especifica una fuente de resolución pública verificable (Yahoo Finance, INE, OMIE, football-data.org, etc.). Al cierre del mercado, el oráculo consulta la fuente y determina el resultado.
           </P>
           <P>
-            Los participantes con contratos ganadores reciben una recompensa proporcional al pool total. Los perdedores pierden su inversión.
+            Los participantes con contratos ganadores reciben una recompensa proporcional al volumen total del mercado. Los perdedores pierden su inversión.
           </P>
         </Section>
 
         <Section title="Créditos virtuales">
           <P>
-            Predimarket opera con créditos virtuales exclusivamente. No hay dinero real involucrado. Los créditos no tienen valor monetario ni pueden canjearse.
+            Forsii opera con créditos virtuales exclusivamente. No hay dinero real involucrado. Los créditos no tienen valor monetario ni pueden canjearse.
           </P>
         </Section>
 

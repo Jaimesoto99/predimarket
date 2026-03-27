@@ -189,7 +189,7 @@ export default function Stats() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
-                        {['Mercado', 'Categoría', 'Prob. SÍ', 'Pool SÍ', 'Pool NO', 'Volumen', 'Cierre'].map(h => (
+                        {['Mercado', 'Categoría', 'Prob. SÍ', 'Precio SÍ', 'Precio NO', 'Volumen', 'Cierre'].map(h => (
                           <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.textDim, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>

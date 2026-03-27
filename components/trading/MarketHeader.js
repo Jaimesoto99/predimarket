@@ -30,7 +30,7 @@ export default function MarketHeader({ market, onClose, user, isWatching, onTogg
   useEffect(() => {
     if (user) return
     try {
-      const saved = localStorage.getItem('predi_user')
+      const saved = localStorage.getItem('forsii_user')
       if (saved) setLocalUser(JSON.parse(saved))
     } catch {}
   }, [user])

@@ -1,9 +1,136 @@
 import { createClient } from '@supabase/supabase-js'
+import { sendEmail }    from '../../lib/email/sendEmail'
+import { buildPendingResolutionEmail, buildAlertEmail } from '../../lib/email/resolutionTemplate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
+
+const ADMIN_EMAIL = 'jaime@forsii.com'
+
+function getSiteUrl() {
+  return (process.env.NEXT_PUBLIC_SITE_URL || 'https://forsii.com').replace(/\/$/, '')
+}
+
+// ─── Create a pending_resolution row and notify admin ─────────────────────────
+async function createPendingResolution(market, oracleResult, oracleType) {
+  const oracleData = {
+    source:    oracleResult.source,
+    value:     oracleResult.value ?? null,
+    oracleUrl: oracleResult.oracleUrl || null,
+  }
+
+  const { data: row, error } = await supabase
+    .from('pending_resolutions')
+    .insert({
+      market_id:       market.id,
+      suggested_result: oracleResult.outcome,
+      oracle_data:     oracleData,
+      oracle_type:     oracleType,
+      status:          'pending',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[resolve-markets] insert pending_resolution error:', error.message)
+    return null
+  }
+
+  const siteUrl     = getSiteUrl()
+  const token       = row.confirmation_token
+  const confirmUrl  = `${siteUrl}/api/admin/resolve-market?token=${token}&result=${oracleResult.outcome ? 'YES' : 'NO'}`
+  const rejectUrl   = `${siteUrl}/api/admin/resolve-market?token=${token}&result=REJECT`
+  const adminUrl    = `${siteUrl}/admin/markets/${market.id}`
+
+  await sendEmail({
+    to:      ADMIN_EMAIL,
+    subject: `⏳ Resolución pendiente — ${market.title}`,
+    html:    buildPendingResolutionEmail({
+      market:          { id: market.id, title: market.title, description: market.description || '' },
+      oracleType,
+      oracleData,
+      suggestedResult: oracleResult.outcome,
+      confirmUrl,
+      rejectUrl,
+      adminMarketUrl:  adminUrl,
+    }),
+  })
+
+  return row
+}
+
+// ─── Auto-approve markets pending review for more than 24 hours ──────────────
+async function autoApproveExpiredReviews() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: approved, error } = await supabase
+    .from('markets')
+    .update({ review_status: 'approved', review_token: null })
+    .eq('review_status', 'pending_review')
+    .lt('open_date', cutoff)
+    .select('id, title')
+
+  if (error) {
+    console.error('[resolve-markets] autoApproveExpiredReviews error:', error.message)
+    return []
+  }
+
+  if (approved?.length) {
+    console.log(`[resolve-markets] Auto-approved ${approved.length} markets after 24h review window`)
+  }
+
+  return approved || []
+}
+
+// ─── Auto-expire pending resolutions older than 24 hours ─────────────────────
+async function expireOldPendingResolutions() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: expired, error } = await supabase
+    .from('pending_resolutions')
+    .select('id, market_id')
+    .eq('status', 'pending')
+    .lt('created_at', cutoff)
+
+  if (error || !expired?.length) return []
+
+  const results = []
+  for (const row of expired) {
+    try {
+      await supabase.rpc('refund_market', { p_market_id: row.market_id })
+
+      await supabase
+        .from('pending_resolutions')
+        .update({ status: 'expired', resolved_at: new Date().toISOString() })
+        .eq('id', row.id)
+
+      const { data: market } = await supabase
+        .from('markets')
+        .select('id, title')
+        .eq('id', row.market_id)
+        .single()
+
+      await sendEmail({
+        to:      ADMIN_EMAIL,
+        subject: `⚠️ Resolución expirada — reembolso automático — ${market?.title || row.market_id}`,
+        html:    buildAlertEmail({
+          market,
+          reason:  'La resolución no fue confirmada en 24 horas. Se ha ejecutado un reembolso automático a todos los participantes.',
+          details: `market_id: ${row.market_id}`,
+        }),
+      })
+
+      results.push({ id: row.market_id, status: 'EXPIRED_AND_REFUNDED' })
+    } catch (e) {
+      console.error('[resolve-markets] expire error:', row.market_id, e.message)
+      results.push({ id: row.market_id, status: 'EXPIRE_ERROR', error: e.message })
+    }
+  }
+
+  return results
+}
 
 // ─── Oracle: IBEX 35 ─────────────────────────────────────────────────────
 async function checkIBEXVerde() {
@@ -319,6 +446,12 @@ export default async function handler(req, res) {
   if (!expected || key !== expected) return res.status(401).json({ error: "No autorizado" })
 
   try {
+    // Step 1a: auto-approve markets whose 24h review window has passed
+    const autoApproved = await autoApproveExpiredReviews()
+
+    // Step 1b: auto-expire pending resolutions that have been waiting > 24h
+    const expired = await expireOldPendingResolutions()
+
     // Prices injected externally (e.g., from GitHub Actions)
     const injectedLuz = req.query.luz ? parseFloat(req.query.luz) : null
     const injectedIbex = req.query.ibex !== undefined ? req.query.ibex === 'true' : null
@@ -331,6 +464,19 @@ export default async function handler(req, res) {
     const results = []
     for (const market of (pendingMarkets || [])) {
       if (market.resolved_outcome !== null) continue
+
+      // Skip markets that already have a pending resolution awaiting confirmation
+      const { data: existingPending } = await supabase
+        .from('pending_resolutions')
+        .select('id, status, created_at')
+        .eq('market_id', market.id)
+        .eq('status', 'pending')
+        .limit(1)
+      if (existingPending?.length > 0) {
+        results.push({ id: market.id, title: market.title, status: 'AWAITING_CONFIRMATION', pendingSince: existingPending[0].created_at })
+        continue
+      }
+
       const oracle = getOracleForMarket(market)
 
       // No oracle found — check if market has been expired > 24h and issue refund
@@ -386,13 +532,12 @@ export default async function handler(req, res) {
         continue
       }
 
-      const { error: rErr } = await supabase.rpc('resolve_market_manual', { p_market_id: market.id, p_outcome: oracleResult.outcome, p_source: oracleResult.source })
-      if (!rErr) {
-        try { await supabase.rpc('distribute_winnings', { p_market_id: market.id }) } catch (e) { console.error('Error distributing winnings:', market.id, e) }
-      }
-      results.push(rErr
-        ? { id: market.id, title: market.title, status: 'ERROR', error: rErr.message }
-        : { id: market.id, title: market.title, status: 'RESOLVED', outcome: oracleResult.outcome, source: oracleResult.source })
+      // ── SUPERVISED RESOLUTION: pause and notify admin instead of resolving immediately ──
+      const pending = await createPendingResolution(market, oracleResult, oracle.type)
+      results.push(pending
+        ? { id: market.id, title: market.title, status: 'PENDING_CONFIRMATION', outcome: oracleResult.outcome, oracleType: oracle.type }
+        : { id: market.id, title: market.title, status: 'ERROR', error: 'Failed to create pending resolution' }
+      )
     }
 
     // Redistribute winnings in already-RESOLVED markets that still have OPEN trades
@@ -429,10 +574,15 @@ export default async function handler(req, res) {
     return res.status(200).json({
       timestamp: new Date().toISOString(),
       resolved: results.filter(r => r.status === 'RESOLVED').length,
+      pending_confirmation: results.filter(r => r.status === 'PENDING_CONFIRMATION').length,
+      awaiting_confirmation: results.filter(r => r.status === 'AWAITING_CONFIRMATION').length,
       refunded: results.filter(r => r.status === 'REFUNDED').length,
-      pending: results.filter(r => !['RESOLVED', 'REFUNDED'].includes(r.status)).length,
+      auto_approved_reviews: autoApproved.length,
+      auto_expired: expired.length,
+      pending: results.filter(r => !['RESOLVED', 'REFUNDED', 'PENDING_CONFIRMATION', 'AWAITING_CONFIRMATION'].includes(r.status)).length,
       redistributed: redistributed.length,
       details: results,
+      expired_resolutions: expired,
       redistributed_details: redistributed,
       recurring,
       expired_orders: expiredOrders,

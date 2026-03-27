@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-// URL: /api/stress-test?key=predi-admin-2026
+// URL: /api/stress-test?key=forsii-admin-2026
 // Crea 50 usuarios de prueba, simula 500 operaciones, verifica integridad, limpia.
 
 const supabase = createClient(

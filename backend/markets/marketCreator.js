@@ -11,6 +11,14 @@
 
 import { createClient }  from '@supabase/supabase-js'
 import { logLifecycle }  from './marketLifecycle'
+import { sendEmail }     from '../../lib/email/sendEmail'
+import { buildMarketReviewEmail } from '../../lib/email/reviewTemplate'
+
+const ADMIN_EMAIL = 'jaime@forsii.com'
+
+function getSiteUrl() {
+  return (process.env.NEXT_PUBLIC_SITE_URL || 'https://forsii.com').replace(/\/$/, '')
+}
 
 function getSupabase() {
   return createClient(
@@ -168,6 +176,47 @@ export async function createMarket(candidate) {
       entities:        Object.keys(candidate.entities || {}),
     },
   })
+
+  // 6. Fetch market record and send review email
+  try {
+    const { data: newMarket } = await supabase
+      .from('markets')
+      .select('id, title, description, category, close_date, review_token, yes_pool, no_pool, oracle_type, resolution_source')
+      .eq('id', marketId)
+      .single()
+
+    if (newMarket?.review_token) {
+      const siteUrl     = getSiteUrl()
+      const token       = newMarket.review_token
+      const approveUrl  = `${siteUrl}/api/admin/approve-market?token=${token}`
+      const withdrawUrl = `${siteUrl}/api/admin/withdraw-market?token=${token}`
+      const adminUrl    = `${siteUrl}/admin?market_id=${marketId}`
+      const yesPool     = parseFloat(newMarket.yes_pool) || 5000
+      const noPool      = parseFloat(newMarket.no_pool)  || 5000
+
+      await sendEmail({
+        to:      ADMIN_EMAIL,
+        subject: `🆕 Nuevo mercado pendiente de revisión — ${newMarket.title}`,
+        html:    buildMarketReviewEmail({
+          market: {
+            id:                newMarket.id,
+            title:             newMarket.title,
+            description:       newMarket.description || '',
+            category:          newMarket.category || '',
+            close_date:        newMarket.close_date || null,
+            oracle_type:       newMarket.oracle_type || candidate.oracle_type || null,
+            resolution_source: newMarket.resolution_source || candidate.resolution_source || null,
+          },
+          probability:     yesPool / (yesPool + noPool),
+          approveUrl,
+          withdrawUrl,
+          adminMarketUrl:  adminUrl,
+        }),
+      })
+    }
+  } catch (emailErr) {
+    console.error('[marketCreator] review email error:', emailErr.message)
+  }
 
   return {
     success:     true,

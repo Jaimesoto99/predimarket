@@ -76,7 +76,7 @@ export default function Home() {
 
   // ─── Init — restaurar sesión desde localStorage + listener Supabase Auth ─
   useEffect(() => {
-    const savedUser = localStorage.getItem('predi_user')
+    const savedUser = localStorage.getItem('forsii_user')
     if (savedUser) {
       try {
         const u = JSON.parse(savedUser)
@@ -87,10 +87,10 @@ export default function Home() {
           if (r?.success && r.user?.balance !== u.balance) {
             const synced = { ...u, balance: r.user.balance }
             setUser(synced)
-            localStorage.setItem('predi_user', JSON.stringify(synced))
+            localStorage.setItem('forsii_user', JSON.stringify(synced))
           }
         }).catch(() => {})
-      } catch (e) { localStorage.removeItem('predi_user') }
+      } catch (e) { localStorage.removeItem('forsii_user') }
     }
 
     // Auth state change listener
@@ -99,13 +99,13 @@ export default function Home() {
         const result = await getOrCreateUser(authUser.email)
         if (result.success) {
           setUser(result.user)
-          localStorage.setItem('predi_user', JSON.stringify(result.user))
+          localStorage.setItem('forsii_user', JSON.stringify(result.user))
           loadUserTrades(result.user.email)
         }
       } else {
         // signed out via Supabase
         setUser(null)
-        localStorage.removeItem('predi_user')
+        localStorage.removeItem('forsii_user')
       }
     })
 
@@ -130,19 +130,19 @@ export default function Home() {
   }, [router.query.openMarket, markets])
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
-  function handleLogin(prediUser) {
+  function handleLogin(forsiiUser) {
     // Called by AuthModal after successful auth + getOrCreateUser
-    setUser(prediUser)
-    localStorage.setItem('predi_user', JSON.stringify(prediUser))
+    setUser(forsiiUser)
+    localStorage.setItem('forsii_user', JSON.stringify(forsiiUser))
     setShowAuth(false)
-    loadUserTrades(prediUser.email)
+    loadUserTrades(forsiiUser.email)
   }
 
   async function handleLogout() {
     const { signOut } = await import('../lib/supabase')
     await signOut()
     setUser(null)
-    localStorage.removeItem('predi_user')
+    localStorage.removeItem('forsii_user')
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ export default function Home() {
       if (result.new_balance != null) {
         const newUser = { ...user, balance: result.new_balance }
         setUser(newUser)
-        localStorage.setItem('predi_user', JSON.stringify(newUser))
+        localStorage.setItem('forsii_user', JSON.stringify(newUser))
       }
       setTradeAmount(10)
       loadUserTrades(user.email)
@@ -213,7 +213,7 @@ export default function Home() {
     if (data?.new_balance != null) {
       const newUser = { ...user, balance: data.new_balance }
       setUser(newUser)
-      localStorage.setItem('predi_user', JSON.stringify(newUser))
+      localStorage.setItem('forsii_user', JSON.stringify(newUser))
     }
     loadOrderBook(selectedMarket.id)
     loadUserTrades(user.email)
@@ -226,7 +226,7 @@ export default function Home() {
     if (data && !data.success) { showToast(data.error, 'error'); return }
     const newUser = { ...user, balance: data.new_balance }
     setUser(newUser)
-    localStorage.setItem('predi_user', JSON.stringify(newUser))
+    localStorage.setItem('forsii_user', JSON.stringify(newUser))
     loadOrderBook(selectedMarket.id)
   }
 

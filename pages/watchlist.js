@@ -14,7 +14,7 @@ export default function WatchlistPage() {
   const [user, setUser] = useState(null)
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('predi_user')
+      const saved = localStorage.getItem('forsii_user')
       if (saved) setUser(JSON.parse(saved))
     } catch { /* ignore */ }
   }, [])
@@ -67,7 +67,7 @@ export default function WatchlistPage() {
       if (result.new_balance != null) {
         const newUser = { ...user, balance: result.new_balance }
         setUser(newUser)
-        localStorage.setItem('predi_user', JSON.stringify(newUser))
+        localStorage.setItem('forsii_user', JSON.stringify(newUser))
       }
       setTradeAmount(10)
       loadMarkets()
@@ -89,7 +89,7 @@ export default function WatchlistPage() {
     if (data?.new_balance != null) {
       const newUser = { ...user, balance: data.new_balance }
       setUser(newUser)
-      localStorage.setItem('predi_user', JSON.stringify(newUser))
+      localStorage.setItem('forsii_user', JSON.stringify(newUser))
     }
     return { success: true, new_balance: data.new_balance }
   }
