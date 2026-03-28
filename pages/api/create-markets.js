@@ -276,12 +276,22 @@ async function createObjectiveMarkets() {
   const prices = await fetchCurrentPrices()
   const markets = getObjectiveMarkets(prices)
 
-  // Obtener mercados existentes activos/cerrados para evitar duplicados
-  const { data: existing } = await supabase
+  // Deduplicate against: all ACTIVE markets + CLOSED markets from the last 36 hours.
+  // Using 36h (not 7 days) so weekly markets can be recreated next cycle after closing.
+  const recentCutoff = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString()
+  const { data: existingActive } = await supabase
     .from('markets')
     .select('title')
-    .in('status', ['ACTIVE', 'CLOSED'])
-  const existingTitles = (existing || []).map(m => m.title)
+    .eq('status', 'ACTIVE')
+  const { data: existingRecentClosed } = await supabase
+    .from('markets')
+    .select('title')
+    .eq('status', 'CLOSED')
+    .gte('close_date', recentCutoff)
+  const existingTitles = [
+    ...(existingActive || []),
+    ...(existingRecentClosed || []),
+  ].map(m => m.title)
 
   const created = []
   const skipped = []
@@ -340,11 +350,11 @@ async function createManualMarket(params) {
 
   if (!title) return { error: 'Falta título' }
 
-  // Check duplicate
+  // Check duplicate against active markets only (manual markets can re-create resolved ones)
   const { data: existing } = await supabase
     .from('markets')
     .select('title')
-    .in('status', ['ACTIVE', 'CLOSED'])
+    .eq('status', 'ACTIVE')
   const existingTitles = (existing || []).map(m => m.title)
   const isDuplicate = existingTitles.some(et => titlesAreSimilar(title, et))
   if (isDuplicate) return { error: 'Ya existe un mercado similar activo' }
