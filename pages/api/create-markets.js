@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
-import { sendEmail } from '../../lib/email/sendEmail'
+import { sendEmail }            from '../../lib/email/sendEmail'
 import { buildMarketReviewEmail } from '../../lib/email/reviewTemplate'
+import { rateMarket }            from '../../lib/oracle-rating'
+import { fetchTrendingNews }     from './admin/trending-spain'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -13,21 +15,24 @@ function getSiteUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL || 'https://forsii.com').replace(/\/$/, '')
 }
 
-async function sendReviewEmail(market) {
+async function sendReviewEmail(market, rating) {
   try {
-    const siteUrl    = getSiteUrl()
-    const token      = market.review_token
-    const approveUrl = `${siteUrl}/api/admin/approve-market?token=${token}`
+    const siteUrl     = getSiteUrl()
+    const token       = market.review_token
+    const approveUrl  = `${siteUrl}/api/admin/approve-market?token=${token}`
     const withdrawUrl = `${siteUrl}/api/admin/withdraw-market?token=${token}`
-    const adminUrl   = `${siteUrl}/admin?market_id=${market.id}`
+    const adminKey    = process.env.ADMIN_API_KEY || ''
+    const adminUrl    = `${siteUrl}/admin?key=${adminKey}&market_id=${market.id}`
 
-    const yesPool = parseFloat(market.yes_pool) || 5000
-    const noPool  = parseFloat(market.no_pool)  || 5000
+    const yesPool     = parseFloat(market.yes_pool) || 5000
+    const noPool      = parseFloat(market.no_pool)  || 5000
     const probability = yesPool / (yesPool + noPool)
 
-    await sendEmail({
+    const result = await sendEmail({
       to:      ADMIN_EMAIL,
-      subject: `🆕 Nuevo mercado pendiente de revisión — ${market.title}`,
+      subject: rating
+        ? `🆕 [${rating.score}/10] Nuevo mercado pendiente — ${market.title}`
+        : `🆕 Nuevo mercado pendiente de revisión — ${market.title}`,
       html:    buildMarketReviewEmail({
         market: {
           id:                market.id,
@@ -35,17 +40,25 @@ async function sendReviewEmail(market) {
           description:       market.description || '',
           category:          market.category || '',
           close_date:        market.close_date || null,
-          oracle_type:       market.oracle_type || null,
           resolution_source: market.resolution_source || null,
         },
         probability,
         approveUrl,
         withdrawUrl,
         adminMarketUrl: adminUrl,
+        rating,
       }),
     })
+
+    if (result.success) {
+      console.log(`[create-markets] Review email sent for market ${market.id}, resend_id: ${result.id}`)
+    } else {
+      console.error(`[create-markets] Review email FAILED for market ${market.id}:`, result.error)
+    }
+    return result
   } catch (err) {
     console.error('[create-markets] sendReviewEmail error:', err.message)
+    return { success: false, error: err.message }
   }
 }
 
@@ -58,7 +71,7 @@ async function sendReviewEmail(market) {
 
 // ─── Obtener precios actuales para umbrales calibrados ───────────────────
 async function fetchCurrentPrices() {
-  const prices = { ibex: null, btc: null, brent: null }
+  const prices = { ibex: null, btc: null, brent: null, luz: null }
   try {
     const r = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EIBEX?interval=1d&range=1d', { headers: { 'User-Agent': 'Mozilla/5.0' } })
     const d = await r.json()
@@ -74,6 +87,13 @@ async function fetchCurrentPrices() {
     const d = await r.json()
     prices.brent = d?.chart?.result?.[0]?.meta?.regularMarketPrice
   } catch (e) { console.error('Brent fetch error:', e.message) }
+  try {
+    const r = await fetch('https://api.preciodelaluz.org/v1/prices/avg?zone=PCB', { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } })
+    if (r.ok) {
+      const d = await r.json()
+      if (d?.price != null) prices.luz = d.price
+    }
+  } catch (e) { console.error('LUZ fetch error:', e.message) }
   return prices
 }
 
@@ -99,16 +119,31 @@ function getObjectiveMarkets(prices = {}) {
   const hoursToEndOfMonth = Math.max(24, Math.ceil((endOfMonth - now) / 3600000))
   const hoursToNextMonday = Math.max(24, Math.ceil((nextMonday - now) / 3600000))
 
-  // Umbrales dinámicos basados en precio actual ±1% (redondeados a valores limpios)
+  // Umbrales dinámicos calibrados en ±3-5% del precio actual
+  // Probabilidad implícita objetivo: 35-65% (umbral cercano al precio actual)
   const ibexThreshold = prices.ibex
-    ? Math.round(prices.ibex * 1.008 / 25) * 25  // +0.8%, redondear a múltiplo de 25
+    ? Math.round(prices.ibex * 1.015 / 25) * 25   // +1.5%, múltiplo de 25
     : null
   const btcThreshold = prices.btc
-    ? Math.round(prices.btc * 1.015 / 500) * 500  // +1.5%, redondear a múltiplo de $500
+    ? Math.round(prices.btc * 1.02 / 250) * 250   // +2%, múltiplo de $250
     : null
   const brentThreshold = prices.brent
-    ? Math.round(prices.brent * 1.01 * 4) / 4     // +1%, redondear a $0.25
+    ? Math.round(prices.brent * 1.015 * 4) / 4    // +1.5%, $0.25 precision
     : null
+  // Luz: +3% of current price, rounded to nearest €1
+  const luzThresholdDaily  = prices.luz
+    ? Math.round(prices.luz * 1.03)                // +3% para mercado diario
+    : null
+  const luzThresholdWeekly = prices.luz
+    ? Math.round(prices.luz * 1.02)                // +2% para media semanal
+    : null
+
+  // Gate: skip market if threshold is >10% above or below current price (too one-sided)
+  function isWellCalibrated(threshold, current) {
+    if (!threshold || !current) return true // no live price, allow through
+    const ratio = threshold / current
+    return ratio >= 0.92 && ratio <= 1.10
+  }
 
   const markets = []
 
@@ -119,36 +154,42 @@ function getObjectiveMarkets(prices = {}) {
     category: 'ECONOMIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
   })
 
-  if (ibexThreshold) {
+  if (ibexThreshold && isWellCalibrated(ibexThreshold, prices.ibex)) {
     const ibexRounded = ibexThreshold.toLocaleString('es-ES')
     const ibexCurrent = Math.round(prices.ibex).toLocaleString('es-ES')
     markets.push({
       title: `¿El IBEX 35 supera los ${ibexRounded} puntos esta semana?`,
-      description: `Se resuelve SÍ si el IBEX 35 cierra por encima de ${ibexRounded} puntos en alguna sesión de esta semana. Cotización actual: ~${ibexCurrent}. Fuente: Yahoo Finance (finance.yahoo.com/quote/%5EIBEX/). Dato verificable tras las 17:35h de cada día hábil.`,
+      description: `Se resuelve SÍ si el IBEX 35 cierra por encima de ${ibexRounded} puntos en alguna sesión de esta semana. Cotización actual: ~${ibexCurrent}. Umbral calibrado a +1.5% del precio actual. Fuente: Yahoo Finance (finance.yahoo.com/quote/%5EIBEX/). Dato verificable tras las 17:35h de cada día hábil.`,
       category: 'ECONOMIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
     })
   }
 
-  markets.push(
-    {
-      title: '¿El precio medio del PVPC supera 80 €/MWh esta semana?',
-      description: 'Se resuelve SÍ si el precio medio del PVPC (Precio Voluntario para el Pequeño Consumidor) acumula una media superior a 80 €/MWh durante esta semana. Fuente: REE apidatos (apidatos.ree.es). Dato oficial.',
+  // Luz markets: use live price if available, otherwise fall back to fixed values
+  const luzDaily   = luzThresholdDaily   ?? 90
+  const luzWeekly  = luzThresholdWeekly  ?? 88
+  const luzCurrent = prices.luz ? `Precio actual: ~${Math.round(prices.luz)} €/MWh. ` : ''
+  if (isWellCalibrated(luzWeekly, prices.luz)) {
+    markets.push({
+      title: `¿El precio medio del PVPC supera ${luzWeekly} €/MWh esta semana?`,
+      description: `Se resuelve SÍ si el precio medio del PVPC acumula una media superior a ${luzWeekly} €/MWh esta semana. ${luzCurrent}Umbral calibrado a +2% del precio actual. Fuente: REE apidatos (apidatos.ree.es). Dato oficial.`,
       category: 'ENERGIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
-    },
-    {
-      title: '¿El precio medio de la luz supera 60 €/MWh hoy?',
-      description: 'Se resuelve SÍ si el precio medio del pool eléctrico diario supera 60 €/MWh hoy. Fuente: OMIE / REE (apidatos.ree.es). Dato oficial publicado diariamente.',
+    })
+  }
+  if (isWellCalibrated(luzDaily, prices.luz)) {
+    markets.push({
+      title: `¿El precio medio de la luz supera ${luzDaily} €/MWh hoy?`,
+      description: `Se resuelve SÍ si el precio medio del pool eléctrico diario supera ${luzDaily} €/MWh hoy. ${luzCurrent}Umbral calibrado a +3% del precio actual. Fuente: OMIE / REE (apidatos.ree.es). Dato oficial publicado diariamente.`,
       category: 'ENERGIA', type: 'DIARIO', hours: 20,
-    }
-  )
+    })
+  }
 
   // ── CRIPTO ────────────────────────────────────────────────────────────
-  if (btcThreshold) {
+  if (btcThreshold && isWellCalibrated(btcThreshold, prices.btc)) {
     const btcRounded = btcThreshold.toLocaleString('es-ES')
     const btcCurrent = Math.round(prices.btc).toLocaleString('es-ES')
     markets.push({
       title: `¿Bitcoin supera los ${btcRounded}$ esta semana?`,
-      description: `Se resuelve SÍ si el precio de Bitcoin (BTC) supera ${btcRounded} USD en algún momento durante esta semana. Precio actual: ~$${btcCurrent}. Umbral calibrado a +1.5% del precio actual. Fuente: CoinGecko API (api.coingecko.com). Precio spot en tiempo real.`,
+      description: `Se resuelve SÍ si el precio de Bitcoin (BTC) supera ${btcRounded} USD en algún momento durante esta semana. Precio actual: ~$${btcCurrent}. Umbral calibrado a +2% del precio actual. Fuente: CoinGecko API (api.coingecko.com). Precio spot en tiempo real.`,
       category: 'CRIPTO', type: 'SEMANAL', hours: hoursToEndOfWeek,
     })
   } else {
@@ -233,18 +274,12 @@ function getObjectiveMarkets(prices = {}) {
     }
   )
 
-  // ── ENERGÍA (Brent) ───────────────────────────────────────────────────
-  if (brentThreshold) {
+  // ── ENERGÍA (Brent) — only create if live price available and well-calibrated ──
+  if (brentThreshold && isWellCalibrated(brentThreshold, prices.brent)) {
     const brentCurrent = prices.brent.toFixed(2)
     markets.push({
       title: `¿El Brent supera los ${brentThreshold}$ por barril esta semana?`,
-      description: `Se resuelve SÍ si el precio del petróleo Brent supera ${brentThreshold} USD/barril en algún momento durante esta semana. Precio actual: ~$${brentCurrent}. Fuente: Yahoo Finance (BZ=F). Dato de mercado verificable.`,
-      category: 'ENERGIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
-    })
-  } else {
-    markets.push({
-      title: '¿El Brent sube más de un 2% esta semana?',
-      description: 'Se resuelve SÍ si el precio del petróleo Brent sube más de un 2% de lunes a viernes. Fuente: Yahoo Finance (BZ=F).',
+      description: `Se resuelve SÍ si el precio del petróleo Brent supera ${brentThreshold} USD/barril en algún momento durante esta semana. Precio actual: ~$${brentCurrent}. Umbral calibrado a +1.5% del precio actual. Fuente: Yahoo Finance (BZ=F). Dato de mercado verificable.`,
       category: 'ENERGIA', type: 'SEMANAL', hours: hoursToEndOfWeek,
     })
   }
@@ -273,7 +308,10 @@ function titlesAreSimilar(a, b) {
 
 // ─── Crear mercados objetivos curados ────────────────────────────────────
 async function createObjectiveMarkets() {
-  const prices = await fetchCurrentPrices()
+  const [prices, trendingNews] = await Promise.all([
+    fetchCurrentPrices(),
+    fetchTrendingNews().catch(() => []),
+  ])
   const markets = getObjectiveMarkets(prices)
 
   // Deduplicate against: all ACTIVE markets + CLOSED markets from the last 36 hours.
@@ -315,7 +353,7 @@ async function createObjectiveMarkets() {
       p_category: m.category,
       p_market_type: m.type,
       p_duration_hours: Math.round(m.hours),
-      p_initial_pool: 0
+      p_initial_pool: 10000
     })
 
     if (!error) {
@@ -325,7 +363,7 @@ async function createObjectiveMarkets() {
       // Fetch the created market to get its review_token and send review email
       const { data: newMarket } = await supabase
         .from('markets')
-        .select('id, title, description, category, close_date, review_token, yes_pool, no_pool, oracle_type, resolution_source')
+        .select('id, title, description, category, close_date, review_token, yes_pool, no_pool, resolution_source')
         .eq('title', m.title)
         .eq('status', 'ACTIVE')
         .order('open_date', { ascending: false })
@@ -333,7 +371,27 @@ async function createObjectiveMarkets() {
         .single()
 
       if (newMarket) {
-        await sendReviewEmail(newMarket)
+        // Rate the market
+        const rating = rateMarket(newMarket, trendingNews, { prices })
+
+        // Store rating in DB
+        await supabase
+          .from('markets')
+          .update({ market_rating: rating })
+          .eq('id', newMarket.id)
+
+        // Auto-reject if score is too low
+        if (rating.score < 4.0) {
+          await supabase
+            .from('markets')
+            .update({ review_status: 'rejected', status: 'HIDDEN' })
+            .eq('id', newMarket.id)
+          console.log(`[create-markets] Auto-rejected market #${newMarket.id} (score ${rating.score}): ${newMarket.title}`)
+          skipped.push({ title: m.title, reason: `Auto-rechazado: puntuación ${rating.score}/10 < 4.0` })
+          continue
+        }
+
+        await sendReviewEmail(newMarket, rating)
       }
     } else {
       console.error('Error creating market:', m.title, error.message)
@@ -365,7 +423,7 @@ async function createManualMarket(params) {
     p_category: category || 'ACTUALIDAD',
     p_market_type: type || 'SEMANAL',
     p_duration_hours: parseInt(hours) || 168,
-    p_initial_pool: parseInt(pool) || 0
+    p_initial_pool: parseInt(pool) || 10000
   })
 
   if (error) return { error: error.message }
@@ -375,11 +433,22 @@ async function createManualMarket(params) {
   if (marketId) {
     const { data: newMarket } = await supabase
       .from('markets')
-      .select('id, title, description, category, close_date, review_token, yes_pool, no_pool, oracle_type, resolution_source')
+      .select('id, title, description, category, close_date, review_token, yes_pool, no_pool, resolution_source')
       .eq('id', marketId)
       .single()
 
-    if (newMarket) await sendReviewEmail(newMarket)
+    if (newMarket) {
+      const trendingNews = await fetchTrendingNews().catch(() => [])
+      const rating       = rateMarket(newMarket, trendingNews)
+
+      await supabase
+        .from('markets')
+        .update({ market_rating: rating })
+        .eq('id', newMarket.id)
+
+      const emailResult = await sendReviewEmail(newMarket, rating)
+      return { success: true, data, email: emailResult, rating: { score: rating.score } }
+    }
   }
 
   return { success: true, data }

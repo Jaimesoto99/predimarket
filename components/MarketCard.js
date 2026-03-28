@@ -109,7 +109,7 @@ export default function MarketCard({ market, onOpen, label, user, isWatching, on
                 color: label === 'TRENDING' ? C.yes : label === 'HOT' ? C.warning : C.accentLight,
                 background: label === 'TRENDING' ? `${C.yes}12` : label === 'HOT' ? `${C.warning}12` : `${C.accent}12`,
               }}>
-                {label === 'TRENDING' ? 'Trending' : label === 'HOT' ? 'Hot' : 'Nuevo'}
+                {label === 'TRENDING' ? 'Tendencia' : label === 'HOT' ? 'Popular' : 'Nuevo'}
               </span>
             )}
             <div style={{ marginLeft: 'auto', flexShrink: 0, textAlign: 'right' }}>

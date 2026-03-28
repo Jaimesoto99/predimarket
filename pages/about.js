@@ -31,8 +31,8 @@ const ORACLES = [
   {
     category: 'ENERGIA',
     indicator: 'Precio luz PVPC',
-    source: 'REE / preciodelaluz.org',
-    api: 'api.esios.ree.es/indicators/1001',
+    source: 'REE apidatos (Red Eléctrica de España)',
+    api: 'apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real',
     field: 'values[].value',
     resolution: 'Media diaria (€/MWh → €/kWh)',
   },
@@ -74,7 +74,7 @@ const STEPS = [
   {
     n: 1,
     title: 'Se crea el contrato',
-    desc: 'Un mercado de predicción se abre sobre un evento futuro verificable: "¿Cerrará el IBEX 35 por encima de 11.500 el viernes?"',
+    desc: 'Se crea un contrato financiero binario sobre un evento futuro verificable: "¿Cerrará el IBEX 35 por encima de 11.500 el viernes?"',
   },
   {
     n: 2,
@@ -113,7 +113,7 @@ export default function About() {
     <>
       <Head>
         <title>Forsii — Sobre nosotros</title>
-        <meta name="description" content="Qué es Forsii, cómo funcionan los contratos de predicción, oráculos públicos y el equipo detrás del proyecto." />
+        <meta name="description" content="Qué es Forsii, cómo funcionan los contratos financieros binarios, oráculos públicos y el equipo detrás del proyecto." />
         <meta property="og:title" content="Forsii — Sobre nosotros" />
         <meta property="og:description" content="Plataforma de contratos financieros binarios sobre indicadores económicos verificables. Resolución automática por oráculo público." />
         <link rel="canonical" href="https://forsii.com/about" />
@@ -146,8 +146,8 @@ export default function About() {
 
           {/* Qué es */}
           <Section id="que-es" title="Qué es Forsii">
-            <P>Forsii es un mercado de predicción financiero donde los usuarios compran y venden contratos binarios sobre eventos verificables: si el IBEX 35 superará un nivel determinado, si el precio de la luz bajará esta semana, si Bitcoin alcanzará cierto precio.</P>
-            <P>A diferencia de los mercados de predicción basados en opinión, todos los mercados de Forsii se resuelven mediante oráculos automatizados que consultan fuentes públicas oficiales. No hay subjetividad, no hay árbitros: los datos mandan.</P>
+            <P>Forsii es una plataforma de intermediación de contratos financieros binarios donde los usuarios compran y venden contratos sobre eventos verificables: si el IBEX 35 superará un nivel determinado, si el precio de la luz bajará esta semana, si Bitcoin alcanzará cierto precio. Forsii actúa exclusivamente como intermediario tecnológico — nunca como contraparte.</P>
+            <P>Todos los contratos se resuelven mediante oráculos automatizados que consultan fuentes públicas oficiales. La resolución es supervisada por el promotor antes de ejecutar la liquidación. No hay subjetividad, no hay árbitros no identificados: los datos mandan.</P>
             <P>La plataforma opera actualmente en fase de pruebas con saldos virtuales. No se requiere dinero real. El objetivo es demostrar el modelo antes de solicitar autorización regulatoria.</P>
 
             <div style={{ display: 'flex', gap: 16, marginTop: 24, flexWrap: 'wrap' }}>
@@ -287,14 +287,14 @@ export default function About() {
                 J
               </div>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>Jaime de Soto Enrile</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>Jaime Soto Enrile</div>
                 <div style={{ fontSize: 12, color: C.accent, marginBottom: 10 }}>Fundador — Madrid, España</div>
                 <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.7, maxWidth: 520 }}>
                   Diseño, desarrollo y operación de Forsii. Responsable del tratamiento de datos personales conforme al RGPD y la LOPDGDD.
                 </div>
                 <div style={{ marginTop: 12 }}>
-                  <a href="mailto:jaimesotoenrile@gmail.com" style={{ fontSize: 12, color: C.accentLight, textDecoration: 'none' }}>
-                    jaimesotoenrile@gmail.com
+                  <a href="mailto:jaime@forsii.com" style={{ fontSize: 12, color: C.accentLight, textDecoration: 'none' }}>
+                    jaime@forsii.com
                   </a>
                 </div>
               </div>

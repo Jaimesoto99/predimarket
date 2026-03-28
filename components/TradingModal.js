@@ -21,7 +21,7 @@ export default function TradingModal({
   limitPrice, setLimitPrice,
   modalTab, setModalTab,
   tradeImpact, processing,
-  priceHistory, recentActivity, orderBook, userOrders,
+  priceHistory, priceHistoryLoading, recentActivity, orderBook, userOrders,
   comments, newComment, setNewComment, topHolders,
   relatedMarkets = [],
   isWatching, onToggleWatch,
@@ -61,7 +61,11 @@ export default function TradingModal({
           <div ref={scrollRef} className="trading-modal-scroll" style={{ padding: '24px 28px' }}>
 
             {/* ── PriceChart ───────────────────────────────────────────────── */}
-            {priceHistory.length > 1 && (
+            {priceHistoryLoading ? (
+              <div style={{ textAlign: 'center', padding: '20px 0 28px', fontSize: 12, color: 'var(--text-dim)' }}>
+                Cargando historial…
+              </div>
+            ) : priceHistory.length >= 1 ? (
               <>
                 <div style={{
                   fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
@@ -73,6 +77,13 @@ export default function TradingModal({
                   <ProbabilityChart priceHistory={priceHistory} market={market} />
                 </div>
               </>
+            ) : (
+              <div style={{
+                textAlign: 'center', padding: '20px 0 28px',
+                fontSize: 13, color: 'var(--text-dim)',
+              }}>
+                Aún no hay historial de precio para este mercado
+              </div>
             )}
 
             {/* ── Two-column body ───────────────────────────────────────────── */}

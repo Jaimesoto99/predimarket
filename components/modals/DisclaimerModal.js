@@ -10,7 +10,7 @@ export default function DisclaimerModal({ showDisclaimer, setShowDisclaimer, onA
           Antes de tu primera operación
         </h2>
         <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.7, marginBottom: 20, padding: '14px 16px', background: C.surface, borderRadius: 7, border: `1px solid ${C.cardBorder}` }}>
-          Forsii es una plataforma de mercados de predicción con <strong style={{ color: C.text }}>créditos virtuales</strong>. Al operar, aceptas que:
+          Forsii es una plataforma de intermediación de contratos financieros binarios con <strong style={{ color: C.text }}>créditos virtuales</strong>. Al operar, aceptas que:
           <ul style={{ marginTop: 10, marginBottom: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <li>Puedes perder el 100% del crédito invertido en cada operación</li>
             <li>Forsii actúa como intermediario tecnológico, no como asesor financiero</li>

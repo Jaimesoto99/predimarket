@@ -14,7 +14,6 @@ import useWatchlist from '@/hooks/useWatchlist'
 import AppLayout from '@/components/layout/AppLayout'
 import TrendingRow from '@/components/TrendingRow'
 import Footer from '@/components/Footer'
-import KYCModal from '@/components/KYCModal'
 import HomeHero from '@/components/home/HomeHero'
 import HowItWorks from '@/components/home/HowItWorks'
 import MarketFeed from '@/components/home/MarketFeed'
@@ -37,7 +36,6 @@ export default function Home() {
   const [showPortfolio, setShowPortfolio] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
-  const [showKYC, setShowKYC] = useState(false)
 
   const [showResolved, setShowResolved] = useState(false)
 
@@ -56,7 +54,8 @@ export default function Home() {
   const [recentActivity, setRecentActivity] = useState([])
   const [orderBook, setOrderBook] = useState([])
   const [userOrders, setUserOrders] = useState([])
-  const [priceHistory, setPriceHistory] = useState([])
+  const [priceHistory, setPriceHistory]           = useState([])
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false)
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
   const [topHolders, setTopHolders] = useState([])
@@ -112,6 +111,33 @@ export default function Home() {
     return () => { subscription?.unsubscribe?.() }
   }, [])
 
+  // ─── Realtime subscriptions (orderbook + price history) ──────────────────
+  useEffect(() => {
+    if (!showTradeModal || !selectedMarket) return
+
+    const marketId = selectedMarket.id
+    const channel = supabase
+      .channel(`market-${marketId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'limit_orders',
+        filter: `market_id=eq.${marketId}`,
+      }, () => loadOrderBook(marketId))
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'trades',
+        filter: `market_id=eq.${marketId}`,
+      }, () => {
+        loadPriceHistory(marketId)
+        loadMarkets()
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [showTradeModal, selectedMarket?.id])
+
   // ─── Trade preview ────────────────────────────────────────────────────────
   useEffect(() => {
     if (selectedMarket && tradeAmount > 0) {
@@ -162,6 +188,7 @@ export default function Home() {
     setComments([])
     setTopHolders([])
     setRelatedMarkets([])
+    setPriceHistory([])
     loadPriceHistory(market.id)
     loadRecentActivity(market.id)
     loadOrderBook(market.id)
@@ -276,8 +303,10 @@ export default function Home() {
   }
 
   async function loadPriceHistory(marketId) {
-    const history = await getPriceHistory(marketId, 168)
+    setPriceHistoryLoading(true)
+    const history = await getPriceHistory(marketId, 720)
     setPriceHistory(history)
+    setPriceHistoryLoading(false)
   }
 
   // ─── Computed ─────────────────────────────────────────────────────────────
@@ -373,6 +402,7 @@ export default function Home() {
           tradeImpact={tradeImpact}
           processing={processing}
           priceHistory={priceHistory}
+          priceHistoryLoading={priceHistoryLoading}
           recentActivity={recentActivity}
           orderBook={orderBook}
           userOrders={userOrders}
@@ -405,7 +435,7 @@ export default function Home() {
           user={user}
           userTrades={userTrades}
           onClose={() => setShowProfile(false)}
-          onShowKYC={() => { setShowProfile(false); setShowKYC(true) }}
+          onShowKYC={() => {}}
         />
       )}
 
@@ -435,7 +465,6 @@ export default function Home() {
         </div>
       )}
 
-      {showKYC && <KYCModal onClose={() => setShowKYC(false)} />}
 
       <Footer />
 

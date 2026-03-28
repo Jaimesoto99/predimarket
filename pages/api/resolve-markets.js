@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail }    from '../../lib/email/sendEmail'
-import { buildPendingResolutionEmail, buildAlertEmail } from '../../lib/email/resolutionTemplate'
+import { buildPendingResolutionEmail, buildAlertEmail, buildClosingWarningEmail } from '../../lib/email/resolutionTemplate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -39,10 +39,11 @@ async function createPendingResolution(market, oracleResult, oracleType) {
   }
 
   const siteUrl     = getSiteUrl()
+  const adminKey    = process.env.ADMIN_API_KEY || ''
   const token       = row.confirmation_token
   const confirmUrl  = `${siteUrl}/api/admin/resolve-market?token=${token}&result=${oracleResult.outcome ? 'YES' : 'NO'}`
   const rejectUrl   = `${siteUrl}/api/admin/resolve-market?token=${token}&result=REJECT`
-  const adminUrl    = `${siteUrl}/admin/markets/${market.id}`
+  const adminUrl    = `${siteUrl}/admin?key=${adminKey}&market_id=${market.id}`
 
   await sendEmail({
     to:      ADMIN_EMAIL,
@@ -59,6 +60,55 @@ async function createPendingResolution(market, oracleResult, oracleType) {
   })
 
   return row
+}
+
+// ─── Send 30-minute closing warning emails ────────────────────────────────────
+async function sendClosingWarnings() {
+  const now      = new Date()
+  const from     = new Date(now.getTime() + 30 * 60 * 1000).toISOString()
+  const to       = new Date(now.getTime() + 35 * 60 * 1000).toISOString()
+
+  const { data: markets, error } = await supabase
+    .from('markets')
+    .select('id, title, yes_pool, no_pool, oracle_type, resolution_source')
+    .in('status', ['ACTIVE', 'CLOSED'])
+    .eq('closing_warning_sent', false)
+    .gte('close_date', from)
+    .lte('close_date', to)
+
+  if (error) {
+    console.error('[resolve-markets] sendClosingWarnings query error:', error.message)
+    return []
+  }
+  if (!markets?.length) return []
+
+  const siteUrl = getSiteUrl()
+  const sent = []
+
+  for (const market of markets) {
+    const yp  = parseFloat(market.yes_pool) || 5000
+    const np  = parseFloat(market.no_pool)  || 5000
+    const prob = yp / (yp + np)
+
+    await sendEmail({
+      to:      ADMIN_EMAIL,
+      subject: `⏰ Mercado cierra en 30 min — ${market.title}`,
+      html:    buildClosingWarningEmail({
+        market,
+        impliedProbability: prob,
+        marketUrl: `${siteUrl}/prediccion/${market.id}`,
+      }),
+    })
+
+    await supabase
+      .from('markets')
+      .update({ closing_warning_sent: true })
+      .eq('id', market.id)
+
+    sent.push({ id: market.id, title: market.title })
+  }
+
+  return sent
 }
 
 // ─── Auto-approve markets pending review for more than 24 hours ──────────────
@@ -146,23 +196,24 @@ async function checkIBEXVerde() {
     const timestamps = result.timestamp
     if (!quotes || !timestamps || timestamps.length === 0) return null
     const lastIdx = timestamps.length - 1
-    const open = quotes.open?.[lastIdx]
+    const open  = quotes.open?.[lastIdx]
     const close = quotes.close?.[lastIdx]
     if (!open || !close) {
-      const metaOpen = result.meta?.previousClose
+      // Fallback: use regularMarketOpen (today's open) vs regularMarketPrice (current/close)
+      const metaOpen  = result.meta?.regularMarketOpen || result.meta?.previousClose
       const metaClose = result.meta?.regularMarketPrice
       if (!metaOpen || !metaClose) return null
       return {
         outcome: metaClose > metaOpen,
-        source: `Yahoo Finance — IBEX 35: Apertura ${metaOpen.toFixed(2)}, Cierre ${metaClose.toFixed(2)}. Variacion: ${((metaClose - metaOpen) / metaOpen * 100).toFixed(2)}%`,
-        value: metaClose,
+        source:    `Yahoo Finance — IBEX 35: Apertura ${metaOpen.toFixed(2)}, Cierre ${metaClose.toFixed(2)}. Variacion: ${((metaClose - metaOpen) / metaOpen * 100).toFixed(2)}%`,
+        value:     metaClose,
         oracleUrl: 'https://finance.yahoo.com/quote/%5EIBEX/'
       }
     }
     return {
       outcome: close > open,
-      source: `Yahoo Finance — IBEX 35: Apertura ${open.toFixed(2)}, Cierre ${close.toFixed(2)}. Variacion: ${((close - open) / open * 100).toFixed(2)}%`,
-      value: close,
+      source:    `Yahoo Finance — IBEX 35: Apertura ${open.toFixed(2)}, Cierre ${close.toFixed(2)}. Variacion: ${((close - open) / open * 100).toFixed(2)}%`,
+      value:     close,
       oracleUrl: 'https://finance.yahoo.com/quote/%5EIBEX/'
     }
   } catch (err) {
@@ -360,43 +411,42 @@ async function checkIdealista() {
 function getOracleForMarket(market) {
   const t = market.title.toLowerCase()
 
-  // IBEX: "cierra en verde" → verde oracle; "> X puntos" → threshold oracle
+  // IBEX: "cierra en verde" → verde oracle
+  //       "por encima de X" / "supera (los) X" → threshold oracle
+  // Spanish number format: "16.700" = 16,700 (dot is thousands separator)
   if (t.includes('ibex')) {
-    const thresholdMatch = t.match(/>\s*([\d.]+)\s*(puntos|pts)?/)
+    const thresholdMatch = t.match(/(?:encima\s+de|superar[aá]\s+los?\s+|superar[aá]\s+|supera\s+los?\s+|supera\s+)([\d.]+)/)
     if (thresholdMatch) {
-      const thr = parseFloat(thresholdMatch[1])
+      const thr = parseFloat(thresholdMatch[1].replace(/\./g, ''))
       return { fn: () => checkIBEXThreshold(thr), type: 'IBEX' }
     }
     return { fn: checkIBEXVerde, type: 'IBEX' }
   }
 
-  // Precio luz
+  // Precio luz — extract threshold, handle Spanish thousands separator
   if (t.includes('luz') || t.includes('mwh') || t.includes('pvpc')) {
-    const m = t.match(/>?\s*([\d]+)\s*(eur|€)?\/?(mwh)?/)
-    const thr = m ? parseInt(m[1]) : 100
-    return { fn: () => checkPrecioLuz(thr), type: 'LUZ' }
+    const m = t.match(/superar[aá]?\s+(?:los?\s+)?([\d.,]+)|>\s*([\d.,]+)|([\d.,]+)\s*€/)
+    const raw = (m?.[1] || m?.[2] || m?.[3] || '').replace(/\./g, '').replace(',', '.')
+    const thr = raw ? parseFloat(raw) : 100
+    return { fn: () => checkPrecioLuz(isNaN(thr) ? 100 : thr), type: 'LUZ' }
   }
 
-  // Temperatura
-  if (t.includes('grados') || t.includes('temperatura') || t.includes('30°') || t.includes('35°')) {
-    const m = t.match(/([\d]+)\s*°?c?\s*(grados|°)?/)
-    const thr = m ? parseInt(m[1]) : 30
-    return { fn: () => checkTemperatura(thr), type: 'TEMP' }
+  // Temperatura — extract °C threshold
+  if (t.includes('°') || t.includes('grados') || t.includes('temperatura')) {
+    const m = t.match(/(?:superior\s+a\s+|supera\s+(?:los?\s+)?|encima\s+de\s+)(\d+)|(\d+)\s*°/)
+    const thr = m ? parseInt(m[1] || m[2]) : 30
+    return { fn: () => checkTemperatura(isNaN(thr) ? 30 : thr), type: 'TEMP' }
   }
 
-  // Bitcoin
+  // Bitcoin — Spanish number format: "88.500$" = $88,500
   if (t.includes('bitcoin') || t.includes('btc')) {
-    const m = t.match(/([\d.]+)\s*[k$]?\s*(usd|dólares|dolares)?/)
-    // Parse threshold: "100.000$" or "100k" etc.
     let thr = 100000
     const numMatch = market.title.match(/\$?([\d.,]+)\s*[kK]?/)
     if (numMatch) {
       const raw = parseFloat(numMatch[1].replace(/\./g, '').replace(',', '.'))
-      thr = raw
-      // Check if market title has K suffix
-      if (market.title.match(/\d+\s*[kK]\b/)) thr = raw * 1000
+      thr = market.title.match(/\d+\s*[kK]\b/) ? raw * 1000 : raw
     }
-    return { fn: () => checkBitcoin(thr), type: 'BITCOIN' }
+    return { fn: () => checkBitcoin(isNaN(thr) ? 100000 : thr), type: 'BITCOIN' }
   }
 
   // Football
@@ -445,7 +495,15 @@ export default async function handler(req, res) {
   const expected = (process.env.ADMIN_API_KEY || "").trim()
   if (!expected || key !== expected) return res.status(401).json({ error: "No autorizado" })
 
+  // Health check — return immediately without resolving anything
+  if (req.query.health === '1') {
+    return res.status(200).json({ ok: true, service: 'resolve-markets' })
+  }
+
   try {
+    // Step 0: send 30-minute closing warnings
+    const closingWarnings = await sendClosingWarnings()
+
     // Step 1a: auto-approve markets whose 24h review window has passed
     const autoApproved = await autoApproveExpiredReviews()
 
@@ -577,6 +635,7 @@ export default async function handler(req, res) {
       pending_confirmation: results.filter(r => r.status === 'PENDING_CONFIRMATION').length,
       awaiting_confirmation: results.filter(r => r.status === 'AWAITING_CONFIRMATION').length,
       refunded: results.filter(r => r.status === 'REFUNDED').length,
+      closing_warnings_sent: closingWarnings.length,
       auto_approved_reviews: autoApproved.length,
       auto_expired: expired.length,
       pending: results.filter(r => !['RESOLVED', 'REFUNDED', 'PENDING_CONFIRMATION', 'AWAITING_CONFIRMATION'].includes(r.status)).length,

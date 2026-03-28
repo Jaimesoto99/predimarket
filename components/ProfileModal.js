@@ -12,15 +12,18 @@ function sectionLabel(text) {
 export default function ProfileModal({ user, userTrades, onClose, onShowKYC }) {
   const [tradeHistoryFilter, setTradeHistoryFilter] = useState('ALL')
 
-  const openTrades = userTrades.filter(t => t.status === 'OPEN')
+  const openTrades    = userTrades.filter(t => t.status === 'OPEN')
   const realizedTrades = userTrades.filter(t => t.status === 'WON' || t.status === 'LOST' || t.status === 'SOLD')
-  const wonTrades = userTrades.filter(t => t.status === 'WON')
-  const lostTrades = userTrades.filter(t => t.status === 'LOST')
-  const soldTrades = userTrades.filter(t => t.status === 'SOLD')
-  const realizedPnL = realizedTrades.reduce((s, t) => s + (t.pnl || 0), 0)
-  const totalInvested = openTrades.reduce((s, t) => s + t.amount, 0)
-  const winRate = (wonTrades.length + lostTrades.length) > 0
+  const wonTrades     = userTrades.filter(t => t.status === 'WON')
+  const lostTrades    = userTrades.filter(t => t.status === 'LOST')
+  const soldTrades    = userTrades.filter(t => t.status === 'SOLD')
+  const realizedPnL   = realizedTrades.reduce((s, t) => s + (t.pnl || 0), 0)
+  const totalInvested = openTrades.reduce((s, t) => s + parseFloat(t.amount || 0), 0)
+  const openCurVal    = openTrades.reduce((s, t) => s + (t.currentValue || 0), 0)
+  const hasClosedTrades = wonTrades.length + lostTrades.length > 0
+  const winRate       = hasClosedTrades
     ? (wonTrades.length / (wonTrades.length + lostTrades.length) * 100) : 0
+  const unrealizedPnL = openCurVal - totalInvested
 
   const catBreakdown = {}
   userTrades.forEach(t => {
@@ -95,34 +98,13 @@ export default function ProfileModal({ user, userTrades, onClose, onShowKYC }) {
             </div>
           </div>
 
-          {/* KYC banner */}
-          {onShowKYC && (() => {
-            let kycDone = false
-            try { kycDone = localStorage.getItem('kycCompleted') === 'true' } catch {}
-            return !kycDone ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: `${C.accent}08`, border: `1px solid ${C.accent}25`, borderRadius: 8, marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 2 }}>Verificación de identidad pendiente</div>
-                  <div style={{ fontSize: 11, color: C.textDim }}>Requerida para operar con fondos reales</div>
-                </div>
-                <button onClick={onShowKYC} style={{ padding: '7px 14px', background: C.accent, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-                  Verificar
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: `${C.yes}08`, border: `1px solid ${C.yes}25`, borderRadius: 8, marginBottom: 16 }}>
-                <span style={{ fontSize: 13, color: C.yes }}>✓</span>
-                <span style={{ fontSize: 12, color: C.yes, fontWeight: 600 }}>Identidad verificada (KYC completado)</span>
-              </div>
-            )
-          })()}
 
           {/* KPI cards */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
             {[
-              { label: 'P/L realizado', value: `${realizedPnL >= 0 ? '+' : ''}€${realizedPnL.toFixed(0)}`, color: realizedPnL >= 0 ? C.yes : C.no, sub: 'Solo cerrados' },
-              { label: 'Win rate', value: `${winRate.toFixed(0)}%`, color: winRate >= 50 ? C.yes : C.no, sub: `${wonTrades.length}G · ${lostTrades.length}P` },
-              { label: 'Retorno', value: `${((user.balance - 1000) / 10).toFixed(1)}%`, color: user.balance >= 1000 ? C.yes : C.no, sub: 'vs 1.000 inicial' },
+              { label: 'P/L realizado', value: `${realizedPnL >= 0 ? '+' : ''}€${realizedPnL.toFixed(0)}`, color: realizedPnL >= 0 ? C.yes : C.no, sub: hasClosedTrades ? `${(realizedPnL / 1000 * 100).toFixed(1)}% del capital` : 'Sin cierres aún' },
+              { label: 'Win rate', value: hasClosedTrades ? `${winRate.toFixed(0)}%` : '—', color: hasClosedTrades && winRate >= 50 ? C.yes : C.textDim, sub: hasClosedTrades ? `${wonTrades.length}G · ${lostTrades.length}P` : 'Sin cierres aún' },
+              { label: 'P/L no realizado', value: openTrades.length > 0 ? `~${unrealizedPnL >= 0 ? '+' : ''}€${unrealizedPnL.toFixed(0)}` : '—', color: unrealizedPnL >= 0 ? C.yes : C.no, sub: openTrades.length > 0 ? 'Estimado · posiciones abiertas' : 'Sin posiciones abiertas' },
             ].map(({ label, value, color, sub }) => (
               <div key={label} style={{ background: C.surface, borderRadius: 7, padding: '12px 14px', border: `1px solid ${C.cardBorder}` }}>
                 <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim, marginBottom: 7 }}>{label}</div>

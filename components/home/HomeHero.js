@@ -9,7 +9,7 @@ export default function HomeHero({ marketCount, totalVolume, totalTraders }) {
         fontSize: 22, fontWeight: 800, letterSpacing: '-0.04em',
         color: C.text, marginBottom: 6, lineHeight: 1.2,
       }}>
-        Mercados de predicción
+        Contratos financieros binarios
       </h1>
       <p style={{ fontSize: 14, color: C.textMuted, lineHeight: 1.6, marginBottom: 20, maxWidth: 520 }}>
         Los precios reflejan la probabilidad colectiva de que ocurra un evento futuro.

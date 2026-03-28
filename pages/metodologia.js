@@ -26,12 +26,12 @@ export default function Metodologia() {
           Metodología
         </h1>
         <p style={{ fontSize: 15, color: C.textMuted, marginBottom: 40, lineHeight: 1.6 }}>
-          Cómo funcionan los mercados de predicción y el mecanismo de precios en Forsii.
+          Cómo funcionan los contratos financieros binarios y el mecanismo de precios en Forsii.
         </p>
 
-        <Section title="¿Qué es un mercado de predicción?">
+        <Section title="¿Qué es un contrato financiero binario?">
           <P>
-            Un mercado de predicción es un mecanismo en el que los participantes compran y venden contratos vinculados al resultado de un evento futuro. El precio de un contrato refleja la probabilidad colectiva de que ese evento ocurra.
+            Un contrato financiero binario es un instrumento en el que los participantes compran y venden contratos vinculados al resultado de un evento futuro verificable. El precio de un contrato refleja la probabilidad colectiva de que ese evento ocurra.
           </P>
           <P>
             Si el mercado pregunta "¿Superará el IBEX 35 los 12.000 puntos el viernes?" y el precio de SÍ es 65¢, eso significa que el mercado colectivamente estima una probabilidad del 65% de que ocurra.
@@ -69,12 +69,12 @@ export default function Metodologia() {
           </P>
         </Section>
 
-        <Section title="Resolución automática">
+        <Section title="Resolución supervisada">
           <P>
-            Cada mercado especifica una fuente de resolución pública verificable (Yahoo Finance, INE, OMIE, football-data.org, etc.). Al cierre del mercado, el oráculo consulta la fuente y determina el resultado.
+            Cada contrato especifica una fuente de resolución pública verificable (Yahoo Finance, INE, REE apidatos, football-data.org, etc.). Al cierre, el oráculo consulta la fuente y determina el resultado automáticamente.
           </P>
           <P>
-            Los participantes con contratos ganadores reciben una recompensa proporcional al volumen total del mercado. Los perdedores pierden su inversión.
+            El promotor revisa y confirma el resultado antes de ejecutar la liquidación. Solo tras esta supervisión se distribuyen los créditos a los contratos ganadores. Los perdedores pierden su inversión.
           </P>
         </Section>
 

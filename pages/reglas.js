@@ -60,8 +60,9 @@ export default function Reglas() {
           <Rule n="1">Al expirar la fecha de cierre, el mercado pasa a estado CERRADO automáticamente.</Rule>
           <Rule n="2">El oráculo consulta la fuente oficial especificada en el mercado (Yahoo Finance, INE, OMIE, etc.).</Rule>
           <Rule n="3">Si el dato confirma la condición del mercado (ej. IBEX {'>'} 12.000), el resultado es SÍ. En caso contrario, NO.</Rule>
-          <Rule n="4">Se ejecuta la distribución de ganancias: los contratos ganadores reciben una recompensa proporcional al pool total.</Rule>
-          <Rule n="5">Los créditos se acreditan en el saldo de los usuarios ganadores.</Rule>
+          <Rule n="4">El promotor revisa y confirma el resultado antes de ejecutar la liquidación. En caso de dato incorrecto o fuente no disponible, puede declarar el mercado nulo y reembolsar los créditos.</Rule>
+          <Rule n="5">Se ejecuta la distribución de ganancias: los contratos ganadores reciben una recompensa proporcional al pool total.</Rule>
+          <Rule n="6">Los créditos se acreditan en el saldo de los usuarios ganadores.</Rule>
         </Section>
 
         <Section title="Fuentes de resolución utilizadas">
@@ -69,7 +70,7 @@ export default function Reglas() {
             {[
               ['IBEX 35, S&P 500, Nasdaq, Brent', 'Yahoo Finance'],
               ['Bitcoin, Ethereum y otras criptomonedas', 'CoinGecko'],
-              ['Precio de la electricidad (PVPC)', 'OMIE / Red Eléctrica de España'],
+              ['Precio de la electricidad (PVPC)', 'REE apidatos (Red Eléctrica de España)'],
               ['IPC, datos macroeconómicos España', 'INE (Instituto Nacional de Estadística)'],
               ['Euribor', 'BCE / Banco de España'],
               ['Resultados de fútbol', 'football-data.org'],
@@ -96,7 +97,7 @@ export default function Reglas() {
             <strong style={{ color: C.text }}>Resolución manual:</strong> En circunstancias excepcionales documentadas, el equipo puede resolver un mercado manualmente citando la fuente oficial utilizada.
           </P>
           <P>
-            <strong style={{ color: C.text }}>Suspensión de mercado:</strong> Predimarket se reserva el derecho de suspender un mercado ante evidencia de manipulación o datos claramente erróneos.
+            <strong style={{ color: C.text }}>Suspensión de mercado:</strong> Forsii se reserva el derecho de suspender un mercado ante evidencia de manipulación o datos claramente erróneos.
           </P>
         </Section>
 

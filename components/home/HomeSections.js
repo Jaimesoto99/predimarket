@@ -106,7 +106,7 @@ export default function HomeSections({ markets, onOpen, onTrade }) {
       <MarketSection icon="⭐" title="Destacados"        markets={featured}       onOpen={onOpen} onTrade={onTrade} />
       <MarketSection icon="🔥" title="Resuelven hoy"    markets={resolvingToday} onOpen={onOpen} onTrade={onTrade} />
       <MarketSection icon="⚡" title="Mercados rápidos" markets={fastMarkets}    onOpen={onOpen} onTrade={onTrade} />
-      <MarketSection icon="📈" title="Trending"          markets={trending}       onOpen={onOpen} onTrade={onTrade} />
+      <MarketSection icon="📈" title="Tendencia"          markets={trending}       onOpen={onOpen} onTrade={onTrade} />
       <MarketSection icon="🏆" title="Más populares"     markets={popular}        onOpen={onOpen} onTrade={onTrade} />
       <MarketSection icon="🇪🇸" title="España"           markets={espana}         onOpen={onOpen} onTrade={onTrade} />
     </div>

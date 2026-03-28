@@ -42,7 +42,7 @@ export default function Stats() {
         const [{ data: m }, { data: t }, { data: u }] = await Promise.all([
           supabase.from('markets').select('id, title, category, status, yes_pool, no_pool, total_volume, close_date, created_at').order('created_at', { ascending: false }),
           supabase.from('trades').select('id, side, amount, status, created_at, market_id').order('created_at', { ascending: false }),
-          supabase.from('user_profiles').select('user_email, display_name, balance, created_at').order('created_at', { ascending: false }),
+          supabase.from('leaderboard_current').select('user_email, display_name, avatar_emoji, current_balance, net_profit, win_rate, trades_this_week').order('current_balance', { ascending: false }),
         ])
         setMarkets(m || [])
         setTrades(t || [])
@@ -88,7 +88,7 @@ export default function Stats() {
         <title>Forsii — Estadísticas de la plataforma</title>
         <meta name="description" content="Dashboard de métricas de Forsii: mercados activos, volumen negociado, usuarios registrados y distribución por categoría." />
         <meta property="og:title" content="Forsii — Estadísticas" />
-        <meta property="og:description" content="Métricas en tiempo real de la plataforma de contratos de predicción Forsii." />
+        <meta property="og:description" content="Métricas en tiempo real de la plataforma de contratos financieros binarios Forsii." />
         <link rel="canonical" href="https://forsii.com/stats" />
       </Head>
 
@@ -222,24 +222,31 @@ export default function Stats() {
 
               {/* Últimos usuarios */}
               <div style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 10, padding: '20px 24px' }}>
-                <SectionTitle>Últimos usuarios registrados</SectionTitle>
+                <SectionTitle>Clasificación de usuarios</SectionTitle>
                 {users.length === 0 ? (
-                  <div style={{ fontSize: 13, color: C.textDim }}>Sin usuarios registrados</div>
+                  <div style={{ fontSize: 13, color: C.textDim }}>Sin datos de usuarios</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {users.slice(0, 10).map((u, i) => (
                       <div key={u.user_email} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < Math.min(users.length, 10) - 1 ? `1px solid ${C.divider}` : 'none' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.accent}15`, border: `1px solid ${C.accent}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: C.accent }}>
-                            {(u.display_name || u.user_email || '?')[0].toUpperCase()}
+                          <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.accent}15`, border: `1px solid ${C.accent}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                            {u.avatar_emoji || (u.display_name || u.user_email || '?')[0].toUpperCase()}
                           </div>
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{u.display_name || u.user_email?.split('@')[0]}</div>
-                            <div style={{ fontSize: 10, color: C.textDim }}>{u.user_email}</div>
+                            <div style={{ fontSize: 10, color: C.textDim }}>{u.trades_this_week || 0} ops · {u.win_rate != null ? `${Math.round(u.win_rate)}% win rate` : '—'}</div>
                           </div>
                         </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: C.accentLight, fontFamily: 'ui-monospace, monospace' }}>
-                          €{parseFloat(u.balance || 0).toFixed(0)}
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: C.accentLight, fontFamily: 'ui-monospace, monospace' }}>
+                            €{parseFloat(u.current_balance || 0).toFixed(0)}
+                          </div>
+                          {u.net_profit != null && (
+                            <div style={{ fontSize: 10, color: u.net_profit >= 0 ? C.yes : C.no, fontFamily: 'ui-monospace, monospace' }}>
+                              {u.net_profit >= 0 ? '+' : ''}€{parseFloat(u.net_profit).toFixed(0)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

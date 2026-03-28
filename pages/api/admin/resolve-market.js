@@ -26,6 +26,10 @@ function getSupabase() {
   )
 }
 
+function getSiteUrl() {
+  return (process.env.NEXT_PUBLIC_SITE_URL || 'https://forsii.com').replace(/\/$/, '')
+}
+
 // ─── Core resolution logic ────────────────────────────────────────────────────
 
 async function executeResolution(supabase, pendingRow, result) {
@@ -33,7 +37,7 @@ async function executeResolution(supabase, pendingRow, result) {
   const oracleData = pendingRow.oracle_data || {}
 
   if (result === 'REJECT') {
-    // Mark as rejected — market stays CLOSED for manual review
+    // Mark current resolution as rejected
     await supabase
       .from('pending_resolutions')
       .update({ status: 'rejected', resolved_at: new Date().toISOString() })
@@ -46,13 +50,33 @@ async function executeResolution(supabase, pendingRow, result) {
       .eq('id', marketId)
       .single()
 
+    // Create a fresh pending resolution so admin can confirm correct result from the alert email
+    const { data: newRow } = await supabase
+      .from('pending_resolutions')
+      .insert({
+        market_id:        marketId,
+        suggested_result: pendingRow.suggested_result,
+        oracle_data:      pendingRow.oracle_data,
+        oracle_type:      pendingRow.oracle_type,
+        status:           'pending',
+      })
+      .select('confirmation_token')
+      .single()
+
+    const siteUrl       = getSiteUrl()
+    const token         = newRow?.confirmation_token
+    const confirmYesUrl = token ? `${siteUrl}/api/admin/resolve-market?token=${token}&result=YES` : null
+    const confirmNoUrl  = token ? `${siteUrl}/api/admin/resolve-market?token=${token}&result=NO`  : null
+
     await sendEmail({
       to:      ADMIN_EMAIL,
       subject: `⚠️ Resolución rechazada — ${market?.title || marketId}`,
       html:    buildAlertEmail({
         market,
-        reason:  'Resolución rechazada manualmente. El mercado requiere revisión.',
-        details: `Oracle data: ${oracleData.source || 'N/A'}`,
+        reason:       'Resolución rechazada manualmente. Selecciona el resultado correcto:',
+        details:      `Oracle: ${oracleData.source || 'N/A'}`,
+        confirmYesUrl,
+        confirmNoUrl,
       }),
     })
 

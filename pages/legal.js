@@ -32,7 +32,7 @@ function Item({ children }) {
 }
 
 export default function Legal() {
-  const updated = '7 de marzo de 2026'
+  const updated = '28 de marzo de 2026'
 
   return (
     <>
@@ -86,16 +86,20 @@ export default function Legal() {
 
             <H3>4. Situación regulatoria</H3>
             <P>Forsii no está autorizada actualmente como entidad de servicios de inversión. La plataforma opera en fase de pruebas bajo evaluación regulatoria. No se garantiza la continuidad del servicio.</P>
+            <P>Forsii ha presentado solicitud de participación en el Sandbox Financiero de la CNMV (11ª cohorte, Ley 7/2020, de 13 de noviembre). Registro de entrada: REGAGE26e00032113807. La plataforma se encuentra pendiente de evaluación por la Comisión Nacional del Mercado de Valores.</P>
             <P>Jurisdicción: legislación española. Cualquier disputa se resolverá ante los tribunales competentes del domicilio social.</P>
 
-            <H3>5. Modificaciones</H3>
+            <H3>5. Revisión y resolución de mercados</H3>
+            <P>Todos los mercados pasan por un proceso de revisión previa de 24 horas antes de su publicación. La resolución de cada mercado es supervisada por el promotor antes de ejecutar la liquidación.</P>
+
+            <H3>6. Modificaciones</H3>
             <P>Forsii se reserva el derecho de modificar estos términos con 15 días de preaviso. El uso continuado de la plataforma implica la aceptación de los nuevos términos.</P>
           </Section>
 
           {/* ── SECCIÓN 2: PRIVACIDAD ── */}
           <Section id="privacidad" title="Política de Privacidad">
             <H3>Responsable del tratamiento</H3>
-            <P><strong style={{ color: C.text }}>Jaime de Soto Enrile</strong> — jaimesotoenrile@gmail.com</P>
+            <P><strong style={{ color: C.text }}>Jaime Soto Enrile</strong> — <a href="mailto:jaime@forsii.com" style={{ color: C.accentLight }}>jaime@forsii.com</a></P>
 
             <H3>Datos recogidos</H3>
             <Item>Nombre y apellidos</Item>
@@ -123,10 +127,10 @@ export default function Legal() {
             <Item>Logs de acceso: 12 meses.</Item>
 
             <H3>Compartición de datos</H3>
-            <P>No se comparten datos con terceros salvo por obligación legal o requerimiento de autoridad competente. No se realizan transferencias internacionales fuera del EEE.</P>
+            <P>Encargados del tratamiento: Supabase GmbH (alojamiento de datos, servidores en Frankfurt, UE), Vercel Inc. (alojamiento web), Resend Inc. (envío de emails transaccionales). Vercel y Resend pueden procesar datos en Estados Unidos al amparo de las cláusulas contractuales tipo aprobadas por la Comisión Europea. No se ceden datos a terceros salvo por obligación legal.</P>
 
             <H3>Tus derechos</H3>
-            <P>Conforme al RGPD y la LOPDGDD tienes derecho a: acceso, rectificación, supresión, portabilidad, oposición y limitación del tratamiento. Para ejercerlos: <a href="mailto:jaimesotoenrile@gmail.com" style={{ color: C.accentLight }}>jaimesotoenrile@gmail.com</a></P>
+            <P>Conforme al RGPD y la LOPDGDD tienes derecho a: acceso, rectificación, supresión, portabilidad, oposición y limitación del tratamiento. Para ejercerlos: <a href="mailto:jaime@forsii.com" style={{ color: C.accentLight }}>jaime@forsii.com</a></P>
             <P>Puedes presentar reclamación ante la Agencia Española de Protección de Datos (aepd.es).</P>
 
             <H3>Cookies</H3>

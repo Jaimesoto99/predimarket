@@ -76,7 +76,7 @@ export default async function handler(req, res) {
 
     const { data: market, error: fetchErr } = await supabase
       .from('markets')
-      .select('id, title, review_status')
+      .select('id, title, description, category, close_date, open_date, resolution_source, review_status, market_rating')
       .eq('id', market_id)
       .single()
 
@@ -88,9 +88,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'El mercado ya estaba aprobado', market_id })
     }
 
+    const approvedAt = new Date().toISOString()
+    const ficha = buildFicha(market, approvedAt)
+
     const { error: updateErr } = await supabase
       .from('markets')
-      .update({ review_status: 'approved', review_token: null })
+      .update({ review_status: 'approved', review_token: null, market_ficha: ficha })
       .eq('id', market_id)
 
     if (updateErr) {
@@ -102,11 +105,60 @@ export default async function handler(req, res) {
       action:     'approved',
       market_id,
       market_title: market.title,
-      timestamp:  new Date().toISOString(),
+      timestamp:  approvedAt,
     })
   }
 
   return res.status(405).json({ error: 'Método no permitido' })
+}
+
+function buildFicha(market, approvedAt) {
+  const text = `${market.title} ${market.description || ''}`.toLowerCase()
+
+  let underlying = 'Indicador macroeconómico / económico'
+  if (text.includes('ibex'))                                     underlying = 'IBEX 35 — Índice bursátil español (BME)'
+  else if (text.includes('bitcoin') || text.includes('btc'))    underlying = 'Bitcoin (BTC) — Criptomoneda descentralizada'
+  else if (text.includes('pvpc') || text.includes('mwh') || text.includes('electrici') || text.includes('eléctric'))
+                                                                 underlying = 'PVPC — Precio Voluntario al Pequeño Consumidor (Red Eléctrica de España)'
+  else if (text.includes('brent'))                              underlying = 'Brent Crude Oil — Petróleo crudo marcador europeo'
+  else if (text.includes('euribor') || text.includes('euríbor')) underlying = 'Euríbor 12M — Tipo de interés interbancario europeo'
+  else if (text.includes('ipc') || text.includes('inflación'))  underlying = 'IPC — Índice de Precios al Consumo (INE)'
+  else if (text.includes('paro') || text.includes('sepe') || text.includes('empleo')) underlying = 'Paro registrado — Estadística mensual (SEPE)'
+  else if (text.includes('vivienda') || text.includes('idealista')) underlying = 'Precio vivienda — Índice Idealista'
+  else if (text.includes('renfe'))                              underlying = 'Operaciones ferroviarias — Renfe'
+  else if (text.includes('congreso'))                           underlying = 'Actividad parlamentaria — Congreso de los Diputados'
+
+  let sourceAgency = 'Resolución manual por oráculo Forsii'
+  if (market.resolution_source) {
+    const src = market.resolution_source
+    if (src.includes('ine.es'))               sourceAgency = 'INE — Instituto Nacional de Estadística'
+    else if (src.includes('ree.es') || src.includes('apidatos')) sourceAgency = 'REE — Red Eléctrica de España (apidatos)'
+    else if (src.includes('finance.yahoo'))   sourceAgency = 'Yahoo Finance'
+    else if (src.includes('coingecko'))       sourceAgency = 'CoinGecko'
+    else if (src.includes('sepe.gob'))        sourceAgency = 'SEPE — Servicio Público de Empleo Estatal'
+    else if (src.includes('idealista'))       sourceAgency = 'Idealista — Portal inmobiliario'
+    else if (src.includes('renfe'))           sourceAgency = 'Renfe — Operadora ferroviaria nacional'
+    else if (src.includes('congreso.es'))     sourceAgency = 'Congreso de los Diputados'
+    else                                       sourceAgency = src
+  }
+
+  return {
+    market_name:              market.title,
+    category:                 market.category,
+    underlying,
+    source_agency:            sourceAgency,
+    resolution_source_url:    market.resolution_source || null,
+    resolution_criteria:      market.description || null,
+    expiration_date:          market.close_date,
+    settlement:               '€1.00 por contrato ganador',
+    creation_date:            market.open_date || null,
+    oracle_rating_at_approval: market.market_rating?.score ?? null,
+    review_status:            'approved',
+    approval_date:            approvedAt,
+    position_limit:           null,
+    prohibited_participants:  'Ninguno',
+    generated_at:             approvedAt,
+  }
 }
 
 function htmlPage(title, body) {

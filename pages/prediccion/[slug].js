@@ -57,7 +57,7 @@ export default function MarketSharePage({ market }) {
   const timeLeft = getTimeLeft(market.close_date)
   const probColor = yesP > 60 ? '#16A34A' : yesP < 40 ? '#DC2626' : '#F59E0B'
 
-  const ogTitle = `${market.title} — ${yesP.toFixed(0)}% probabilidad | Predimarket`
+  const ogTitle = `${market.title} — ${yesP.toFixed(0)}% probabilidad | Forsii`
   const ogDesc  = `El mercado colectivo estima un ${yesP.toFixed(0)}% de probabilidad de que ocurra este evento. ${market.description || ''}`
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://forsii.com'
   const shareUrl = `${siteUrl}/prediccion/${market.slugified || market.id}`
@@ -73,7 +73,7 @@ export default function MarketSharePage({ market }) {
         <meta property="og:description" content={ogDesc} />
         <meta property="og:type"        content="article" />
         <meta property="og:url"         content={shareUrl} />
-        <meta property="og:site_name"   content="Predimarket" />
+        <meta property="og:site_name"   content="Forsii" />
 
         {/* Twitter */}
         <meta name="twitter:card"        content="summary" />
@@ -194,7 +194,7 @@ export default function MarketSharePage({ market }) {
                 fontSize: 14, fontWeight: 600, textDecoration: 'none',
                 letterSpacing: '-0.01em',
               }}>
-                Participar en Predimarket →
+                Participar en Forsii →
               </Link>
             </div>
           </div>

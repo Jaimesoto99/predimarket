@@ -20,7 +20,7 @@ const STEPS = [
     example: {
       label: 'Ejemplo de mercado',
       title: '¿Cerrará el IBEX 35 por encima de 11.500 el viernes?',
-      meta: 'Cierre: viernes 7 mar 2026 · Oráculo: Yahoo Finance',
+      meta: 'Cierre: viernes 3 abr 2026 · Oráculo: Yahoo Finance',
       prob: 62,
       volume: '€2.340',
       traders: 18,
@@ -81,7 +81,7 @@ const STEPS = [
     n: 6,
     title: 'Oráculo y resolución',
     tag: 'RESOLUCIÓN',
-    desc: 'Al cierre del mercado, un oráculo automatizado consulta la fuente oficial (Yahoo Finance para IBEX, INE para IPC, REE para luz...) y determina el resultado. No hay árbitros humanos.',
+    desc: 'Al cierre del mercado, un oráculo automatizado consulta la fuente oficial (Yahoo Finance para IBEX, INE para IPC, REE apidatos para luz...) y determina el resultado. El promotor revisa y confirma el resultado antes de ejecutar la liquidación.',
     resolution: {
       oracle: 'Yahoo Finance',
       value: 'IBEX 35: 11.647,30',
@@ -103,7 +103,7 @@ const STEPS = [
       profit: '+€6,10',
       pct: '+61%',
     },
-    tip: 'El historial completo de cada resolución (fuente, valor, timestamp) queda registrado en la blockchain de auditoría.',
+    tip: 'El historial completo de cada resolución (fuente, valor, timestamp) queda registrado en el sistema de auditoría de Forsii.',
   },
 ]
 
@@ -143,7 +143,7 @@ export default function Demo() {
         <title>Forsii — Demo interactiva</title>
         <meta name="description" content="Aprende a operar en Forsii con esta guía interactiva paso a paso: desde elegir un mercado hasta la liquidación automática por oráculo." />
         <meta property="og:title" content="Forsii — Demo interactiva" />
-        <meta property="og:description" content="Guía paso a paso de cómo funcionan los contratos de predicción en Forsii." />
+        <meta property="og:description" content="Guía paso a paso de cómo funcionan los contratos financieros binarios en Forsii." />
         <link rel="canonical" href="https://forsii.com/demo" />
       </Head>
 
@@ -167,7 +167,7 @@ export default function Demo() {
         <main style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px', flex: 1, width: '100%' }}>
           <div style={{ marginBottom: 40 }}>
             <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.04em', color: C.text, marginBottom: 8 }}>Cómo operar en Forsii</h1>
-            <p style={{ fontSize: 13, color: C.textDim, maxWidth: 560 }}>Guía interactiva del ciclo completo de un contrato de predicción, desde la selección del mercado hasta la liquidación.</p>
+            <p style={{ fontSize: 13, color: C.textDim, maxWidth: 560 }}>Guía interactiva del ciclo completo de un contrato financiero binario, desde la selección del mercado hasta la liquidación.</p>
           </div>
 
           {/* Step navigator */}

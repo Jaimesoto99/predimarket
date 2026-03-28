@@ -66,19 +66,22 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
       // Abort if a newer fetch already started
       if (fetchId !== fetchIdRef.current) return
 
-      const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
-
       const enriched = (data || [])
-        .filter(m => !HIDDEN_CATEGORIES.has(m.category) && CNMV_CATS.has(m.category))
+        .filter(m => !HIDDEN_CATEGORIES.has(m.category))
         .map(m => ({
           ...m,
           prices:    m.prices || calculatePrices(parseFloat(m.yes_pool), parseFloat(m.no_pool)),
           isExpired: new Date(m.close_date) < new Date(),
         }))
+        .sort((a, b) => {
+          const sa = a.market_rating?.score ?? -1
+          const sb = b.market_rating?.score ?? -1
+          return sb - sa
+        })
 
       const nonExpiredCount = enriched.filter(m => !m.isExpired).length
       const fillerCount     = Math.max(0, 15 - nonExpiredCount)
-      const fillers         = EXAMPLE_PLACEHOLDERS.filter(p => CNMV_CATS.has(p.category)).slice(0, fillerCount)
+      const fillers         = EXAMPLE_PLACEHOLDERS.slice(0, fillerCount)
 
       setMarkets([...enriched, ...fillers])
     } catch (err) {
@@ -99,11 +102,9 @@ export default function useMarkets(catFilter = 'ALL', typeFilter = 'ALL') {
   }, [loadMarkets])
 
   useEffect(() => {
-    const CNMV_CATS = new Set(['ECONOMIA', 'TIPOS', 'ENERGIA'])
     getResolvedMarkets(50)
       .then(data => {
-        const filtered = (data || []).filter(m => CNMV_CATS.has(m.category))
-        setResolvedMarkets(filtered)
+        setResolvedMarkets((data || []).filter(m => !HIDDEN_CATEGORIES.has(m.category)))
       })
       .catch(() => {})
   }, [])

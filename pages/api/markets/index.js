@@ -126,6 +126,8 @@ export default async function handler(req, res) {
         is_new:        m.open_date
           ? (Date.now() - new Date(m.open_date).getTime()) < 48 * 3600000
           : false,
+        market_rating: m.market_rating ?? null,
+        mid_price:     np / (yp + np),
       }
     })
 

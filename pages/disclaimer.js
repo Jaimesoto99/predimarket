@@ -31,7 +31,7 @@ export default function Disclaimer() {
             Aviso importante
           </div>
           <p style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.65, margin: 0 }}>
-            Predimarket opera exclusivamente con créditos virtuales. No hay dinero real. Esta plataforma no constituye un servicio de inversión regulado.
+            Forsii opera exclusivamente con créditos virtuales. No hay dinero real. Esta plataforma no constituye un servicio de inversión regulado.
           </p>
         </div>
 
@@ -44,10 +44,10 @@ export default function Disclaimer() {
 
         <Section title="Naturaleza de la plataforma">
           <P>
-            Predimarket es una plataforma de mercados de predicción que opera con créditos virtuales sin valor monetario real. Los precios reflejan la probabilidad colectiva agregada de los participantes sobre la ocurrencia de eventos futuros.
+            Forsii es una plataforma de intermediación de contratos financieros binarios que opera con créditos virtuales sin valor monetario real. Los precios reflejan la probabilidad colectiva agregada de los participantes sobre la ocurrencia de eventos futuros.
           </P>
           <P>
-            Los resultados de los mercados no representan asesoramiento financiero, de inversión, legal, fiscal ni de ningún otro tipo. Predimarket no es una entidad autorizada como servicio de inversión según la normativa MiFID II o cualquier otra regulación aplicable.
+            Los resultados de los mercados no representan asesoramiento financiero, de inversión, legal, fiscal ni de ningún otro tipo. Forsii no es una entidad autorizada como servicio de inversión según la normativa MiFID II o cualquier otra regulación aplicable.
           </P>
         </Section>
 
@@ -56,28 +56,28 @@ export default function Disclaimer() {
             Los mercados representan predicciones agregadas de una comunidad de usuarios, no pronósticos profesionales. La probabilidad que muestra un mercado puede diferir significativamente de la probabilidad real de que ocurra un evento.
           </P>
           <P>
-            Predimarket no garantiza la exactitud, completitud o actualidad de los precios mostrados. Los mercados pueden verse afectados por baja liquidez, comportamientos especulativos u otros factores que distorsionen los precios.
+            Forsii no garantiza la exactitud, completitud o actualidad de los precios mostrados. Los mercados pueden verse afectados por baja liquidez, comportamientos especulativos u otros factores que distorsionen los precios.
           </P>
         </Section>
 
         <Section title="Resolución y oráculos">
           <P>
-            La resolución de los mercados depende de fuentes externas de datos (Yahoo Finance, INE, OMIE, etc.). Predimarket no controla estas fuentes y no puede garantizar su disponibilidad, precisión o continuidad.
+            La resolución de los mercados depende de fuentes externas de datos (Yahoo Finance, INE, OMIE, etc.). Forsii no controla estas fuentes y no puede garantizar su disponibilidad, precisión o continuidad.
           </P>
           <P>
-            En caso de datos incorrectos, no disponibles o disputados, Predimarket se reserva el derecho de resolver los mercados de forma alternativa según su mejor criterio, incluyendo la posibilidad de declarar el mercado nulo y devolver los créditos.
+            En caso de datos incorrectos, no disponibles o disputados, Forsii se reserva el derecho de resolver los mercados de forma alternativa según su mejor criterio, incluyendo la posibilidad de declarar el mercado nulo y devolver los créditos.
           </P>
         </Section>
 
         <Section title="Créditos virtuales">
           <P>
-            Los créditos de Predimarket son unidades virtuales sin valor económico. No pueden transferirse, canjearse por dinero real ni utilizarse fuera de la plataforma. La pérdida de créditos no supone ningún perjuicio económico real.
+            Los créditos de Forsii son unidades virtuales sin valor económico. No pueden transferirse, canjearse por dinero real ni utilizarse fuera de la plataforma. La pérdida de créditos no supone ningún perjuicio económico real.
           </P>
         </Section>
 
         <Section title="Limitación de responsabilidad">
           <P>
-            Predimarket no asume ninguna responsabilidad por decisiones tomadas a partir de la información disponible en la plataforma. El uso de Predimarket implica la aceptación de que los mercados de predicción tienen un componente especulativo inherente.
+            Forsii no asume ninguna responsabilidad por decisiones tomadas a partir de la información disponible en la plataforma. El uso de Forsii implica la aceptación de que los contratos financieros binarios tienen un componente especulativo inherente.
           </P>
           <P>
             La plataforma se encuentra en fase de pruebas. Pueden producirse interrupciones del servicio, pérdida de datos o cambios en las reglas sin previo aviso.
@@ -87,14 +87,14 @@ export default function Disclaimer() {
         <Section title="Contacto">
           <P>
             Para cualquier consulta legal o de cumplimiento:{' '}
-            <a href="mailto:jaimesotoenrile@gmail.com" style={{ color: C.accentLight, textDecoration: 'underline' }}>
-              jaimesotoenrile@gmail.com
+            <a href="mailto:jaime@forsii.com" style={{ color: C.accentLight, textDecoration: 'underline' }}>
+              jaime@forsii.com
             </a>
           </P>
         </Section>
 
         <div style={{ fontSize: 12, color: C.textDim, borderTop: `1px solid ${C.divider}`, paddingTop: 20 }}>
-          Última actualización: marzo 2026 · Predimarket — Fase de pruebas
+          Última actualización: marzo 2026 · Forsii — Fase de pruebas
         </div>
 
       </div>

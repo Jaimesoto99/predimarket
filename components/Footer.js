@@ -62,10 +62,10 @@ export default function Footer() {
           <span style={{ fontSize: 11, color: C.textDim }}>© 2026 Forsii — Plataforma de contratos financieros binarios</span>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: C.textDim }}>
-              Forsii no está autorizada como entidad de servicios de inversión. Fase de pruebas.
+              Forsii no está autorizada como entidad de servicios de inversión. Fase de pruebas con créditos virtuales. Sandbox CNMV 11ª cohorte (pendiente de evaluación).
             </span>
-            <a href="mailto:jaimesotoenrile@gmail.com" style={{ fontSize: 11, color: C.textDim, textDecoration: 'none' }}>
-              jaimesotoenrile@gmail.com
+            <a href="mailto:jaime@forsii.com" style={{ fontSize: 11, color: C.textDim, textDecoration: 'none' }}>
+              jaime@forsii.com
             </a>
           </div>
         </div>

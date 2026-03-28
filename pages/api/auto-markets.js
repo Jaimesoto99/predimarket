@@ -4,7 +4,9 @@
 // Invocación: POST /api/auto-markets  con header x-admin-key: forsii-admin-2026
 // También se puede configurar como cron job en vercel.json
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient }    from '@supabase/supabase-js';
+import { rateMarket }      from '../../lib/oracle-rating';
+import { fetchTrendingNews } from './admin/trending-spain';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -278,8 +280,8 @@ function priceToPool(yesPrice) {
   };
 }
 
-async function upsertMarkets(markets) {
-  const results = { created: [], skipped: [], errors: [] };
+async function upsertMarkets(markets, trendingNews = [], prices = {}) {
+  const results = { created: [], skipped: [], rejected_by_rating: [], errors: [] };
   const today   = todayUTC();
 
   for (const market of markets) {
@@ -312,13 +314,29 @@ async function upsertMarkets(markets) {
           no_pool,
           status:            'ACTIVE',
         })
-        .select('id')
+        .select('id, title, description, category, close_date, resolution_source, yes_pool, no_pool')
         .single();
 
       if (error) {
         results.errors.push({ id: market.title, error: error.message });
       } else {
-        results.created.push({ id: data.id, title: market.title });
+        // Rate the market
+        const rating = rateMarket(data, trendingNews, { prices });
+
+        // Store rating always
+        await supabase.from('markets').update({ market_rating: rating }).eq('id', data.id);
+
+        if (rating.score < 4.0) {
+          // Auto-reject low-quality markets
+          await supabase
+            .from('markets')
+            .update({ review_status: 'rejected', status: 'HIDDEN' })
+            .eq('id', data.id);
+          console.log(`[auto-markets] Auto-rejected #${data.id} score=${rating.score}: ${data.title}`);
+          results.rejected_by_rating.push({ id: data.id, title: data.title, score: rating.score });
+        } else {
+          results.created.push({ id: data.id, title: market.title, score: rating.score });
+        }
       }
     } catch (err) {
       results.errors.push({ id: market.title, error: err.message });
@@ -342,15 +360,21 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'No autorizado' });
   }
 
+  // Health check — return immediately without creating markets
+  if (req.query.health === '1') {
+    return res.status(200).json({ ok: true, service: 'auto-markets' })
+  }
+
   console.log('[auto-markets] Iniciando generación de mercados diarios...');
 
   // ── Fetch paralelo de todas las fuentes ──────────────────────────────────
-  const [ibex, eurusd, cryptoPrices, meteo, luz] = await Promise.all([
+  const [ibex, eurusd, cryptoPrices, meteo, luz, trendingNews] = await Promise.all([
     fetchYahooFinance('^IBEX'),
     fetchYahooFinance('EURUSD=X'),
     fetchCoinGecko('bitcoin,ethereum'),
     fetchOpenMeteo(),
     fetchPrecioDeLaLuz(),
+    fetchTrendingNews().catch(() => []),
   ]);
 
   const btc = cryptoPrices?.bitcoin ?? null;
@@ -386,7 +410,8 @@ export default async function handler(req, res) {
   }
 
   // ── Insertar en Supabase ──────────────────────────────────────────────────
-  const results = await upsertMarkets(markets);
+  const liveP = { ibex: ibex?.price, btc: cryptoPrices?.bitcoin?.usd, brent: null, luz: luz?.price }
+  const results = await upsertMarkets(markets, trendingNews, liveP);
 
   console.log('[auto-markets] Resultado:', results);
 
@@ -395,10 +420,11 @@ export default async function handler(req, res) {
     date: todayUTC(),
     dataSnapshot,
     markets: {
-      total:   markets.length,
-      created: results.created.length,
-      skipped: results.skipped.length,
-      errors:  results.errors.length,
+      total:              markets.length,
+      created:            results.created.length,
+      skipped:            results.skipped.length,
+      rejected_by_rating: results.rejected_by_rating.length,
+      errors:             results.errors.length,
     },
     details: results,
   });
